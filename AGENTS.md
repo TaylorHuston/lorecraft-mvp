@@ -2,7 +2,11 @@
 
 - Production branch: `main`.
 - Integration branch: `develop`.
-- Short-lived work branches: branch from `develop` using descriptive prefixes such as `feature/`, `bug/`, or `task/`.
+- Short-lived work branches: branch from `develop` using one of these prefixes:
+  - `change/` for planned product, UX, architecture, or feature changes.
+  - `fix/` for defects, regressions, and broken behavior.
+  - `misc/` for chores, tooling, documentation-only work, and other low-risk maintenance.
+- Reserve `release/` or `hotfix/` branches for later if release management needs them; do not use them by default.
 - Merge completed work back into `develop` after review/verification.
 - Promote `develop` to `main` only for release or explicit closeout work.
 - Documentation-only changes may land directly on `develop`; documentation-only changes to `main` require explicit Taylor approval.
