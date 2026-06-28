@@ -17,6 +17,7 @@ In the MVP, that state is intentionally small:
 - Seeded world objects describe the baseline world.
 - Facts represent current durable truth.
 - Commands, narrations, and events reconstruct the visible play feed.
+- Turns group each persisted player intent with the Director work it caused.
 - State diffs record accepted mutations.
 - Director calls and local logs explain what happened during LLM/provider interactions.
 
@@ -61,17 +62,21 @@ Current synchronous flow:
 1. The player submits narrative input.
 2. The route validates the request and LLM configuration.
 3. The route loads bounded Director context from Convex.
-4. Convex records the player input.
-5. The backend builds a stateless provider request from current state plus recent feed.
-6. The provider returns strict JSON with `narration` and optional `npcUpdates`.
-7. The backend parses and validates the output.
-8. Convex records the Director call for debugging.
-9. On success, Convex stores the narration.
-10. Convex applies accepted NPC fact changes.
-11. Convex stores events and state diffs for accepted changes.
-12. The UI updates from Convex state.
+4. Convex creates a pending turn with the next world-scoped sequence number.
+5. Convex records the player input command and links it to the turn.
+6. The backend builds a stateless provider request from current state plus recent feed.
+7. The provider returns strict JSON with `narration` and optional `npcUpdates`.
+8. The backend parses and validates the output.
+9. Convex records the Director call for debugging and links it to the turn.
+10. On success, Convex stores the narration and marks the turn `succeeded`.
+11. Convex applies accepted NPC fact changes.
+12. Convex stores turn-linked events and state diffs for accepted changes.
+13. On provider or output failure after the turn exists, Convex keeps the command and Director call, marks the turn `failed`, and does not store fake narration or state changes.
+14. The UI updates from Convex state.
 
 The important bit is that the provider does not own continuity. The next turn starts from Convex again.
+
+Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid world ids, and missing required world state.
 
 ## NPC State Strategy
 
@@ -144,6 +149,8 @@ The visible play feed is reconstructed from persisted rows:
 
 Events are currently shown in the feed because they help us inspect whether the world is changing. If they become noisy, we can filter them later without changing what the canonical state is.
 
+Feed entries include `turnId` when they were caused by a narrative turn, but the player-facing stream should still read as a story rather than as rigid turn cards. Turn grouping belongs in backend/debug surfaces until the story UI needs it.
+
 ## Debug Strategy
 
 Debug records are intentionally separate from story state.
@@ -152,13 +159,23 @@ Debug records are intentionally separate from story state.
 
 These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world.
 
+The debug panel also exposes recent turn summaries: sequence number, status, player input, related narration/event/diff counts, and Director call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
+
 ## Reset Strategy
 
-The MVP has one editable world and a rough reset. Reset clears playtest history and debug records, then restores Mira's baseline `mood`, `status`, and `memory`.
+The MVP has one editable world and a rough reset. Reset clears scoped turns, playtest history, and debug records, then restores Mira's baseline `mood`, `status`, and `memory`.
 
 It does not delete the seeded world graph.
 
 Long term, reset is not the product model. The likely product model is independent story/play-session instances created from world templates, but that is intentionally deferred until the single-world persistence loop proves itself.
+
+## Rollback Strategy
+
+Rollback is deferred, but turn boundaries are the intended attachment point.
+
+The likely future implementation is snapshot-based: capture or derive a restorable world-state snapshot at a completed turn boundary, then restore the world to that snapshot. Current state diffs are useful audit records, but they are not sufficient rollback machinery because they do not capture all before-state and would become hard to invert safely as operations grow.
+
+This MVP does not add snapshot tables, reverse-diff logic, branching timelines, restore mutations, or rollback UI.
 
 ## When To Add More Structure
 
@@ -170,7 +187,8 @@ Likely future promotions:
 - `npcMemories` when one rolling `memory` fact cannot support long-running play.
 - `actorAppearance` when physical continuity, portrait generation, outfits, scars, or visibility rules need structure.
 - `npcBehaviorProfiles` when NPCs need autonomous goals, schedules, or behavior packages.
-- `turns` or `timeline` when feed grouping, replay, branching, streaming, or multiplayer ordering becomes hard.
+- `timeline` when scoped turns plus derived feed reconstruction are not enough for replay, branching, streaming, or multiplayer ordering.
+- `turnSnapshots` when rollback needs a concrete world-state restore point at a turn boundary.
 - `storyInstances` when play sessions need independent mutable copies of canonical worlds.
 
 The bias should stay simple: add structure when flexible facts fail, not when a cleaner architecture can be imagined.

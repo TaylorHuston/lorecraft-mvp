@@ -141,6 +141,7 @@ export async function POST(request: Request) {
     const providerError = normalizeProviderError(error);
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
+      turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
       model: configResult.config.model,
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
       event: "director.turn.provider_error",
       stage: "provider_request",
       worldId,
+      turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
       model: configResult.config.model,
@@ -177,6 +179,7 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
+      turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
       model: configResult.config.model,
@@ -191,6 +194,7 @@ export async function POST(request: Request) {
       event: "director.turn.invalid_output",
       stage: "parse_director_output",
       worldId,
+      turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
       model: configResult.config.model,
@@ -212,6 +216,7 @@ export async function POST(request: Request) {
   const validated = validateNpcUpdates(parsed.output.npcUpdates, context.actors);
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
+    turnId: recorded.turnId,
     commandId: recorded.commandId,
     provider,
     model: configResult.config.model,
@@ -227,6 +232,7 @@ export async function POST(request: Request) {
     event: "director.turn.completed",
     stage: "complete_director_turn",
     worldId,
+    turnId: recorded.turnId,
     commandId: recorded.commandId,
     provider,
     model: configResult.config.model,

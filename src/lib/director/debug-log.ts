@@ -7,6 +7,7 @@ export type DirectorDebugLogEntry = {
   event: string;
   stage: string;
   worldId?: string;
+  turnId?: string;
   commandId?: string;
   provider?: string;
   model?: string;
@@ -67,6 +68,7 @@ export function buildDirectorDebugLogRecord(
     event: entry.event,
     stage: entry.stage,
     worldId: entry.worldId,
+    turnId: entry.turnId,
     commandId: entry.commandId,
     provider: entry.provider,
     model: entry.model,

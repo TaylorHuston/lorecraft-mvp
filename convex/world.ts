@@ -22,6 +22,7 @@ const directorStatus = v.union(
   v.literal("provider_error"),
   v.literal("invalid_output"),
 );
+const turnStatus = v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed"));
 const npcFactKey = v.union(v.literal("mood"), v.literal("status"), v.literal("memory"));
 const acceptedNpcUpdate = v.object({
   actorKey: v.string(),
@@ -348,6 +349,7 @@ const feedEntry = v.object({
   text: v.string(),
   source: v.string(),
   createdAt: v.number(),
+  turnId: v.optional(v.id("turns")),
   commandId: v.optional(v.id("commands")),
 });
 
@@ -413,14 +415,33 @@ export const getSnapshot = query({
       diffs: v.array(
         v.object({
           _id: v.id("stateDiffs"),
+          turnId: v.optional(v.id("turns")),
           source: v.string(),
           operations: v.array(v.any()),
+        }),
+      ),
+      turns: v.array(
+        v.object({
+          _id: v.id("turns"),
+          _creationTime: v.number(),
+          sequenceNumber: v.number(),
+          actorId: v.id("actors"),
+          commandId: v.optional(v.id("commands")),
+          status: turnStatus,
+          error: v.optional(v.string()),
+          completedAt: v.optional(v.number()),
+          playerInput: v.optional(v.string()),
+          narrationCount: v.number(),
+          eventCount: v.number(),
+          stateDiffCount: v.number(),
+          directorCallStatus: v.optional(directorStatus),
         }),
       ),
       directorCalls: v.array(
         v.object({
           _id: v.id("directorCalls"),
           _creationTime: v.number(),
+          turnId: v.optional(v.id("turns")),
           commandId: v.optional(v.id("commands")),
           provider: v.string(),
           model: v.string(),
@@ -442,7 +463,7 @@ export const getSnapshot = query({
     }
 
     const { world, player, room } = loaded;
-    const [exits, actors, objects, facts, events, narrations, diffs, directorCalls, feed] =
+    const [exits, actors, objects, facts, events, narrations, diffs, directorCalls, turns, feed] =
       await Promise.all([
         loadVisibleExits(ctx, args.worldId, room._id),
         ctx.db
@@ -482,6 +503,7 @@ export const getSnapshot = query({
           .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
           .order("desc")
           .take(10),
+        loadTurnSummaries(ctx, args.worldId, 12),
         loadFeed(ctx, args.worldId, 60),
       ]);
 
@@ -540,12 +562,15 @@ export const getSnapshot = query({
       })),
       diffs: diffs.map((diff) => ({
         _id: diff._id,
+        ...(diff.turnId ? { turnId: diff.turnId } : {}),
         source: diff.source,
         operations: diff.operations,
       })),
+      turns,
       directorCalls: directorCalls.map((call) => ({
         _id: call._id,
         _creationTime: call._creationTime,
+        ...(call.turnId ? { turnId: call.turnId } : {}),
         provider: call.provider,
         model: call.model,
         requestSummary: call.requestSummary,
@@ -671,7 +696,12 @@ export const getDirectorContext = query({
 export const recordPlayerInput = mutation({
   args: { worldId: v.id("worlds"), input: v.string() },
   returns: v.union(
-    v.object({ ok: v.literal(true), commandId: v.id("commands") }),
+    v.object({
+      ok: v.literal(true),
+      turnId: v.id("turns"),
+      commandId: v.id("commands"),
+      sequenceNumber: v.number(),
+    }),
     v.object({ ok: v.literal(false), error: v.string() }),
   ),
   handler: async (ctx, args) => {
@@ -695,20 +725,37 @@ export const recordPlayerInput = mutation({
       return { ok: false as const, error: "The current room could not be loaded." };
     }
 
+    const previousTurn = await ctx.db
+      .query("turns")
+      .withIndex("by_worldId_and_sequenceNumber", (q) => q.eq("worldId", args.worldId))
+      .order("desc")
+      .take(1);
+    const sequenceNumber = (previousTurn[0]?.sequenceNumber ?? 0) + 1;
+    const turnId = await ctx.db.insert("turns", {
+      worldId: args.worldId,
+      sequenceNumber,
+      actorId: player._id,
+      status: "pending",
+    });
+
     const commandId = await ctx.db.insert("commands", {
       worldId: args.worldId,
+      turnId,
       actorId: player._id,
       input,
       normalizedInput: normalized(input),
     });
 
-    return { ok: true as const, commandId };
+    await ctx.db.patch(turnId, { commandId });
+
+    return { ok: true as const, turnId, commandId, sequenceNumber };
   },
 });
 
 export const completeDirectorTurn = mutation({
   args: {
     worldId: v.id("worlds"),
+    turnId: v.id("turns"),
     commandId: v.id("commands"),
     provider: v.string(),
     model: v.string(),
@@ -727,8 +774,14 @@ export const completeDirectorTurn = mutation({
     changedFacts: v.number(),
   }),
   handler: async (ctx, args) => {
+    const turn = await ctx.db.get(args.turnId);
+    if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
+      throw new Error("Turn, world, and command do not match.");
+    }
+
     const directorCall = {
       worldId: args.worldId,
+      turnId: args.turnId,
       commandId: args.commandId,
       provider: args.provider,
       model: args.model,
@@ -743,11 +796,17 @@ export const completeDirectorTurn = mutation({
     const directorCallId = await ctx.db.insert("directorCalls", directorCall);
 
     if (args.status !== "success" || !args.narration?.trim()) {
+      await ctx.db.patch(args.turnId, {
+        status: "failed",
+        ...(args.error !== undefined ? { error: args.error } : {}),
+        completedAt: Date.now(),
+      });
       return { directorCallId, changedFacts: 0 };
     }
 
     const narrationId = await ctx.db.insert("narrations", {
       worldId: args.worldId,
+      turnId: args.turnId,
       commandId: args.commandId,
       text: args.narration.trim(),
       source: "llm",
@@ -790,6 +849,7 @@ export const completeDirectorTurn = mutation({
       const eventText = `${update.actorName}'s state changed after the exchange.`;
       await ctx.db.insert("events", {
         worldId: args.worldId,
+        turnId: args.turnId,
         commandId: args.commandId,
         text: eventText,
         source: "llm",
@@ -800,11 +860,14 @@ export const completeDirectorTurn = mutation({
     if (operations.length > 0) {
       await ctx.db.insert("stateDiffs", {
         worldId: args.worldId,
+        turnId: args.turnId,
         commandId: args.commandId,
         source: "llm",
         operations,
       });
     }
+
+    await ctx.db.patch(args.turnId, { status: "succeeded", completedAt: Date.now() });
 
     return { directorCallId, narrationId, changedFacts };
   },
@@ -813,6 +876,7 @@ export const completeDirectorTurn = mutation({
 export const resetPlaytestWorld = mutation({
   args: { worldId: v.id("worlds") },
   returns: v.object({
+    deletedTurns: v.number(),
     deletedCommands: v.number(),
     deletedNarrations: v.number(),
     deletedEvents: v.number(),
@@ -826,6 +890,7 @@ export const resetPlaytestWorld = mutation({
     const deletedStateDiffs = await deleteStateDiffs(ctx, args.worldId);
     const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.worldId);
     const deletedCommands = await deleteCommands(ctx, args.worldId);
+    const deletedTurns = await deleteTurns(ctx, args.worldId);
 
     const mira = await findActorByKeyOrName(ctx, args.worldId, MIRA_KEY, "Mira");
     let restoredFacts = 0;
@@ -848,6 +913,7 @@ export const resetPlaytestWorld = mutation({
     }
 
     return {
+      deletedTurns,
       deletedCommands,
       deletedNarrations,
       deletedEvents,
@@ -923,6 +989,7 @@ async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
       text: command.input,
       source: "player",
       createdAt: command._creationTime,
+      ...(command.turnId ? { turnId: command.turnId } : {}),
       commandId: command._id,
     })),
     ...narrations.map((narration) => ({
@@ -931,6 +998,7 @@ async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
       text: narration.text,
       source: narration.source,
       createdAt: narration._creationTime,
+      ...(narration.turnId ? { turnId: narration.turnId } : {}),
       ...(narration.commandId ? { commandId: narration.commandId } : {}),
     })),
     ...events.map((event) => ({
@@ -939,9 +1007,59 @@ async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
       text: event.text,
       source: event.source,
       createdAt: event._creationTime,
+      ...(event.turnId ? { turnId: event.turnId } : {}),
       ...(event.commandId ? { commandId: event.commandId } : {}),
     })),
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+}
+
+async function loadTurnSummaries(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
+  const turns = await ctx.db
+    .query("turns")
+    .withIndex("by_worldId_and_sequenceNumber", (q) => q.eq("worldId", worldId))
+    .order("desc")
+    .take(limit);
+
+  return await Promise.all(
+    turns.map(async (turn) => {
+      const [command, narrations, events, stateDiffs, directorCalls] = await Promise.all([
+        turn.commandId ? ctx.db.get(turn.commandId) : Promise.resolve(null),
+        ctx.db
+          .query("narrations")
+          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .take(20),
+        ctx.db
+          .query("events")
+          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .take(20),
+        ctx.db
+          .query("stateDiffs")
+          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .take(20),
+        ctx.db
+          .query("directorCalls")
+          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .order("desc")
+          .take(1),
+      ]);
+
+      return {
+        _id: turn._id,
+        _creationTime: turn._creationTime,
+        sequenceNumber: turn.sequenceNumber,
+        actorId: turn.actorId,
+        status: turn.status,
+        narrationCount: narrations.length,
+        eventCount: events.length,
+        stateDiffCount: stateDiffs.length,
+        ...(turn.commandId ? { commandId: turn.commandId } : {}),
+        ...(turn.error !== undefined ? { error: turn.error } : {}),
+        ...(turn.completedAt !== undefined ? { completedAt: turn.completedAt } : {}),
+        ...(command ? { playerInput: command.input } : {}),
+        ...(directorCalls[0] ? { directorCallStatus: directorCalls[0].status } : {}),
+      };
+    }),
+  );
 }
 
 async function deleteCommands(ctx: MutationCtx, worldId: Id<"worlds">) {
@@ -991,6 +1109,17 @@ async function deleteStateDiffs(ctx: MutationCtx, worldId: Id<"worlds">) {
 async function deleteDirectorCalls(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("directorCalls")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(500);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteTurns(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("turns")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
     .take(500);
   for (const row of rows) {

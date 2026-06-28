@@ -152,6 +152,7 @@ A command records player input. The name is historical; current MVP inputs are n
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
+| `turnId` | Optional scoped turn that owns this player input. Seed/legacy rows may omit it. |
 | `actorId` | Actor who submitted the input. |
 | `input` | Original trimmed player text. |
 | `normalizedInput` | Lowercase normalized text for simple matching/debugging. |
@@ -159,8 +160,33 @@ A command records player input. The name is historical; current MVP inputs are n
 Strategy:
 
 - Record input before calling the provider.
-- Use the command row as the turn anchor for narrations, events, state diffs, and Director calls.
+- Use `turnId` as the durable grouping boundary for narrations, events, state diffs, and Director calls.
+- Keep `commandId` on child rows as a direct link back to the player text.
 - Do not treat player input as interpreted truth until the backend records accepted state.
+
+## Turn
+
+Table: `turns`
+
+A turn is one persisted narrative exchange: one player intent plus the backend work caused by that intent.
+
+| Field | Meaning |
+|---|---|
+| `worldId` | Owning world. |
+| `sequenceNumber` | World-scoped ordering number assigned when the player input becomes persisted history. |
+| `actorId` | Actor who initiated the turn. |
+| `commandId` | Optional player input row for the turn. It is patched after the command is created. |
+| `status` | Lifecycle state: `pending`, `succeeded`, or `failed`. |
+| `error` | Optional failure message when provider or output handling fails after the turn exists. |
+| `completedAt` | Optional timestamp set when the turn reaches a terminal state. |
+
+Strategy:
+
+- Turns are the canonical grouping layer for narrative play.
+- A turn is created only after the request is valid enough to become persisted game history.
+- Failed provider/output attempts remain as failed turns with linked command and Director call records.
+- Malformed request bodies, missing LLM configuration, invalid world ids, and missing world state are rejected before a turn exists.
+- Future rollback should attach snapshots to turn boundaries, but snapshots and restore behavior are deferred.
 
 ## Narration
 
@@ -171,6 +197,7 @@ A narration is player-facing prose from the engine or Director.
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
+| `turnId` | Optional scoped turn that caused this narration. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input that caused this narration. |
 | `text` | Player-facing prose. |
 | `source` | `seed`, `engine`, or `llm`. |
@@ -190,6 +217,7 @@ An event is a concise statement that something happened.
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
+| `turnId` | Optional scoped turn that caused this event. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the event. |
 | `text` | Concise event text. |
 | `source` | `seed`, `player`, `engine`, `llm`, or `manual`. |
@@ -209,6 +237,7 @@ A state diff records accepted mutations for a turn.
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
+| `turnId` | Optional scoped turn that accepted this diff. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the diff. |
 | `source` | `player`, `engine`, `llm`, or `manual`. |
 | `operations` | List of accepted mutation operations. |
@@ -224,6 +253,7 @@ Current operation types:
 Strategy:
 
 - State diffs are the audit trail for accepted state changes.
+- Diffs are not rollback by themselves; future rollback should use snapshots attached to turn boundaries.
 - Add operation types only when the backend can validate and apply them consistently.
 
 ## Director Call
@@ -235,6 +265,7 @@ A Director call records provider interaction and validation results.
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
+| `turnId` | Optional scoped turn that owns this provider/debug record. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the call. |
 | `provider` | Provider host/name derived from configuration. |
 | `model` | Configured model string. |
@@ -263,11 +294,12 @@ There is no `feedEntries` table. Feed entries are derived by combining commands,
 | `text` | Text to display. |
 | `source` | Source label from the underlying row. |
 | `createdAt` | Creation time from the underlying row. |
-| `commandId` | Optional turn anchor. |
+| `turnId` | Optional scoped turn that caused the entry. |
+| `commandId` | Optional direct player-input link. |
 
 Strategy:
 
-- Keep feed derived until grouping, editing, branching, streaming, or multiplayer ordering requires a timeline table.
+- Keep feed derived until editing, branching, streaming, or multiplayer ordering requires a timeline table.
 - Use stable derived IDs as React keys.
 
 ## Local Debug Log
@@ -283,6 +315,7 @@ The local debug log is not a Convex table. It is opt-in diagnostic output for lo
 | Request summary | Compact context summary. |
 | Outcome/error | Success, validation failure, provider failure, or route error. |
 | Counts/timings | Accepted update count, ignored update count, response metadata, and timing data. |
+| IDs | World, turn, and command ids when the route has persisted them. |
 
 Strategy:
 
@@ -300,7 +333,8 @@ These are likely future objects, but they are not part of the current canonical 
 | `NpcMemory` | When one rolling `memory` fact cannot support long-running play. |
 | `ActorAppearance` | When physical continuity, portraits, injuries, outfits, or hidden/visible traits need structure. |
 | `NpcBehaviorProfile` | When NPCs need autonomous goals, schedules, instincts, or behavior packages. |
-| `Turn` / `TimelineEntry` | When derived feed reconstruction is not enough for grouping, replay, branching, streaming, or multiplayer ordering. |
+| `TimelineEntry` | When derived feed reconstruction plus scoped turns is not enough for replay, branching, streaming, or multiplayer ordering. |
+| `TurnSnapshot` | When rollback needs a concrete world-state restore point at a turn boundary. |
 | `StoryInstance` | When players need independent mutable copies of canonical world templates. |
 
 Do not add these until the current model hits a concrete playtest or implementation failure.

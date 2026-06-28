@@ -81,13 +81,29 @@ export default defineSchema({
 
   commands: defineTable({
     worldId: v.id("worlds"),
+    turnId: v.optional(v.id("turns")),
     actorId: v.id("actors"),
     input: v.string(),
     normalizedInput: v.string(),
-  }).index("by_worldId", ["worldId"]),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_turnId", ["worldId", "turnId"]),
+
+  turns: defineTable({
+    worldId: v.id("worlds"),
+    sequenceNumber: v.number(),
+    actorId: v.id("actors"),
+    commandId: v.optional(v.id("commands")),
+    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    error: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_sequenceNumber", ["worldId", "sequenceNumber"]),
 
   events: defineTable({
     worldId: v.id("worlds"),
+    turnId: v.optional(v.id("turns")),
     commandId: v.optional(v.id("commands")),
     text: v.string(),
     source: v.union(
@@ -97,10 +113,13 @@ export default defineSchema({
       v.literal("llm"),
       v.literal("manual"),
     ),
-  }).index("by_worldId", ["worldId"]),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_turnId", ["worldId", "turnId"]),
 
   stateDiffs: defineTable({
     worldId: v.id("worlds"),
+    turnId: v.optional(v.id("turns")),
     commandId: v.optional(v.id("commands")),
     source: v.union(v.literal("player"), v.literal("engine"), v.literal("llm"), v.literal("manual")),
     operations: v.array(
@@ -123,17 +142,23 @@ export default defineSchema({
         }),
       ),
     ),
-  }).index("by_worldId", ["worldId"]),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_turnId", ["worldId", "turnId"]),
 
   narrations: defineTable({
     worldId: v.id("worlds"),
+    turnId: v.optional(v.id("turns")),
     commandId: v.optional(v.id("commands")),
     text: v.string(),
     source: v.union(v.literal("seed"), v.literal("engine"), v.literal("llm")),
-  }).index("by_worldId", ["worldId"]),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_turnId", ["worldId", "turnId"]),
 
   directorCalls: defineTable({
     worldId: v.id("worlds"),
+    turnId: v.optional(v.id("turns")),
     commandId: v.optional(v.id("commands")),
     provider: v.string(),
     model: v.string(),
@@ -148,5 +173,7 @@ export default defineSchema({
     acceptedUpdates: v.array(v.any()),
     ignoredUpdates: v.array(v.any()),
     error: v.optional(v.string()),
-  }).index("by_worldId", ["worldId"]),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_worldId_and_turnId", ["worldId", "turnId"]),
 });

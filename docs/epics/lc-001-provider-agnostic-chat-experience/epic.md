@@ -476,3 +476,97 @@ The system SHALL keep empty, pending, and error states understandable without re
 ### Verification Gaps
 
 - Live empty-feed browser verification was not run because it would require clearing the current local playtest feed with rough reset. The empty-feed branch is implemented in `src/app/world-client.tsx` and remains a focused manual check before acceptance.
+
+## Story LC-001-S6: Scoped Narrative Turns
+
+As a developer-playtester, I want each narrative exchange to be stored as a scoped turn, so that story history, debug records, and future rollback boundaries have one durable unit of progression.
+
+### Requirement R1: Turn Lifecycle
+
+The system SHALL create a durable turn for each persisted narrative player intent.
+
+#### Scenario R1-S1: Successful narrative turn
+
+- WHEN the player submits valid narrative input for a seeded world
+- THEN the backend creates a turn with a world-scoped sequence number
+- AND the turn links the player input, Director call, narration, accepted state diffs, and events caused by that input
+- AND the turn ends with a succeeded status after persistence completes
+
+#### Scenario R1-S2: Provider or output failure after turn creation
+
+- WHEN a turn is created and the provider call fails or returns invalid output
+- THEN the turn remains persisted with a failed status
+- AND the related command and Director call remain linked to the turn for debug inspection
+- AND no fake narration or unaccepted state change is stored
+
+#### Scenario R1-S3: Request rejected before persistence
+
+- WHEN a request is malformed, missing required configuration, or references an invalid world before game persistence starts
+- THEN no turn is created
+- AND the route returns the existing structured setup or validation error
+
+### Requirement R2: Turn-Scoped Feed And Debug Records
+
+The system SHALL expose turn scope in persisted history without making the player-facing story stream more complicated.
+
+#### Scenario R2-S1: Feed entries carry turn scope
+
+- WHEN the UI loads a persisted story feed
+- THEN entries caused by a player input include the same `turnId`
+- AND the visible story stream remains ordered by persisted creation time or turn sequence
+
+#### Scenario R2-S2: Debug panel can inspect turn grouping
+
+- WHEN a playtester opens the debug panel
+- THEN recent turns show sequence, status, player input, related narration/event/diff counts, and related Director call status
+- AND failed turns can be distinguished from successful turns after reload
+
+#### Scenario R2-S3: Seed rows remain outside player turns
+
+- WHEN the world is seeded
+- THEN seed narration and seed events may remain unscoped
+- AND narrative turns still begin with the first persisted player intent
+
+### Requirement R3: Reset And Future Rollback Boundary
+
+The system SHALL keep turn persistence compatible with rough reset now and snapshot/rollback later.
+
+#### Scenario R3-S1: Rough reset clears turn history
+
+- WHEN the existing rough reset is invoked
+- THEN persisted turns and turn-linked history for the playtest world are cleared with commands, narrations, events, state diffs, and Director calls
+- AND seeded world graph rows and baseline facts are restored as they are today
+
+#### Scenario R3-S2: State diffs remain tied to one turn
+
+- WHEN accepted mutations are recorded
+- THEN each state diff belongs to the turn that accepted those mutations
+- AND the diff remains an audit record rather than a rollback implementation by itself
+
+#### Scenario R3-S3: Snapshot rollback remains deferred
+
+- WHEN the data model is documented
+- THEN it states that future rollback should attach snapshots to turn boundaries
+- AND this change does not add snapshot capture, reverse-diff logic, branching, or restore behavior
+
+### Implemented By
+
+- `convex/schema.ts` defines `turns` plus optional `turnId` links on commands, narrations, events, state diffs, and Director calls.
+- `convex/world.ts` creates pending turns with world-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during rough reset.
+- `src/app/api/director/turn/route.ts` passes `turnId` through successful, provider-error, and invalid-output Director completion paths while leaving pre-persistence request/config/world-load failures unpersisted.
+- `src/lib/director/debug-log.ts` includes optional `turnId` in local JSONL debug records.
+- `src/app/world-client.tsx` shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel without changing the story stream into turn cards.
+- `docs/data-model.md` and `docs/persistence-system.md` document scoped turns and defer snapshot rollback.
+
+### Verified By
+
+- `npm run test` passed, including turn-scoped feed metadata being omitted from the Director prompt and local debug log records retaining `turnId`.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `npx convex codegen` passed, including schema/function validation and generated TypeScript bindings.
+- `curl -I --max-time 5 http://localhost:3000` returned `HTTP/1.1 200 OK` from the existing dev server.
+
+### Verification Gaps
+
+- `npm run convex:once` could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
+- Runtime playtest verification of successful and failed turns in the browser remains pending.

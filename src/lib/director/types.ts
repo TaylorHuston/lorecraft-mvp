@@ -10,6 +10,8 @@ export type DirectorFeedEntry = {
   text: string;
   source: string;
   createdAt: number;
+  turnId?: string;
+  commandId?: string;
 };
 
 export type DirectorActor = {

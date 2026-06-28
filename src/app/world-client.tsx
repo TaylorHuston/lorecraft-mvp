@@ -60,7 +60,7 @@ export function WorldClient() {
     try {
       const result = await resetPlaytestWorld({ worldId });
       setNotice(
-        `Reset playtest state: cleared ${result.deletedCommands} player turns and restored ${result.restoredFacts} Mira facts.`,
+        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, and restored ${result.restoredFacts} Mira facts.`,
       );
     } catch (resetError) {
       setError(errorMessage(resetError));
@@ -252,6 +252,7 @@ export function WorldClient() {
                 title="NPC state changes"
                 items={directorUpdateItems(snapshot.directorCalls)}
               />
+              <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
               <DebugList
                 title="Events"
                 items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
@@ -262,6 +263,7 @@ export function WorldClient() {
                   (narration) => `${narration.text} (${narration.source})`,
                 )}
               />
+              <DebugJson title="Turns" value={snapshot.turns} />
               <DebugJson title="Director calls" value={snapshot.directorCalls} />
               <DebugJson title="State diffs" value={snapshot.diffs} />
             </div>
@@ -357,6 +359,33 @@ function directorUpdateItems(directorCalls: unknown[]) {
       return changes ? [`${actorName}: ${changes}.${reason}`] : [];
     });
   });
+}
+
+function turnSummaryItems(turns: unknown[]) {
+  return turns.flatMap((turn) => {
+    if (!isRecord(turn)) {
+      return [];
+    }
+
+    const sequenceNumber =
+      typeof turn.sequenceNumber === "number" ? `#${turn.sequenceNumber}` : "Unsequenced";
+    const status = typeof turn.status === "string" ? turn.status : "unknown";
+    const input = typeof turn.playerInput === "string" ? ` - ${turn.playerInput}` : "";
+    const counts = [
+      countLabel(turn.narrationCount, "narration"),
+      countLabel(turn.eventCount, "event"),
+      countLabel(turn.stateDiffCount, "diff"),
+    ].join(", ");
+    const directorStatus =
+      typeof turn.directorCallStatus === "string" ? `; Director: ${turn.directorCallStatus}` : "";
+
+    return [`Turn ${sequenceNumber}: ${status}${input} (${counts}${directorStatus})`];
+  });
+}
+
+function countLabel(value: unknown, label: string) {
+  const count = typeof value === "number" ? value : 0;
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

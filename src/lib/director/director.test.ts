@@ -57,6 +57,8 @@ const context: DirectorContext = {
     text: `feed entry ${index}`,
     source: index % 2 === 0 ? "player" : "llm",
     createdAt: index,
+    turnId: `turn-${index}`,
+    commandId: `command-${index}`,
   })),
 };
 
@@ -77,6 +79,8 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain("I ask Mira about the storm.");
     expect(userMessage?.content).toContain("feed entry 14");
     expect(userMessage?.content).not.toContain("feed entry 0");
+    expect(userMessage?.content).not.toContain("turn-14");
+    expect(userMessage?.content).not.toContain("command-14");
     expect(userMessage?.content).not.toContain("outputShape");
     expect(systemMessage?.content).toContain(
       "The status field is stable ongoing circumstance, not moment-to-moment physical action.",
@@ -263,6 +267,7 @@ describe("Director debug logging", () => {
       {
         event: "director.turn.invalid_output",
         stage: "parse_director_output",
+        turnId: "turn-id",
         provider: "localhost:11434",
         model: "llama3.1:8b",
         rawResponse: '{"narration":"Hello."}',
@@ -278,6 +283,7 @@ describe("Director debug logging", () => {
       ts: "2026-06-27T19:30:00.000Z",
       event: "director.turn.invalid_output",
       rawResponseLength: 22,
+      turnId: "turn-id",
     });
     expect(record).not.toHaveProperty("rawResponse");
   });
