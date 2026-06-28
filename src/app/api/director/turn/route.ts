@@ -3,7 +3,11 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { writeDirectorDebugLog } from "@/lib/director/debug-log";
 import { buildDirectorRequest } from "@/lib/director/prompt";
-import { parseDirectorOutput, validateNpcUpdates } from "@/lib/director/output";
+import {
+  applySceneBeatPersistenceBoundary,
+  parseDirectorOutput,
+  validateNpcUpdates,
+} from "@/lib/director/output";
 import {
   ProviderError,
   readLlmConfig,
@@ -215,7 +219,10 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: parsed.error }, 422);
   }
 
-  const validated = validateNpcUpdates(parsed.output.npcUpdates, context.actors);
+  const validated = applySceneBeatPersistenceBoundary(
+    validateNpcUpdates(parsed.output.npcUpdates, context.actors),
+    directorRequest.requestSummary.requiredSceneBeat,
+  );
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
     turnId: recorded.turnId,

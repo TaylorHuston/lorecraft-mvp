@@ -128,6 +128,7 @@ export function buildDirectorRequest(
           ? { targetActorKey: requiredSceneBeat.targetActorKey }
           : {}),
         expectsNpcResponse: requiredSceneBeat.expectsNpcResponse,
+        allowsNpcUpdates: requiredSceneBeat.allowsNpcUpdates,
       },
       promptComponentKeys: Object.keys(scenePayload.promptComponents),
       ...(options.generationSettings ? { generationSettings: options.generationSettings } : {}),
@@ -150,6 +151,7 @@ export function deriveRequiredSceneBeat(
       targetActorKey: target.key,
       targetActorName: target.name,
       expectsNpcResponse: true,
+      allowsNpcUpdates: true,
       instruction: `${target.name} is directly addressed with a question. The narration must include a completed meaningful response or choice from ${target.name}: quoted or clearly attributed speech, an answer, refusal, deflection, warning, lie, counter-question, action, or visibly intentional silence. Do not stop at setup like '${target.name} pauses before speaking.' Facial expression alone does not satisfy this beat.`,
     };
   }
@@ -160,6 +162,7 @@ export function deriveRequiredSceneBeat(
       targetActorKey: target.key,
       targetActorName: target.name,
       expectsNpcResponse: false,
+      allowsNpcUpdates: true,
       instruction: `${target.name} is directly engaged. Let ${target.name} make an observable choice when it matters, but do not force a spoken line if the action does not call for one.`,
     };
   }
@@ -168,14 +171,26 @@ export function deriveRequiredSceneBeat(
     return {
       kind: "scene_question",
       expectsNpcResponse: false,
+      allowsNpcUpdates: true,
       instruction:
         "The player asks a question, but no present NPC is clearly addressed. Answer through scene narration unless an NPC response naturally follows from context.",
+    };
+  }
+
+  if (isTrivialPhysicalAction(normalizedInput)) {
+    return {
+      kind: "trivial_player_action",
+      expectsNpcResponse: false,
+      allowsNpcUpdates: false,
+      instruction:
+        "The player performs a trivial physical action. Narrate the immediate beat and observable reactions, but return npcUpdates as an empty array.",
     };
   }
 
   return {
     kind: "player_action",
     expectsNpcResponse: false,
+    allowsNpcUpdates: true,
     instruction:
       "The player performs or describes the current action. Narrate this action's immediate consequences and observable reactions, but do not continue a previous dialogue beat, force NPC speech, or create durable fact changes for trivial physical actions.",
   };
@@ -220,6 +235,12 @@ function isQuestionLike(normalizedInput: string) {
     /\b(ask|question|what|why|how|where|when|who|which|do you|did you|can you|will you|are you|is there|tell me)\b/.test(
       normalizedInput,
     )
+  );
+}
+
+function isTrivialPhysicalAction(normalizedInput: string) {
+  return /^(i )?(jump|smile|nod|shrug|wave|laugh|clap|look around|glance around|stretch|sit|stand)\.?$/.test(
+    normalizedInput,
   );
 }
 

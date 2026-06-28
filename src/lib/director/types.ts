@@ -73,6 +73,7 @@ export type DirectorRequestSummary = {
     kind: SceneBeatKind;
     targetActorKey?: string;
     expectsNpcResponse: boolean;
+    allowsNpcUpdates: boolean;
   };
   promptComponentKeys: string[];
   generationSettings?: DirectorGenerationSettingsSummary;
@@ -87,6 +88,7 @@ export type SceneBeatKind =
   | "direct_npc_question"
   | "direct_npc_address"
   | "scene_question"
+  | "trivial_player_action"
   | "player_action";
 
 export type RequiredSceneBeat = {
@@ -94,6 +96,7 @@ export type RequiredSceneBeat = {
   targetActorKey?: string;
   targetActorName?: string;
   expectsNpcResponse: boolean;
+  allowsNpcUpdates: boolean;
   instruction: string;
 };
 

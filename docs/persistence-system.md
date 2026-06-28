@@ -162,7 +162,7 @@ Director requests are still stateless, but the prompt is no longer one flat payl
 - Player input, which is the current narrative intent.
 - Required scene beat, which is deterministic engine guidance derived from player input and present actors.
 
-The first required scene-beat rule is deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice. Plain non-dialogue actions should not force speech or fact churn.
+The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech or durable fact churn. The backend enforces that second boundary after normal NPC update validation.
 
 ## Feed Strategy
 

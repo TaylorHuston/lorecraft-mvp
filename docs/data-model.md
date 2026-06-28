@@ -316,6 +316,7 @@ Strategy:
 - Prompt context is diagnostic/request state, not canonical world state.
 - Generation settings are developer configuration and are summarized in Director call debug metadata.
 - Required scene beats should stay narrow until playtesting proves broader automation is needed.
+- Trivial physical actions such as `I jump.` derive a `trivial_player_action` scene beat that disallows durable NPC updates for that turn; passing reactions stay in narration/debug instead.
 
 ## Derived Feed Entry
 

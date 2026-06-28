@@ -676,21 +676,23 @@ The system SHALL let developers tune supported provider generation settings with
 
 ### Implemented By
 
-- `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
+- `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
 - `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
 - `src/app/api/director/turn/route.ts` passes effective generation settings into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them.
-- `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, so read-only knowledge facts are ignored as attempted mutations.
+- `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes.
 - `src/lib/director/director.test.ts` covers prompt component structure, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, and provider generation settings.
+- `scripts/director-playtest.mjs` runs the repeatable local Director playtest against a running dev server.
 
 ### Verified By
 
-- `npm run test` passed, including prompt component structure, hidden read-only knowledge inclusion, direct-question scene-beat derivation, plain-action scene-beat derivation, read-only fact rejection, and generation setting request bodies.
+- `npm run test` passed, including prompt component structure, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, and generation setting request bodies.
 - `npm run ci:required` passed after the initial implementation.
 - `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
 - Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."
 - Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced no accepted durable updates for "I jump."
 - Local Convex snapshot showed `directorCalls.requestSummary` includes `promptComponentKeys`, `readOnlyKnowledgeKeys`, `requiredSceneBeat`, and `generationSettings`.
 - Final `npm run ci:required` passed after documentation and prompt refinements.
+- `npm run playtest:director` passed against local Convex/Next/Ollama after the script caught and the implementation fixed accepted Mira mood churn for "I jump."
 
 ### Verification Gaps
 

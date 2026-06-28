@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Current state: implementation complete, ready for `/th-review`
-- Last completed action: final `npm run ci:required` passed after code, docs, Epic, and changelog reconciliation
+- Last completed action: follow-up script and trivial-action persistence boundary verified with `npm run playtest:director`, `npm run ci:required`, and `npx convex codegen`
 - Next action: run `/th-review` as the local PR gate
 - Active branch/ref: `change/active-director-guidance` from `develop`
 - Expected dirty files: `docs/changes/2026-06-27-active-director-guidance/`
@@ -61,6 +61,8 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-28 | Discovery | main with `th-apply`; specialist routing checked, no delegation for small cohesive slice | Epic, Director modules, persistence docs, Next route-handler docs, Convex AI guidance | Scope/artifacts agree; chose conservative MVP defaults: env knobs are `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`; required scene beat is debug-visible in `requestSummary`; hidden knowledge includes current-scene actor facts outside mutable NPC keys as read-only context | working tree |
 | 2026-06-28 | `LC-001-S7` R1-R6 implementation | main; subagents skipped because current tool policy requires explicit user request for delegation | `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `convex/world.ts`, README/docs/Epic/changelog | Added prompt components, current-turn-first scene beats, hidden read-only NPC knowledge, stronger active NPC guidance, OpenAI-compatible generation settings, and richer Mira storm knowledge seed | working tree |
 | 2026-06-28 | Prompt refinement from live playtest | main | `src/lib/director/prompt.ts`, `src/lib/director/director.test.ts` | Tightened direct-question guidance after local model initially stopped before Mira's answer and tightened trivial-action guidance after it continued a prior question | working tree |
+| 2026-06-28 | Repeatable playtest script | main | `scripts/director-playtest.mjs`, `package.json`, README | Added a local smoke script that seeds/resets Convex, sends the direct-question and plain-action turns, and verifies response/debug metadata | working tree |
+| 2026-06-28 | Trivial-action persistence boundary | main | `src/lib/director/prompt.ts`, `src/lib/director/output.ts`, `src/app/api/director/turn/route.ts`, tests, script | Script exposed accepted Mira mood churn for `I jump`; added a deterministic `trivial_player_action` scene beat and post-validation boundary that ignores durable NPC updates for those actions | working tree |
 
 ## Verification Ledger
 
@@ -69,11 +71,16 @@ Record proof as it happens.
 | Date | Check | What It Proves | Result |
 |---|---|---|---|
 | 2026-06-27 | Artifact self-check | Proposal, design, and tasks exist and identify Epic action plus changelog impact | Passed |
-| 2026-06-28 | `npm run test` | Focused Director tests cover prompt components, hidden knowledge, scene beats, read-only fact rejection, and generation settings | Passed |
+| 2026-06-28 | `npm run test` | Focused Director tests cover prompt components, hidden knowledge, scene beats, read-only fact rejection, trivial-action update suppression, and generation settings | Passed |
 | 2026-06-28 | `npm run ci:required` | Required lint/test/typecheck/build gate after initial implementation | Passed |
 | 2026-06-28 | `npx convex codegen` | Convex function/schema validation after richer seed fact change | Passed |
 | 2026-06-28 | Local route playtest with Ollama `llama3.1:8b` | Direct Mira question produced actual Mira dialogue; non-dialogue "I jump" produced no accepted durable updates; request summaries included scene-beat and generation metadata | Passed |
 | 2026-06-28 | Final `npm run ci:required` | Final lint/test/typecheck/build gate after prompt refinements and artifact updates | Passed |
+| 2026-06-28 | `npm run playtest:director -- --help` | New playtest script is wired into npm and prints usage | Passed |
+| 2026-06-28 | `npm run lint` | New script passes ESLint | Passed |
+| 2026-06-28 | `npm run playtest:director` | Repeatable local Director smoke test passes against local Convex/Next/Ollama; direct question produces Mira dialogue and `I jump.` accepts no durable updates | Passed |
+| 2026-06-28 | Follow-up `npm run ci:required` | Final lint/test/typecheck/build gate after adding the script and trivial-action boundary | Passed |
+| 2026-06-28 | Follow-up `npx convex codegen` | Convex function validation after trivial-action boundary and script follow-up | Passed |
 
 ## Manual UI Confirmation
 
@@ -86,6 +93,8 @@ Use this checklist for Taylor's manual playtest after pulling this branch or run
 5. Enter `I jump.` Expected: the Director narrates the immediate action or observable reaction without forcing Mira dialogue and without accepting durable NPC fact updates.
 
 Feedback classification: missing Mira response is a defect; no debug evidence is a verification gap; desired extra behavior beyond direct questions/read-only knowledge/dev settings is scope expansion.
+
+The same flow can be run from the command line with `npm run playtest:director` while `npm run dev` is running.
 
 ## Manual Feedback
 

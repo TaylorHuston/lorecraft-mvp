@@ -6,6 +6,7 @@ import {
   type IgnoredNpcUpdate,
   type ParsedDirectorOutput,
   type ParsedNpcUpdate,
+  type RequiredSceneBeat,
   type ValidatedNpcUpdates,
 } from "./types";
 
@@ -141,6 +142,30 @@ export function validateNpcUpdates(
   }
 
   return { acceptedUpdates, ignoredUpdates };
+}
+
+export function applySceneBeatPersistenceBoundary(
+  validatedUpdates: ValidatedNpcUpdates,
+  sceneBeat: Pick<RequiredSceneBeat, "allowsNpcUpdates">,
+): ValidatedNpcUpdates {
+  if (sceneBeat.allowsNpcUpdates || validatedUpdates.acceptedUpdates.length === 0) {
+    return validatedUpdates;
+  }
+
+  return {
+    acceptedUpdates: [],
+    ignoredUpdates: [
+      ...validatedUpdates.ignoredUpdates,
+      ...validatedUpdates.acceptedUpdates.flatMap((update) =>
+        update.changes.map((change) => ({
+          actorKey: update.actorKey,
+          field: change.key,
+          reason: "Required scene beat does not allow durable NPC updates for this action.",
+          valuePreview: previewValue(change.value),
+        })),
+      ),
+    ],
+  };
 }
 
 function normalizeNpcUpdate(update: unknown): ParsedNpcUpdate {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
 import { buildDirectorRequest, deriveRequiredSceneBeat } from "./prompt";
-import { parseDirectorOutput, validateNpcUpdates } from "./output";
+import {
+  applySceneBeatPersistenceBoundary,
+  parseDirectorOutput,
+  validateNpcUpdates,
+} from "./output";
 import { readLlmConfig, requestOpenAICompatibleChat } from "./provider";
 import { normalizeWorldLoadError } from "./turn-errors";
 import type { DirectorActor, DirectorContext } from "./types";
@@ -95,6 +99,7 @@ describe("Director request construction", () => {
         kind: "direct_npc_question",
         targetActorKey: "mira",
         expectsNpcResponse: true,
+        allowsNpcUpdates: true,
       },
       generationSettings: {
         temperature: 0.4,
@@ -173,11 +178,13 @@ describe("Director request construction", () => {
       kind: "direct_npc_question",
       targetActorKey: "mira",
       expectsNpcResponse: true,
+      allowsNpcUpdates: true,
     });
 
     expect(deriveRequiredSceneBeat(context, "I jump.")).toMatchObject({
-      kind: "player_action",
+      kind: "trivial_player_action",
       expectsNpcResponse: false,
+      allowsNpcUpdates: false,
     });
   });
 });
@@ -300,6 +307,32 @@ describe("NPC update validation", () => {
         actorKey: "mira",
         field: "memory",
         reason: "NPC memory exceeded 500 characters and was truncated.",
+      },
+    ]);
+  });
+
+  it("suppresses accepted NPC updates when the scene beat disallows durable changes", () => {
+    const validation = validateNpcUpdates(
+      [
+        {
+          actorKey: "mira",
+          reason: "Mira noticed a trivial action.",
+          changes: { mood: "concerned" },
+        },
+      ],
+      context.actors,
+    );
+    const bounded = applySceneBeatPersistenceBoundary(validation, {
+      allowsNpcUpdates: false,
+    });
+
+    expect(bounded.acceptedUpdates).toEqual([]);
+    expect(bounded.ignoredUpdates).toMatchObject([
+      {
+        actorKey: "mira",
+        field: "mood",
+        reason: "Required scene beat does not allow durable NPC updates for this action.",
+        valuePreview: "concerned",
       },
     ]);
   });

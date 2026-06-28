@@ -67,6 +67,14 @@ npm run dev:debug
 
 This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Records include route stage, provider host, model, compact request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data. Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set.
 
+Run the repeatable local Director smoke playtest against a running dev server:
+
+```bash
+npm run playtest:director
+```
+
+The script seeds and rough-resets the demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Director debug metadata. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
+
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
