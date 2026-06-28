@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Current state: implementation complete with one verification gap
-- Last completed action: Reduced and normalized the story font after Taylor's manual feedback, then passed lint/build and desktop/mobile browser checks
+- Last completed action: Changed the player-facing story entry label from `Taylor` to `Player` after Taylor's manual feedback
 - Next action: run `th-review`; before acceptance, optionally verify the empty-feed state after Taylor approves clearing/resetting the local playtest feed
 - Active branch/ref: `feature/story-stream-reading-experience`
 - Expected dirty files: `src/app/world-client.tsx`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/changes/2026-06-27-story-stream-reading-experience/tasks.md`, `CHANGELOG.md`
@@ -65,6 +65,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-27 | LC-001-S5 R1-R3 implementation | main; browser UI guidance via `agent-browser` fallback to `npx agent-browser` | `src/app/world-client.tsx`, Epic, changelog | Replaced chat cards with story stream, independent story/debug scrolling, direct bottom anchoring, and continuation-form states | uncommitted |
 | 2026-06-27 | Fresh-context review remediation | frontend subagent review, main verification | `src/app/world-client.tsx`, Epic, tasks | Fixed narrow viewport reload/continuation gap by constraining the play surface on all breakpoints while leaving debug below the first viewport on mobile | uncommitted |
 | 2026-06-27 | Manual feedback: font normalization | main | `src/app/world-client.tsx`, Epic, tasks | Reduced and normalized stream typography to app sans font, removed serif/italic presentation, and kept story hierarchy through spacing/color | uncommitted |
+| 2026-06-27 | Manual feedback: player label | main | `src/app/world-client.tsx`, tasks | Changed the story stream player label from `Taylor` to generic `Player` until username or character name exists | uncommitted |
 
 ## Verification Ledger
 
@@ -93,6 +94,7 @@ Record Taylor's manual testing feedback after implementation starts.
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
 | 2026-06-27 | "Reduce and normalize the font" | requirement refinement | Reduced oversized story typography and normalized narration/player text to the app's sans font while preserving story-first hierarchy | resolved |
+| 2026-06-27 | Change "TAYLOR" to "PLAYER" because the future label may be username or character name | requirement refinement | Changed the player-facing story stream label to `Player`; debug actor identity remains unchanged | resolved |
 
 ## Blockers / Open Questions
 

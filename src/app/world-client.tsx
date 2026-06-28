@@ -282,7 +282,7 @@ function StoryEntry({ kind, text }: { kind: "player" | "director" | "event"; tex
   if (kind === "player") {
     return (
       <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
-        <p className="text-xs uppercase text-cyan-300">Taylor</p>
+        <p className="text-xs uppercase text-cyan-300">Player</p>
         <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-cyan-50">{text}</p>
       </article>
     );
