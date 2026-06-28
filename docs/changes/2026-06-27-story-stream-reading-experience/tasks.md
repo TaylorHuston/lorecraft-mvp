@@ -6,7 +6,7 @@
 - Last completed action: Removed the explicit submit button and made the narrative textbox full width
 - Next action: run `th-review`; before acceptance, optionally verify the empty-feed state after Taylor approves clearing/resetting the local playtest feed
 - Active branch/ref: `feature/story-stream-reading-experience`
-- Expected dirty files: `src/app/world-client.tsx`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/changes/2026-06-27-story-stream-reading-experience/tasks.md`, `CHANGELOG.md`
+- Expected dirty files: none after review artifact reconciliation is committed
 - Known blockers: none
 
 ## Task Checklist
@@ -59,15 +59,15 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-06-27 | Proposal artifacts | main with `th-propose` | `docs/changes/2026-06-27-story-stream-reading-experience/` | Drafted proposed change artifacts | uncommitted |
-| 2026-06-27 | Discovery | main with `th-apply`; read project `AGENTS.md`, `developer-guide.md`, README, changelog, Epic, current UI, Next `use client` docs, and specialist routing | change artifacts, Epic, `src/app/world-client.tsx` | Scope is coherent and presentation-only; implementation branch created; no blocking questions | uncommitted |
-| 2026-06-27 | Specialist checkpoint | main; skipped subagent implementation because the first slice is a narrow single-component UI change plus artifact reconciliation | `src/app/world-client.tsx` | Use existing client boundary for event handlers and scroll refs; keep Convex/backend untouched | uncommitted |
-| 2026-06-27 | LC-001-S5 R1-R3 implementation | main; browser UI guidance via `agent-browser` fallback to `npx agent-browser` | `src/app/world-client.tsx`, Epic, changelog | Replaced chat cards with story stream, independent story/debug scrolling, direct bottom anchoring, and continuation-form states | uncommitted |
-| 2026-06-27 | Fresh-context review remediation | frontend subagent review, main verification | `src/app/world-client.tsx`, Epic, tasks | Fixed narrow viewport reload/continuation gap by constraining the play surface on all breakpoints while leaving debug below the first viewport on mobile | uncommitted |
-| 2026-06-27 | Manual feedback: font normalization | main | `src/app/world-client.tsx`, Epic, tasks | Reduced and normalized stream typography to app sans font, removed serif/italic presentation, and kept story hierarchy through spacing/color | uncommitted |
-| 2026-06-27 | Manual feedback: player label | main | `src/app/world-client.tsx`, tasks | Changed the story stream player label from `Taylor` to generic `Player` until username or character name exists | uncommitted |
-| 2026-06-27 | Manual feedback: optimistic input clear | main | `src/app/world-client.tsx`, tasks | Clear narrative input immediately on submit; restore the submitted text on failure only when no new draft has been typed | uncommitted |
-| 2026-06-27 | Manual feedback: remove submit button | main | `src/app/world-client.tsx`, tasks | Removed the Send/Director Thinking button, made the textarea full width, and kept pending feedback as a small status line | uncommitted |
+| 2026-06-27 | Proposal artifacts | main with `th-propose` | `docs/changes/2026-06-27-story-stream-reading-experience/` | Drafted proposed change artifacts | `a94702f` |
+| 2026-06-27 | Discovery | main with `th-apply`; read project `AGENTS.md`, `developer-guide.md`, README, changelog, Epic, current UI, Next `use client` docs, and specialist routing | change artifacts, Epic, `src/app/world-client.tsx` | Scope is coherent and presentation-only; implementation branch created; no blocking questions | `a94702f` |
+| 2026-06-27 | Specialist checkpoint | main; skipped subagent implementation because the first slice is a narrow single-component UI change plus artifact reconciliation | `src/app/world-client.tsx` | Use existing client boundary for event handlers and scroll refs; keep Convex/backend untouched | `a94702f` |
+| 2026-06-27 | LC-001-S5 R1-R3 implementation | main; browser UI guidance via `agent-browser` fallback to `npx agent-browser` | `src/app/world-client.tsx`, Epic, changelog | Replaced chat cards with story stream, independent story/debug scrolling, direct bottom anchoring, and continuation-form states | `a94702f` |
+| 2026-06-27 | Fresh-context review remediation | frontend subagent review, main verification | `src/app/world-client.tsx`, Epic, tasks | Fixed narrow viewport reload/continuation gap by constraining the play surface on all breakpoints while leaving debug below the first viewport on mobile | `a94702f` |
+| 2026-06-27 | Manual feedback: font normalization | main | `src/app/world-client.tsx`, Epic, tasks | Reduced and normalized stream typography to app sans font, removed serif/italic presentation, and kept story hierarchy through spacing/color | `7adc9b5` |
+| 2026-06-27 | Manual feedback: player label | main | `src/app/world-client.tsx`, tasks | Changed the story stream player label from `Taylor` to generic `Player` until username or character name exists | `4b98038` |
+| 2026-06-27 | Manual feedback: optimistic input clear | main | `src/app/world-client.tsx`, tasks | Clear narrative input immediately on submit; restore the submitted text on failure only when no new draft has been typed | `750cf09` |
+| 2026-06-27 | Manual feedback: remove submit button | main | `src/app/world-client.tsx`, tasks | Removed the Send/Director Thinking button, made the textarea full width, and kept pending feedback as a small status line | `7875264` |
 
 ## Verification Ledger
 
