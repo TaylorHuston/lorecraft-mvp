@@ -26,6 +26,8 @@ jobs:
     name: Required CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_CONVEX_URL: https://lorecraft-ci-placeholder.convex.cloud
 
     steps:
       - name: Checkout

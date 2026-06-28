@@ -43,7 +43,7 @@ Keep provider-backed and browser checks optional until they are stable, cheap, a
 
 ## Secrets And Configuration
 
-Required CI does not need LLM provider secrets or Convex deployment credentials.
+Required CI does not need LLM provider secrets or Convex deployment credentials. The hosted workflow sets a non-secret placeholder `NEXT_PUBLIC_CONVEX_URL` so `next build` can initialize the Convex browser client without connecting to a real deployment.
 
 Local and deployment-only secrets must stay in ignored `.env*` files, GitHub repository secrets, Vercel environment variables, or provider-specific secret stores. Never print API keys, generated tokens, full environment dumps, or provider credentials in workflow logs.
 
