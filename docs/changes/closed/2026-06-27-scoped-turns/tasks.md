@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: reviewed; ready to merge and close
-- Last completed action: `/th-review` passed, then Taylor requested a small UI follow-up to surface turn numbers in the story stream.
-- Next action: merge `feature/scoped-turns` into `main`, then close the change folder.
-- Active branch/ref: `feature/scoped-turns` from `860532f`
-- Expected dirty files: `docs/changes/2026-06-27-scoped-turns/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/data-model.md`, `docs/persistence-system.md`, `CHANGELOG.md`, `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, and focused tests if practical.
+- Current state: closed
+- Last completed action: merged `feature/scoped-turns` into `main` and moved the change folder to `docs/changes/closed/2026-06-27-scoped-turns/`.
+- Next action: none.
+- Active branch/ref: `main`
+- Expected dirty files: none after closeout commit.
 - Known blockers: `npm run convex:once` cannot run while the existing local Convex backend is already listening on port 3210; `npx convex codegen` passed as the non-destructive Convex validation.
 
 ## Task Checklist
@@ -51,8 +51,8 @@
 - [x] 4.1 Update root `CHANGELOG.md` under `Added`.
 - [x] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
 - [x] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
-- [ ] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [x] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -65,7 +65,8 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-27 | `LC-001-S6` R1/R2/R3 | main with Convex and Next route-handler guidance; no subagents used because schema, route, debug query, and UI changes were tightly coupled | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/lib/director/debug-log.ts`, `src/lib/director/types.ts`, `src/app/world-client.tsx`, `src/lib/director/director.test.ts` | Added scoped turn table, linked rows, lifecycle completion, debug summaries, reset cleanup, local log turn ids, and focused tests. | local implementation commit |
 | 2026-06-27 | Artifact reconciliation | main | Epic, data model, persistence docs, changelog, change design/tasks | Documented `LC-001-S6`, canonical `Turn`, narrative flow, reset, and deferred snapshot rollback. | local implementation commit |
 | 2026-06-27 | Final self-review | main; no delegated subagent review used because subagent tool policy requires explicit user authorization for delegation | Changed code and TH artifacts | No in-scope code/doc fixes found; manual/runtime verification gap remains recorded for `/th-review` and Taylor playtest. | local implementation commit |
-| 2026-06-27 | Review and turn-number UI follow-up | main with `th-review` gate; Taylor manual feedback | `src/app/world-client.tsx`, Epic, tasks | Review passed, then story stream feed entries gained a subtle turn-number gutter sourced from `turnId` and `snapshot.turns`. | pending commit |
+| 2026-06-27 | Review and turn-number UI follow-up | main with `th-review` gate; Taylor manual feedback | `src/app/world-client.tsx`, Epic, tasks | Review passed, then story stream feed entries gained a subtle turn-number gutter sourced from `turnId` and `snapshot.turns`. | `e28532b` |
+| 2026-06-27 | Merge and close | main | `docs/changes/closed/2026-06-27-scoped-turns/` | Fast-forwarded `main` to the feature branch and moved the active change folder to closed. | pending closeout commit |
 
 ## Verification Ledger
 
@@ -119,7 +120,7 @@ Record Taylor's manual testing feedback after implementation starts.
 - Changelog current: yes
 - `th-review` verdict: ready
 - `review.md` findings resolved: not applicable; no review findings file was created
-- PR / merge state: authorized by Taylor; in progress
-- Commit state: local implementation commit created
+- PR / merge state: merged to `main`
+- Commit state: implementation commits `533cf28` and `e28532b`; closeout commit pending
 - Deferred scope accepted: rollback, snapshots, branching, story instances, multiplayer ordering, command parser
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
