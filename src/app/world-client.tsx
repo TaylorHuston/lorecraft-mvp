@@ -1,201 +1,246 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
+type DirectorTurnResponse =
+  | {
+      ok: true;
+      narration: string;
+      acceptedUpdates: unknown[];
+      ignoredUpdates: unknown[];
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 export function WorldClient() {
   const defaultWorldId = useQuery(api.world.getDefaultWorld);
   const seedWorld = useMutation(api.world.seedDemoWorld);
-  const submitCommand = useMutation(api.world.submitCommand);
+  const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const [selectedWorldId, setSelectedWorldId] = useState<Id<"worlds"> | null>(null);
-  const [command, setCommand] = useState("");
-  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
 
-  const suggestedCommands = useMemo(
-    () => ["look", "go north", "go west", "talk to Mira", "open shutters", "break lantern", "mark altar with chalk"],
-    [],
-  );
-
   async function handleSeed() {
+    setError(null);
     const seededWorldId = await seedWorld();
     setSelectedWorldId(seededWorldId);
-    setLastResult("Seeded Stormbound Chapel.");
+    setNotice("Stormbound Chapel is ready.");
+  }
+
+  async function handleReset() {
+    if (!worldId) {
+      return;
+    }
+
+    setError(null);
+    setIsResetting(true);
+    try {
+      const result = await resetPlaytestWorld({ worldId });
+      setNotice(
+        `Reset playtest state: cleared ${result.deletedCommands} player turns and restored ${result.restoredFacts} Mira facts.`,
+      );
+    } catch (resetError) {
+      setError(errorMessage(resetError));
+    } finally {
+      setIsResetting(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!worldId || !command.trim()) {
+    if (!worldId || !input.trim() || isSubmitting) {
       return;
     }
 
+    setError(null);
+    setNotice(null);
     setIsSubmitting(true);
     try {
-      const result = await submitCommand({ worldId, input: command });
-      setLastResult(result.narration);
-      setCommand("");
+      const response = await fetch("/api/director/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ worldId, input }),
+      });
+      const result = (await response.json()) as DirectorTurnResponse;
+
+      if (!response.ok || !result.ok) {
+        setError(result.ok ? "The Director turn failed." : result.error);
+        return;
+      }
+
+      setInput("");
+      setNotice("Director response persisted.");
+    } catch (submitError) {
+      setError(errorMessage(submitError));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-stone-950 text-stone-100">
-      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_420px]">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px]">
         <section className="flex min-h-[70vh] flex-col px-5 py-6 sm:px-8 lg:px-10">
-          <header className="border-b border-stone-800 pb-5">
-            <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Lorecraft MVP</p>
-            <h1 className="mt-3 text-3xl font-semibold text-stone-50 sm:text-5xl">
-              Persistent world memory spike
+          <header className="border-b border-zinc-800 pb-5">
+            <p className="text-sm uppercase tracking-[0.22em] text-cyan-300">Lorecraft MVP</p>
+            <h1 className="mt-3 text-3xl font-semibold text-zinc-50 sm:text-5xl">
+              Stormbound Chapel
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-stone-300">
-              A Next.js 16 and Convex scaffold for testing whether a small world can remember player-made changes as structured state.
+            <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-300">
+              A narrative Director loop for testing persistent scene memory and Mira&apos;s evolving state.
             </p>
           </header>
 
           <div className="flex flex-1 flex-col gap-5 py-6">
             {!worldId ? (
               <div className="flex flex-1 flex-col items-start justify-center gap-4">
-                <p className="max-w-xl text-lg text-stone-300">
-                  Seed the demo world to create rooms, exits, actors, objects, facts, events, and state-diff tables.
+                <p className="max-w-xl text-lg text-zinc-300">
+                  Seed the demo world to begin the persistent scene playtest.
                 </p>
                 <button
                   type="button"
                   onClick={handleSeed}
-                  className="border border-amber-300 bg-amber-300 px-4 py-2 text-sm font-medium text-stone-950 hover:bg-amber-200"
+                  className="border border-cyan-300 bg-cyan-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-cyan-200"
                 >
                   Seed Stormbound Chapel
                 </button>
               </div>
             ) : snapshot === undefined ? (
-              <p className="text-stone-400">Loading world state...</p>
+              <p className="text-zinc-400">Loading world state...</p>
             ) : snapshot === null ? (
               <div className="space-y-4">
-                <p className="text-stone-300">The selected world is missing required player or room state.</p>
+                <p className="text-zinc-300">
+                  The selected world is missing required player or room state.
+                </p>
                 <button
                   type="button"
                   onClick={handleSeed}
-                  className="border border-amber-300 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-stone-900"
+                  className="border border-cyan-300 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-zinc-900"
                 >
-                  Re-seed demo world
+                  Seed or reload demo world
                 </button>
               </div>
             ) : (
               <>
-                <article className="border border-stone-800 bg-stone-900/70 p-5">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm text-stone-400">Current location</p>
-                      <h2 className="text-2xl font-semibold text-stone-50">{snapshot.room.name}</h2>
+                <section className="flex min-h-[52vh] flex-col gap-3 overflow-y-auto border border-zinc-800 bg-zinc-900/60 p-4">
+                  {snapshot.feed.length > 0 ? (
+                    snapshot.feed.map((entry) => (
+                      <article
+                        key={entry.id}
+                        className={`max-w-3xl border px-4 py-3 ${feedEntryClass(entry.kind)}`}
+                      >
+                        <p className="text-xs uppercase tracking-[0.18em] opacity-70">
+                          {feedEntryLabel(entry.kind)}
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{entry.text}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center text-center text-zinc-500">
+                      <p>The story feed is empty. Describe what Taylor does, says, or notices.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleSeed}
-                      className="w-fit border border-stone-700 px-3 py-2 text-sm text-stone-300 hover:bg-stone-800"
-                    >
-                      Ensure seed world exists
-                    </button>
-                  </div>
-                  <p className="mt-4 max-w-3xl text-stone-300">{snapshot.room.description}</p>
-                </article>
-
-                <section className="grid gap-4 md:grid-cols-3">
-                  <InfoPanel title="Exits" empty="No visible exits.">
-                    {snapshot.exits.map((exit) => (
-                      <li key={exit._id}>
-                        <span className="text-amber-200">{exit.label}</span>
-                        <span className="text-stone-500"> to </span>
-                        {exit.toRoomName}
-                      </li>
-                    ))}
-                  </InfoPanel>
-                  <InfoPanel title="Actors" empty="No actors here.">
-                    {snapshot.actors.map((actor) => (
-                      <li key={actor._id}>
-                        <span className="text-amber-200">{actor.name}</span>
-                        <span className="text-stone-500"> - </span>
-                        {actor.description}
-                      </li>
-                    ))}
-                  </InfoPanel>
-                  <InfoPanel title="Objects" empty="No visible objects.">
-                    {snapshot.objects.map((object) => (
-                      <li key={object._id}>
-                        <span className="text-amber-200">{object.name}</span>
-                        <span className="text-stone-500"> - </span>
-                        {object.description}
-                      </li>
-                    ))}
-                  </InfoPanel>
+                  )}
                 </section>
 
-                <form onSubmit={handleSubmit} className="mt-auto border border-stone-800 bg-stone-900 p-4">
-                  <label htmlFor="command" className="text-sm font-medium text-stone-300">
-                    Command
+                <form onSubmit={handleSubmit} className="mt-auto border border-zinc-800 bg-zinc-900 p-4">
+                  <label htmlFor="director-input" className="text-sm font-medium text-zinc-300">
+                    Narrative input
                   </label>
                   <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-                    <input
-                      id="command"
-                      value={command}
-                      onChange={(event) => setCommand(event.target.value)}
-                      placeholder="look, go north, talk to Mira, open shutters..."
-                      className="min-h-11 flex-1 border border-stone-700 bg-stone-950 px-3 text-stone-100 outline-none focus:border-amber-300"
+                    <textarea
+                      id="director-input"
+                      value={input}
+                      onChange={(event) => setInput(event.target.value)}
+                      placeholder="I ask Mira what she knows about the storm."
+                      rows={3}
+                      className="min-h-24 flex-1 resize-y border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-300"
                     />
                     <button
                       type="submit"
-                      disabled={isSubmitting}
-                      className="min-h-11 border border-amber-300 bg-amber-300 px-4 text-sm font-medium text-stone-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isSubmitting || !input.trim()}
+                      className="min-h-11 border border-cyan-300 bg-cyan-300 px-4 text-sm font-medium text-zinc-950 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60 sm:self-stretch"
                     >
-                      {isSubmitting ? "Resolving" : "Submit"}
+                      {isSubmitting ? "Director thinking" : "Send"}
                     </button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {suggestedCommands.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => setCommand(suggestion)}
-                        className="border border-stone-700 px-2 py-1 text-xs text-stone-300 hover:border-stone-500 hover:bg-stone-800"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
+                  {notice ? <p className="mt-3 text-sm text-cyan-200">{notice}</p> : null}
+                  {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
                 </form>
-
-                {lastResult ? (
-                  <p className="border-l-2 border-amber-300 pl-4 text-stone-200">{lastResult}</p>
-                ) : null}
               </>
             )}
           </div>
         </section>
 
-        <aside className="border-t border-stone-800 bg-stone-900 px-5 py-6 lg:border-l lg:border-t-0">
-          <h2 className="text-lg font-semibold text-stone-50">Debug state</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-400">
-            This panel is intentionally visible for the spike. It shows facts, events, narrations, and state diffs as the world changes.
-          </p>
+        <aside className="border-t border-zinc-800 bg-zinc-900 px-5 py-6 lg:border-l lg:border-t-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-50">Debug panel</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                Hidden world state, Director calls, validation decisions, events, and state diffs.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleSeed}
+                className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                Ensure seed
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={!worldId || isResetting}
+                className="border border-rose-400 px-3 py-2 text-sm text-rose-200 hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isResetting ? "Resetting" : "Rough reset"}
+              </button>
+            </div>
+          </div>
 
           {snapshot ? (
             <div className="mt-6 space-y-6">
-              <DebugList title="Facts" items={snapshot.facts.map((fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`)} />
-              <DebugList title="Recent events" items={snapshot.events.map((event) => `${event.text} (${event.source})`)} />
-              <DebugList title="Narrations" items={snapshot.narrations.map((narration) => `${narration.text} (${narration.source})`)} />
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-stone-400">State diffs</h3>
-                <pre className="mt-3 max-h-72 overflow-auto border border-stone-800 bg-stone-950 p-3 text-xs leading-5 text-stone-300">
-                  {JSON.stringify(snapshot.diffs, null, 2)}
-                </pre>
-              </div>
+              <DebugList
+                title="Scene"
+                items={[
+                  `${snapshot.world.name} / ${snapshot.room.name}`,
+                  `Player: ${snapshot.player.name} (${snapshot.player.key})`,
+                  `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
+                  `Objects: ${snapshot.objects.map((object) => object.name).join(", ") || "none"}`,
+                ]}
+              />
+              <DebugList
+                title="Hidden facts"
+                items={snapshot.facts.map(
+                  (fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`,
+                )}
+              />
+              <DebugList
+                title="Events"
+                items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
+              />
+              <DebugList
+                title="Narrations"
+                items={snapshot.narrations.map(
+                  (narration) => `${narration.text} (${narration.source})`,
+                )}
+              />
+              <DebugJson title="Director calls" value={snapshot.directorCalls} />
+              <DebugJson title="State diffs" value={snapshot.diffs} />
             </div>
           ) : (
-            <p className="mt-6 text-sm text-stone-500">Seed a world to inspect state.</p>
+            <p className="mt-6 text-sm text-zinc-500">Seed a world to inspect state.</p>
           )}
         </aside>
       </div>
@@ -203,34 +248,52 @@ export function WorldClient() {
   );
 }
 
-function InfoPanel({
-  title,
-  empty,
-  children,
-}: {
-  title: string;
-  empty: string;
-  children: React.ReactNode;
-}) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+function feedEntryClass(kind: "player" | "director" | "event") {
+  if (kind === "player") {
+    return "self-end border-cyan-500/40 bg-cyan-950/30 text-cyan-50";
+  }
+  if (kind === "event") {
+    return "self-center border-zinc-700 bg-zinc-950/70 text-zinc-300";
+  }
+  return "self-start border-emerald-500/40 bg-emerald-950/20 text-emerald-50";
+}
 
-  return (
-    <div className="border border-stone-800 bg-stone-900/60 p-4">
-      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-stone-400">{title}</h3>
-      <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-300">
-        {hasChildren ? children : <li className="text-stone-500">{empty}</li>}
-      </ul>
-    </div>
-  );
+function feedEntryLabel(kind: "player" | "director" | "event") {
+  if (kind === "player") {
+    return "Taylor";
+  }
+  if (kind === "event") {
+    return "World event";
+  }
+  return "Director";
 }
 
 function DebugList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-stone-400">{title}</h3>
-      <ul className="mt-3 space-y-2 text-xs leading-5 text-stone-300">
-        {items.length > 0 ? items.map((item) => <li key={item}>{item}</li>) : <li className="text-stone-500">None yet.</li>}
+      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-400">{title}</h3>
+      <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
+        {items.length > 0 ? (
+          items.map((item) => <li key={item}>{item}</li>)
+        ) : (
+          <li className="text-zinc-500">None yet.</li>
+        )}
       </ul>
     </div>
   );
+}
+
+function DebugJson({ title, value }: { title: string; value: unknown }) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-400">{title}</h3>
+      <pre className="mt-3 max-h-80 overflow-auto border border-zinc-800 bg-zinc-950 p-3 text-xs leading-5 text-zinc-300">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "The request failed.";
 }

@@ -33,12 +33,14 @@ export default defineSchema({
   actors: defineTable({
     worldId: v.id("worlds"),
     roomId: v.id("rooms"),
+    key: v.optional(v.string()),
     name: v.string(),
     role: v.union(v.literal("player"), v.literal("npc")),
     description: v.string(),
   })
     .index("by_worldId", ["worldId"])
     .index("by_worldId_and_roomId", ["worldId", "roomId"])
+    .index("by_worldId_and_key", ["worldId", "key"])
     .index("by_worldId_and_role", ["worldId", "role"]),
 
   worldObjects: defineTable({
@@ -88,7 +90,13 @@ export default defineSchema({
     worldId: v.id("worlds"),
     commandId: v.optional(v.id("commands")),
     text: v.string(),
-    source: v.union(v.literal("seed"), v.literal("player"), v.literal("engine"), v.literal("manual")),
+    source: v.union(
+      v.literal("seed"),
+      v.literal("player"),
+      v.literal("engine"),
+      v.literal("llm"),
+      v.literal("manual"),
+    ),
   }).index("by_worldId", ["worldId"]),
 
   stateDiffs: defineTable({
@@ -122,5 +130,23 @@ export default defineSchema({
     commandId: v.optional(v.id("commands")),
     text: v.string(),
     source: v.union(v.literal("seed"), v.literal("engine"), v.literal("llm")),
+  }).index("by_worldId", ["worldId"]),
+
+  directorCalls: defineTable({
+    worldId: v.id("worlds"),
+    commandId: v.optional(v.id("commands")),
+    provider: v.string(),
+    model: v.string(),
+    requestSummary: v.any(),
+    rawResponse: v.optional(v.string()),
+    parsedResponse: v.optional(v.any()),
+    status: v.union(
+      v.literal("success"),
+      v.literal("provider_error"),
+      v.literal("invalid_output"),
+    ),
+    acceptedUpdates: v.array(v.any()),
+    ignoredUpdates: v.array(v.any()),
+    error: v.optional(v.string()),
   }).index("by_worldId", ["worldId"]),
 });

@@ -2,7 +2,7 @@
 
 Experimental Next.js + Convex scaffold for the Lorecraft persistent-world memory spike.
 
-The first goal is not a complete RPG. It is to test whether a small world can remember player-made changes as structured state: rooms, exits, actors, visible objects, facts, events, narrations, and state diffs.
+The first goal is not a complete RPG. It is to test whether a small world can remember narrative interaction as durable state: a resumable story feed, Director narrations, world events, debug records, and Mira's mutable NPC facts.
 
 ## Stack
 
@@ -20,6 +20,16 @@ Install dependencies:
 ```bash
 npm install
 ```
+
+Configure an OpenAI-compatible local model endpoint for Director turns. Ollama on macOS is the first intended runtime:
+
+```bash
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_API_KEY=ollama
+LLM_MODEL=<installed-ollama-model>
+```
+
+LM Studio, OpenRouter, Vercel AI Gateway, or a direct provider can use the same variables if they expose an OpenAI-compatible chat completions endpoint.
 
 Provision or validate the local Convex deployment once:
 
@@ -42,22 +52,20 @@ http://localhost:3000
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
-- `convex/world.ts` seeds the Stormbound Chapel world and resolves a few deterministic commands.
-- `src/app/world-client.tsx` renders the playtest UI and debug state panel.
+- `convex/world.ts` seeds the Stormbound Chapel world, reconstructs the feed, persists Director debug records, stores accepted NPC facts, and resets playtest state.
+- `src/app/api/director/turn/route.ts` coordinates synchronous Director turns through a provider-neutral backend boundary.
+- `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
+- `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
 - `src/app/providers.tsx` wires the Convex React provider into the App Router root.
 
-Try:
+Try narrative input such as:
 
 ```text
-look
-go north
-go west
-talk to Mira
-open shutters
-break lantern
-mark altar with chalk
+I ask Mira what she knows about the storm.
 ```
+
+The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, room movement mutation, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 
 ## Current Intent
 
-Keep this repo disposable until the core loop proves itself. Avoid adding combat, HP, inventory, quests, campaign copies, marketplace logic, or polished builder UI before the persistent-world memory loop is validated.
+Keep this repo disposable until the core loop proves itself. The current proof is one editable persistent world with a rough reset. The later target model is independent story/play-session instances generated from a world or template.
