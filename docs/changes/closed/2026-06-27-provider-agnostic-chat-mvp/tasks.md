@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: closeout in progress on `feature/provider-agnostic-chat-mvp`
-- Last completed action: final verification passed; `review.md` verdict is ready; Taylor authorized closeout and merge
-- Next action: commit the closed change folder on the feature branch, then fast-forward `main`
-- Active branch/ref: `feature/provider-agnostic-chat-mvp`
-- Expected dirty files: closeout docs until committed
+- Current state: closed and merged
+- Last completed action: final verification passed, `review.md` verdict is ready, and `main` was fast-forwarded to `71003e4`
+- Next action: no active implementation action remains
+- Active branch/ref: `main` at `71003e4`
+- Expected dirty files: none in this app repo
 - Known blockers: none
 
 ## Task Checklist
@@ -214,6 +214,6 @@ Record proof as it happens.
 - Verified By maps current: yes
 - `th-review` verdict: ready in `docs/changes/closed/2026-06-27-provider-agnostic-chat-mvp/review.md`
 - `review.md` findings resolved: yes
-- PR / merge state: no PR; Taylor authorized fast-forward merge to `main`
+- PR / merge state: no PR; merged by fast-forwarding `main` to `71003e4`
 - Deferred scope accepted: slash commands, MUD command parser, room mutation, story/play-session instances, provider picker, streaming, combat/rules/inventory remain deferred
 - Change moved to `docs/changes/closed/`: yes
