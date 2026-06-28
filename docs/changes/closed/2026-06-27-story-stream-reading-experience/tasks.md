@@ -120,6 +120,6 @@ Record Taylor's manual testing feedback after implementation starts.
 - Changelog current: yes
 - `th-review` verdict: ready
 - `review.md` findings resolved: yes
-- PR / merge state: not created or merged
-- Deferred scope accepted:
-- Change moved to `docs/changes/closed/`:
+- PR / merge state: merge authorized by Taylor; closeout commit pending before merge
+- Deferred scope accepted: live empty-feed browser verification remains a recorded non-blocking gap until rough reset is approved
+- Change moved to `docs/changes/closed/`: yes
