@@ -186,24 +186,16 @@ export function WorldClient() {
                   <label htmlFor="director-input" className="text-sm font-medium text-zinc-300">
                     Continue
                   </label>
-                  <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-                    <textarea
-                      id="director-input"
-                      value={input}
-                      onChange={(event) => setInput(event.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                      placeholder="I ask Mira what she knows about the storm."
-                      rows={3}
-                      className="min-h-24 flex-1 resize-y border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-300"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !input.trim()}
-                      className="min-h-11 border border-cyan-300 bg-cyan-300 px-4 text-sm font-medium text-zinc-950 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60 sm:self-stretch"
-                    >
-                      {isSubmitting ? "Director thinking" : "Send"}
-                    </button>
-                  </div>
+                  <textarea
+                    id="director-input"
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={handleInputKeyDown}
+                    placeholder="I ask Mira what she knows about the storm."
+                    rows={3}
+                    className="mt-2 min-h-24 w-full resize-y border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-300"
+                  />
+                  {isSubmitting ? <p className="mt-3 text-sm text-zinc-400">Director thinking...</p> : null}
                   {notice ? <p className="mt-3 text-sm text-cyan-200">{notice}</p> : null}
                   {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
                 </form>
