@@ -1,8 +1,11 @@
 ## Branch Policy
 
-- Primary branch: `main`.
-- Use short-lived feature branches from `main` for implementation work once the repository has an initial commit.
-- Documentation changes can be done on `main`.
+- Production branch: `main`.
+- Integration branch: `develop`.
+- Short-lived work branches: branch from `develop` using descriptive prefixes such as `feature/`, `bug/`, or `task/`.
+- Merge completed work back into `develop` after review/verification.
+- Promote `develop` to `main` only for release or explicit closeout work.
+- Documentation-only changes may land directly on `develop`; documentation-only changes to `main` require explicit Taylor approval.
 - Do not commit, merge, rebase, push, or rewrite history unless Taylor explicitly asks in the current conversation.
 - Keep this repo independent from the surrounding Obsidian vault git history.
 
