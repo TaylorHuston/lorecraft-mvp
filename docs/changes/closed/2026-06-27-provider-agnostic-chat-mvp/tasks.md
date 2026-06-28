@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `/th-apply` remediation on `feature/provider-agnostic-chat-mvp`; review findings addressed and verification passed
-- Last completed action: added stable artifact IDs, structured malformed `worldId` handling, persistence-doc ledger entries, and reran test/lint/build/Convex/runtime checks
-- Next action: commit the complete review-remediated change set, then rerun `/th-review` as the local PR gate
+- Current state: closeout in progress on `feature/provider-agnostic-chat-mvp`
+- Last completed action: final verification passed; `review.md` verdict is ready; Taylor authorized closeout and merge
+- Next action: commit the closed change folder on the feature branch, then fast-forward `main`
 - Active branch/ref: `feature/provider-agnostic-chat-mvp`
-- Expected dirty files: implementation/docs changes until committed
+- Expected dirty files: closeout docs until committed
 - Known blockers: none
 
 ## Task Checklist
@@ -94,10 +94,10 @@
 
 ### 4. Review And Closeout
 
-- [ ] 4.1 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, and branch readiness.
-- [ ] 4.2 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 4.3 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
-- [ ] 4.4 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 4.1 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, and branch readiness.
+- [x] 4.2 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 4.3 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [x] 4.4 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ### 5. Manual Feedback Continuation
 
@@ -212,8 +212,8 @@ Record proof as it happens.
 - Epic files updated: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
 - Implemented By maps current: yes
 - Verified By maps current: yes
-- `th-review` verdict: changes requested in `docs/changes/2026-06-27-provider-agnostic-chat-mvp/review.md`
-- `review.md` findings resolved: addressed during `/th-apply`; rerun `/th-review` after commit for the official gate
-- PR / merge state: no PR; local commit pending on `feature/provider-agnostic-chat-mvp`
+- `th-review` verdict: ready in `docs/changes/closed/2026-06-27-provider-agnostic-chat-mvp/review.md`
+- `review.md` findings resolved: yes
+- PR / merge state: no PR; Taylor authorized fast-forward merge to `main`
 - Deferred scope accepted: slash commands, MUD command parser, room mutation, story/play-session instances, provider picker, streaming, combat/rules/inventory remain deferred
-- Change moved to `docs/changes/closed/`: no; closeout requires `/th-review` or explicit Taylor override
+- Change moved to `docs/changes/closed/`: yes

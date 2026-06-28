@@ -104,15 +104,15 @@ The system SHALL keep Director orchestration and provider calls out of React com
 
 #### Scenario R1-S3: Orchestration can move later
 
+- WHEN the POC outgrows the Next.js Route Handler boundary
+- THEN the reusable application/domain modules can move behind Convex actions or another backend service
+- AND React-facing behavior does not need to own Director rules
+
 #### Scenario R1-S4: Malformed world id
 
 - WHEN the Route Handler receives a malformed `worldId`
 - THEN it returns a structured `400` `TurnResponse` error
 - AND it does not record player input or call the LLM
-
-- WHEN the POC outgrows the Next.js Route Handler boundary
-- THEN the reusable application/domain modules can move behind Convex actions or another backend service
-- AND React-facing behavior does not need to own Director rules
 
 ### Requirement R2: OpenAI-Compatible Provider Adapter
 

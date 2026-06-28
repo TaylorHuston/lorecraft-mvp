@@ -41,7 +41,7 @@ The important MVP question is no longer just "can the app call an LLM?" It is: c
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-06-27-provider-agnostic-chat-mvp/`
+- Original active location: `docs/changes/2026-06-27-provider-agnostic-chat-mvp/`
 - Closed location: `docs/changes/closed/2026-06-27-provider-agnostic-chat-mvp/`
 
 ## Impact
