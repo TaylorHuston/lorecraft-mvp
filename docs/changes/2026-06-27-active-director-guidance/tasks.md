@@ -46,8 +46,8 @@
 ### 4. Review And Closeout
 
 - [x] 4.1 Update root `CHANGELOG.md` under `Changed`.
-- [ ] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
-- [ ] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [x] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
 - [ ] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -81,6 +81,7 @@ Record proof as it happens.
 | 2026-06-28 | `npm run playtest:director` | Repeatable local Director smoke test passes against local Convex/Next/Ollama; direct question produces Mira dialogue and `I jump.` accepts no durable updates | Passed |
 | 2026-06-28 | Follow-up `npm run ci:required` | Final lint/test/typecheck/build gate after adding the script and trivial-action boundary | Passed |
 | 2026-06-28 | Follow-up `npx convex codegen` | Convex function validation after trivial-action boundary and script follow-up | Passed |
+| 2026-06-28 | `/th-review` local gate | Requirements, Scenarios, Epic truth, implementation, tests, security/privacy, docs, changelog, merge readiness, and local playtest script were reviewed from `change/active-director-guidance` against `develop` | Passed with no findings |
 
 ## Manual UI Confirmation
 
@@ -118,8 +119,8 @@ Record Taylor's manual testing feedback after implementation starts.
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes, `CHANGELOG.md` under `Unreleased / Changed`
-- `th-review` verdict: pending
-- `review.md` findings resolved: not applicable yet
+- `th-review` verdict: ready, passed on 2026-06-28 with no findings
+- `review.md` findings resolved: not applicable; no `review.md` was needed for this clean review
 - PR / merge state: local branch `change/active-director-guidance`, not pushed or merged
 - Deferred scope accepted: RNG, fine-tuning, settings UI, world-builder editing, slash commands, combat, inventory, relationship graph, story instances, rollback, and offscreen NPC autonomy remain out of scope.
 - Change moved to `docs/changes/closed/`: no, pending `/th-review` and closeout authorization
