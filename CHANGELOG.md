@@ -13,6 +13,7 @@ The format is based on Keep a Changelog 1.1.0.
 
 ### Changed
 
+- Improved Director prompt context so direct NPC questions can produce meaningful NPC responses while read-only NPC knowledge remains outside the mutable state allowlist.
 - Changed the Lorecraft play surface from chat-like feed cards to a prose-first story stream with independent story/debug scrolling and bottom anchoring.
 - Replaced the player-facing command parser surface with one narrative input and a split debug layout.
 

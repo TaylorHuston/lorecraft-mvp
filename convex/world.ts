@@ -13,6 +13,13 @@ const MIRA_BASELINE_FACTS = [
   { key: "status", value: "waiting near the chapel aisle" },
   { key: "memory", value: "Mira has not yet formed any meaningful memories of Taylor." },
 ] as const;
+const MIRA_READ_ONLY_FACTS = [
+  {
+    key: "knows_about_storm",
+    value:
+      "Mira knows the storm began after the chapel bell rang at midnight, and she is afraid to say that too plainly.",
+  },
+] as const;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
@@ -136,7 +143,7 @@ async function ensureSeedState(ctx: MutationCtx, worldId: Id<"worlds">) {
     await ctx.db.patch(player._id, { roomId: chapel._id });
   }
   if (mira) {
-    for (const fact of MIRA_BASELINE_FACTS) {
+    for (const fact of [...MIRA_BASELINE_FACTS, ...MIRA_READ_ONLY_FACTS]) {
       await setFact(ctx, {
         worldId,
         subjectType: "actor",
@@ -295,15 +302,17 @@ export const seedDemoWorld = mutation({
         source: "seed",
         overwrite: false,
       }),
-      setFact(ctx, {
-        worldId,
-        subjectType: "actor",
-        subjectId: actorSubjectId(MIRA_KEY),
-        key: "knows_about_storm",
-        value: true,
-        source: "seed",
-        overwrite: false,
-      }),
+      ...MIRA_READ_ONLY_FACTS.map((fact) =>
+        setFact(ctx, {
+          worldId,
+          subjectType: "actor",
+          subjectId: actorSubjectId(MIRA_KEY),
+          key: fact.key,
+          value: fact.value,
+          source: "seed",
+          overwrite: false,
+        }),
+      ),
       ...MIRA_BASELINE_FACTS.map((fact) =>
         setFact(ctx, {
           worldId,

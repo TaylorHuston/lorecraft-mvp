@@ -572,3 +572,126 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 
 - `npm run convex:once` could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
 - Runtime playtest verification of failed turns in the browser remains pending.
+
+## Story LC-001-S7: Active Director Guidance And Context Assembly
+
+As a playtester, I want the Director to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
+
+### Requirement R1: Prompt Context Components
+
+The system SHALL assemble Director prompts from explicit components with clear source ownership.
+
+#### Scenario R1-S1: Prompt separates instructions from state and history
+
+- WHEN the backend builds a Director request
+- THEN the request distinguishes Director instructions, scene state, visible facts, hidden NPC knowledge, recent feed, current player input, and required scene beat
+- AND the recent feed remains bounded and does not include internal turn or command IDs
+
+#### Scenario R1-S2: Editable and derived components have clear ownership
+
+- WHEN prompt components are documented or inspected in tests
+- THEN Director instructions, author/tone guidance, and model settings are treated as editable configuration
+- AND scene state, visible facts, hidden NPC knowledge, recent feed, and required scene beat are derived from Convex state, player input, and engine logic
+
+### Requirement R2: Read-Only Knowledge Context
+
+The system SHALL include relevant read-only knowledge facts in Director context without expanding LLM mutation authority.
+
+#### Scenario R2-S1: Seeded NPC knowledge reaches the Director
+
+- WHEN Mira has a seeded read-only fact such as `knows_about_storm`
+- AND the player asks Mira what she knows about the storm
+- THEN the Director request includes that knowledge as hidden context
+- AND the model can use it to write player-facing narration or dialogue
+
+#### Scenario R2-S2: Read-only facts are not mutable output fields
+
+- WHEN the Director returns `npcUpdates`
+- THEN validation still accepts only the bounded mutable NPC fields currently allowed by the MVP
+- AND read-only facts such as knowledge, secrets, occupation, or relationships are ignored if returned as attempted updates
+
+### Requirement R3: Required Scene Beat
+
+The system SHALL derive a lightweight scene-beat instruction from player input and current scene context.
+
+#### Scenario R3-S1: Direct NPC question expects response
+
+- WHEN the player directly asks Mira a question
+- THEN the Director request includes a required scene beat indicating Mira is directly addressed and a meaningful response is expected
+- AND the response may be an answer, refusal, deflection, warning, lie, counter-question, or visibly intentional silence
+
+#### Scenario R3-S2: Non-dialogue action does not force speech
+
+- WHEN the player performs a non-dialogue action such as jumping, smiling, or inspecting an object
+- THEN the required scene beat does not force an NPC line of dialogue
+- AND the Director may still narrate relevant observable reactions when they make sense
+
+### Requirement R4: Active NPC Narrative Behavior
+
+The system SHALL guide the Director to write active scene progression rather than passive acknowledgement.
+
+#### Scenario R4-S1: NPC response advances the story
+
+- WHEN the player directly engages a present NPC
+- THEN the Director narration includes a concrete response or choice from that NPC
+- AND it avoids merely repeating that the NPC is watchful, thoughtful, hesitant, or unchanged unless that silence is intentionally meaningful in the scene
+
+#### Scenario R4-S2: Dialogue is allowed in narration
+
+- WHEN the Director writes player-facing narration for an NPC response
+- THEN it may include quoted or clearly attributed NPC speech inside the `narration` field
+- AND no separate dialogue schema is required for this change
+
+### Requirement R5: Conservative Persistence Boundary
+
+The system SHALL keep transient story beats out of durable NPC facts unless they should matter after recent context falls away.
+
+#### Scenario R5-S1: Ephemeral reactions stay in narration
+
+- WHEN Mira glances, flinches, smiles, pauses, or briefly reacts to a player action
+- THEN the Director can narrate the beat without returning an `npcUpdates` entry
+- AND existing NPC facts remain unchanged
+
+#### Scenario R5-S2: Durable changes remain bounded
+
+- WHEN an interaction meaningfully changes Mira's current attitude, ongoing circumstance, or rolling memory
+- THEN the Director may propose updates only for `mood`, `status`, or `memory`
+- AND the backend validates, accepts, ignores, and records updates through the existing persistence boundary
+
+### Requirement R6: Dev-Configurable Generation Settings
+
+The system SHALL let developers tune supported provider generation settings without code edits.
+
+#### Scenario R6-S1: Optional settings configured
+
+- WHEN optional LLM generation environment variables are configured
+- THEN the provider adapter includes supported settings in the OpenAI-compatible request body
+- AND unset settings fall back to safe defaults
+
+#### Scenario R6-S2: Settings are visible in debug summaries
+
+- WHEN a Director call is persisted or locally logged
+- THEN debug metadata includes a compact summary of the effective generation settings
+- AND secrets, API keys, and full environment dumps remain excluded
+
+### Implemented By
+
+- `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
+- `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
+- `src/app/api/director/turn/route.ts` passes effective generation settings into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them.
+- `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, so read-only knowledge facts are ignored as attempted mutations.
+- `src/lib/director/director.test.ts` covers prompt component structure, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, and provider generation settings.
+
+### Verified By
+
+- `npm run test` passed, including prompt component structure, hidden read-only knowledge inclusion, direct-question scene-beat derivation, plain-action scene-beat derivation, read-only fact rejection, and generation setting request bodies.
+- `npm run ci:required` passed after the initial implementation.
+- `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
+- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."
+- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced no accepted durable updates for "I jump."
+- Local Convex snapshot showed `directorCalls.requestSummary` includes `promptComponentKeys`, `readOnlyKnowledgeKeys`, `requiredSceneBeat`, and `generationSettings`.
+- Final `npm run ci:required` passed after documentation and prompt refinements.
+
+### Verification Gaps
+
+- Broader provider-specific behavior for LM Studio, OpenRouter, Vercel AI Gateway, or direct hosted providers remains future playtest coverage.

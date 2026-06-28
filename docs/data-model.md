@@ -132,6 +132,18 @@ Strategy:
 | `status` | Durable current circumstance. | Should not change for one-frame physical beats unless they create an ongoing condition. |
 | `memory` | Rolling summary of meaningful direct player interaction. | Keep compact; current MVP caps accepted memory text at 500 characters. |
 
+### Current Read-only NPC Knowledge Keys
+
+| Key | Meaning | Update strategy |
+|---|---|---|
+| `knows_about_storm` | Seeded hidden context about what Mira knows and why she may not say it plainly. | Read-only Director context; ignored if returned as an attempted `npcUpdates` field. |
+
+Strategy:
+
+- Current-scene actor facts outside `mood`, `status`, and `memory` are included in Director requests as hidden read-only knowledge.
+- Read-only facts can shape narration and dialogue, but they are not automatically player-visible.
+- The Director still cannot mutate read-only facts. Only backend-validated `mood`, `status`, and `memory` updates are accepted in the MVP.
+
 Useful future fact keys:
 
 - `occupation`
@@ -282,6 +294,28 @@ Strategy:
 - Director calls are diagnostics, not canonical game state.
 - They explain provider failures, invalid JSON, accepted updates, and ignored updates.
 - Do not use this table as the source of truth for what the world remembers.
+- Current request summaries include compact prompt/debug metadata such as prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+
+## Director Prompt Context
+
+There is no separate prompt table. Director prompt context is derived per turn from current Convex state plus local engine logic.
+
+| Component | Source | Meaning |
+|---|---|---|
+| `directorInstructions` | Editable backend configuration | Story-first behavior, output shape, dialogue allowance, and persistence boundaries. |
+| `authorToneGuidance` | Editable backend configuration | Current prose style and interaction guidance. |
+| `sceneState` | Derived from world and room rows | Current world, room, and baseline scene descriptions. |
+| `visibleFacts` | Derived from current scene rows and mutable actor facts | Exits, objects, actors, descriptions, and mutable NPC state facts. |
+| `hiddenNpcKnowledge` | Derived from current-scene actor facts outside mutable keys | Read-only NPC knowledge available to the Director but not automatically visible to the player. |
+| `recentFeed` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
+| `playerInput` | Current request body | The player's narrative intent for this turn. |
+| `requiredSceneBeat` | Derived by backend logic | Lightweight guidance such as "Mira was directly asked a question; a meaningful response is expected." |
+
+Strategy:
+
+- Prompt context is diagnostic/request state, not canonical world state.
+- Generation settings are developer configuration and are summarized in Director call debug metadata.
+- Required scene beats should stay narrow until playtesting proves broader automation is needed.
 
 ## Derived Feed Entry
 

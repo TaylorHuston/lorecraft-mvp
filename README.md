@@ -31,6 +31,16 @@ LLM_MODEL=<installed-ollama-model>
 
 LM Studio, OpenRouter, Vercel AI Gateway, or a direct provider can use the same variables if they expose an OpenAI-compatible chat completions endpoint.
 
+Optional local tuning variables:
+
+```bash
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=700
+LLM_TOP_P=0.9
+```
+
+Unset optional values use safe defaults. The app currently supports the OpenAI-compatible subset above and records a compact generation-settings summary in Director debug metadata.
+
 Provision or validate the local Convex deployment once:
 
 ```bash
@@ -73,6 +83,8 @@ Try narrative input such as:
 ```text
 I ask Mira what she knows about the storm.
 ```
+
+Direct questions to present NPCs derive a required scene beat so the Director is prompted to let that NPC make a meaningful response or choice. Hidden read-only NPC facts, such as Mira's seeded `knows_about_storm` fact, are included as private context without expanding the mutable fact allowlist beyond `mood`, `status`, and `memory`.
 
 The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, room movement mutation, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 

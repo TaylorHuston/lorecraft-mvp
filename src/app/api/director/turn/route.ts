@@ -129,7 +129,9 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
 
-  const directorRequest = buildDirectorRequest(context, input);
+  const directorRequest = buildDirectorRequest(context, input, {
+    generationSettings: configResult.config.generationSettings,
+  });
   let rawOutput: string;
   const providerStartedAt = performance.now();
   try {
