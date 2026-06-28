@@ -167,7 +167,7 @@ export function WorldClient() {
                       </div>
                     ) : (
                       <div className="flex flex-1 items-end pb-8 text-zinc-500">
-                        <p className="max-w-md font-serif text-xl leading-8">
+                        <p className="max-w-md text-base leading-7 text-zinc-400">
                           The chapel waits in rain and lanternlight.
                         </p>
                       </div>
@@ -283,7 +283,7 @@ function StoryEntry({ kind, text }: { kind: "player" | "director" | "event"; tex
     return (
       <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
         <p className="text-xs uppercase text-cyan-300">Taylor</p>
-        <p className="mt-2 whitespace-pre-wrap text-base italic leading-7 text-cyan-50">{text}</p>
+        <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-cyan-50">{text}</p>
       </article>
     );
   }
@@ -298,7 +298,7 @@ function StoryEntry({ kind, text }: { kind: "player" | "director" | "event"; tex
 
   return (
     <article>
-      <p className="whitespace-pre-wrap font-serif text-xl leading-9 text-zinc-100 sm:text-2xl sm:leading-10">
+      <p className="whitespace-pre-wrap text-base leading-7 text-zinc-100 sm:text-lg sm:leading-8">
         {text}
       </p>
     </article>

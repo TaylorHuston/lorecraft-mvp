@@ -459,7 +459,7 @@ The system SHALL keep empty, pending, and error states understandable without re
 
 ### Implemented By
 
-- `src/app/world-client.tsx` renders persisted feed rows as a prose-first story stream, with Director narration as primary serif prose, player turns as authored action text, and world events as quiet inline notices.
+- `src/app/world-client.tsx` renders persisted feed rows as a prose-first story stream, with Director narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices.
 - `src/app/world-client.tsx` keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports.
 - `src/app/world-client.tsx` scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior.
 
@@ -469,6 +469,7 @@ The system SHALL keep empty, pending, and error states understandable without re
 - `npm run build` passed.
 - Browser verification at `http://localhost:3000` showed the document body no longer scrolls at desktop height, the story pane uses independent overflow, the debug panel uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
 - Browser verification at `390x844` showed the continuation form remains in the first viewport, the story pane uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
+- Browser verification after manual typography feedback showed narration uses the app sans font at a reduced scale, without serif or italic styling, while desktop and narrow viewport bottom anchoring remains intact.
 - Browser verification with a page-local `fetch` stub showed Enter submits the narrative textarea, the submit button changes to disabled "Director thinking" while pending, and no Convex mutation or real LLM call is required for that check.
 - Browser verification with a page-local error `fetch` stub showed Director errors appear near the continuation input and the existing story remains readable.
 
