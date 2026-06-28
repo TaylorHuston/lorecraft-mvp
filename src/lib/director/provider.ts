@@ -6,6 +6,8 @@ export type LlmConfig = {
   model: string;
 };
 
+type LlmEnv = Record<string, string | undefined>;
+
 export type LlmConfigResult =
   | { ok: true; config: LlmConfig }
   | { ok: false; error: string };
@@ -27,7 +29,7 @@ export class ProviderError extends Error {
   }
 }
 
-export function readLlmConfig(env: NodeJS.ProcessEnv = process.env): LlmConfigResult {
+export function readLlmConfig(env: LlmEnv = process.env): LlmConfigResult {
   const baseUrl = env.LLM_BASE_URL?.trim();
   const apiKey = env.LLM_API_KEY?.trim();
   const model = env.LLM_MODEL?.trim();

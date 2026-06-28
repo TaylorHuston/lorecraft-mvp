@@ -10,6 +10,8 @@
     "dev:convex": "convex dev",
     "convex:once": "CONVEX_AGENT_MODE=anonymous convex dev --once",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "ci:required": "npm run lint && npm run test && npm run typecheck && npm run build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run"
