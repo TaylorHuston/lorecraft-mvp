@@ -1,0 +1,109 @@
+# Tasks: Story Stream Reading Experience
+
+## Resume Here
+
+- Current state: implementation complete with one verification gap
+- Last completed action: Implemented Story `LC-001-S5`, addressed fresh-context narrow-viewport review finding, updated Epic and changelog, and passed lint/build/test plus browser checks for story anchoring, split scrolling, pending state, and error state
+- Next action: run `th-review`; before acceptance, optionally verify the empty-feed state after Taylor approves clearing/resetting the local playtest feed
+- Active branch/ref: `feature/story-stream-reading-experience`
+- Expected dirty files: `src/app/world-client.tsx`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/changes/2026-06-27-story-stream-reading-experience/tasks.md`, `CHANGELOG.md`
+- Known blockers: none
+
+## Task Checklist
+
+### 1. Epic Artifacts
+
+- [x] 1.1 Update `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` with Story `LC-001-S5`.
+- [x] 1.2 Confirm Story `LC-001-S5` has local Requirement IDs, local Scenario IDs, Implemented By, Verified By, and Verification Gaps.
+- [x] 1.3 Keep existing Stories `LC-001-S1` through `LC-001-S4` intact unless implementation reveals direct artifact drift.
+
+### 2. Implementation
+
+- [x] 2.1 Implement Story `LC-001-S5: Story Stream Reading Experience`.
+  - [x] Requirement R1: Story-First Feed Presentation
+    - [x] Scenario R1-S1: Director narration is primary prose
+    - [x] Scenario R1-S2: Player input reads as an authored action
+    - [x] Scenario R1-S3: World events do not interrupt the story
+  - [x] Requirement R2: Bottom-Anchored Continuation
+    - [x] Scenario R2-S1: New turn appears near the continuation point
+    - [x] Scenario R2-S2: Reload resumes near latest content
+    - [x] Scenario R2-S3: Debug sidebar is taller than the story column
+  - [x] Requirement R3: Empty, Pending, And Error States Fit The Story Surface
+    - [x] Scenario R3-S1: Empty story
+    - [x] Scenario R3-S2: Director response pending
+    - [x] Scenario R3-S3: Director response fails
+- [x] 2.2 Preserve existing narrative input behavior, including Enter-to-send and Shift+Enter multiline.
+- [x] 2.3 Update Story-level Implemented By maps with current code locations.
+- [x] 2.4 Update root `CHANGELOG.md` under `Changed`.
+
+### 3. Verification
+
+- [x] 3.1 Run `npm run lint`.
+- [x] 3.2 Run `npm run build`.
+- [ ] 3.3 Verify the story stream with an empty feed. Not run live because that would require rough reset/clearing the current local playtest feed; recorded as a Story verification gap.
+- [x] 3.4 Verify the story stream with a long feed and taller debug sidebar.
+- [x] 3.5 Verify feed bottom anchoring after reload and after a new Director turn.
+- [x] 3.6 Verify pending and error states remain visible near the input.
+- [x] 3.7 Update Story-level Verified By maps with concrete evidence.
+
+### 4. Review And Closeout
+
+- [ ] 4.1 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [ ] 4.2 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [ ] 4.3 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [ ] 4.4 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+
+## Implementation Ledger
+
+Record meaningful Requirement, Scenario, enabling, or delegated slices as they happen. Keep entries short.
+
+| Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
+|---|---|---|---|---|---|
+| 2026-06-27 | Proposal artifacts | main with `th-propose` | `docs/changes/2026-06-27-story-stream-reading-experience/` | Drafted proposed change artifacts | uncommitted |
+| 2026-06-27 | Discovery | main with `th-apply`; read project `AGENTS.md`, `developer-guide.md`, README, changelog, Epic, current UI, Next `use client` docs, and specialist routing | change artifacts, Epic, `src/app/world-client.tsx` | Scope is coherent and presentation-only; implementation branch created; no blocking questions | uncommitted |
+| 2026-06-27 | Specialist checkpoint | main; skipped subagent implementation because the first slice is a narrow single-component UI change plus artifact reconciliation | `src/app/world-client.tsx` | Use existing client boundary for event handlers and scroll refs; keep Convex/backend untouched | uncommitted |
+| 2026-06-27 | LC-001-S5 R1-R3 implementation | main; browser UI guidance via `agent-browser` fallback to `npx agent-browser` | `src/app/world-client.tsx`, Epic, changelog | Replaced chat cards with story stream, independent story/debug scrolling, direct bottom anchoring, and continuation-form states | uncommitted |
+| 2026-06-27 | Fresh-context review remediation | frontend subagent review, main verification | `src/app/world-client.tsx`, Epic, tasks | Fixed narrow viewport reload/continuation gap by constraining the play surface on all breakpoints while leaving debug below the first viewport on mobile | uncommitted |
+
+## Verification Ledger
+
+Record proof as it happens.
+
+| Date | Check | What It Proves | Result |
+|---|---|---|---|
+| 2026-06-27 | Artifact reread | Proposal, design, and tasks exist and satisfy initial `th-propose` structure | Passed |
+| 2026-06-27 | `npm run lint` | Story-stream UI compiles under ESLint rules | Passed |
+| 2026-06-27 | `npm run build` | Next.js production build succeeds for `/` and `/api/director/turn` | Passed |
+| 2026-06-27 | `npm run test` | Existing Director/domain tests remain green after UI-only change | Passed: 1 file, 12 tests |
+| 2026-06-27 | Browser metrics at `http://localhost:3000` | Desktop body does not scroll, story pane scrolls independently to exact bottom, and taller debug panel scrolls independently | Passed |
+| 2026-06-27 | Browser metrics at `390x844` | Narrow viewport keeps continuation form in first viewport while story pane scrolls independently to exact bottom | Passed |
+| 2026-06-27 | Browser pending-state stub | Enter submits textarea, duplicate submit is disabled, and pending state appears near continuation input without real LLM/Convex mutation | Passed |
+| 2026-06-27 | Browser error-state stub | Director error appears near continuation input and existing story remains readable without real LLM/Convex mutation | Passed |
+| 2026-06-27 | Fresh-context frontend review | Independent review caught narrow viewport `R2-S2` gap; remediation verified by main agent | Passed after fix |
+
+## Manual Feedback
+
+Record Taylor's manual testing feedback after implementation starts.
+
+| Date | Feedback | Classification | Action / Artifact Updates | Status |
+|---|---|---|---|---|
+| YYYY-MM-DD | TBD | defect / verification gap / artifact drift / requirement refinement / scope expansion / product drift | TBD | open |
+
+## Blockers / Open Questions
+
+- None blocking.
+- Non-blocking: exact visual treatment can be tuned during implementation as long as it remains story-first and not chat-bubble-first.
+- Verification gap: live empty-feed state still needs a browser check after Taylor approves using rough reset or another non-destructive fixture path.
+
+## Closeout
+
+- Epic files updated: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
+- Story/Requirement/Scenario IDs current: yes
+- Implemented By maps current: yes
+- Verified By maps current: yes, with empty-feed live check gap recorded
+- Changelog current: yes
+- `th-review` verdict: pending
+- `review.md` findings resolved:
+- PR / merge state:
+- Deferred scope accepted:
+- Change moved to `docs/changes/closed/`:

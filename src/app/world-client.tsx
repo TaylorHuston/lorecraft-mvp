@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -27,9 +27,21 @@ export function WorldClient() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const storyScrollerRef = useRef<HTMLElement | null>(null);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
+  const feedLength = snapshot?.feed.length ?? 0;
+
+  useEffect(() => {
+    const storyScroller = storyScrollerRef.current;
+
+    if (!storyScroller) {
+      return;
+    }
+
+    storyScroller.scrollTop = storyScroller.scrollHeight;
+  }, [feedLength, isSubmitting, error]);
 
   async function handleSeed() {
     setError(null);
@@ -98,11 +110,11 @@ export function WorldClient() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <section className="px-5 py-6 sm:px-8 lg:px-10">
-          <header className="border-b border-zinc-800 pb-5">
-            <p className="text-sm uppercase tracking-[0.22em] text-cyan-300">Lorecraft MVP</p>
+    <main className="min-h-screen bg-[#08090b] text-zinc-100">
+      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:h-screen lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
+        <section className="flex h-screen min-h-0 flex-col px-5 py-6 sm:px-8 lg:px-10">
+          <header className="shrink-0 border-b border-zinc-800 pb-5">
+            <p className="text-sm uppercase text-cyan-300">Lorecraft MVP</p>
             <h1 className="mt-3 text-3xl font-semibold text-zinc-50 sm:text-5xl">
               Stormbound Chapel
             </h1>
@@ -111,9 +123,9 @@ export function WorldClient() {
             </p>
           </header>
 
-          <div className="flex flex-col gap-5 py-6">
+          <div className="flex min-h-0 flex-1 flex-col gap-5 py-6">
             {!worldId ? (
-              <div className="flex min-h-[40vh] flex-col items-start justify-center gap-4">
+              <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4">
                 <p className="max-w-xl text-lg text-zinc-300">
                   Seed the demo world to begin the persistent scene playtest.
                 </p>
@@ -128,7 +140,7 @@ export function WorldClient() {
             ) : snapshot === undefined ? (
               <p className="text-zinc-400">Loading world state...</p>
             ) : snapshot === null ? (
-              <div className="space-y-4">
+              <div className="min-h-0 flex-1 space-y-4">
                 <p className="text-zinc-300">
                   The selected world is missing required player or room state.
                 </p>
@@ -142,29 +154,33 @@ export function WorldClient() {
               </div>
             ) : (
               <>
-                <section className="flex min-h-[24rem] flex-col gap-3 border border-zinc-800 bg-zinc-900/60 p-4">
-                  {snapshot.feed.length > 0 ? (
-                    snapshot.feed.map((entry) => (
-                      <article
-                        key={entry.id}
-                        className={`max-w-3xl border px-4 py-3 ${feedEntryClass(entry.kind)}`}
-                      >
-                        <p className="text-xs uppercase tracking-[0.18em] opacity-70">
-                          {feedEntryLabel(entry.kind)}
+                <section
+                  ref={storyScrollerRef}
+                  className="min-h-0 flex-1 overflow-y-auto border-y border-zinc-800 bg-zinc-950/40 px-3 py-5 sm:px-5"
+                >
+                  <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end">
+                    {snapshot.feed.length > 0 ? (
+                      <div className="space-y-7">
+                        {snapshot.feed.map((entry) => (
+                          <StoryEntry key={entry.id} kind={entry.kind} text={entry.text} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-1 items-end pb-8 text-zinc-500">
+                        <p className="max-w-md font-serif text-xl leading-8">
+                          The chapel waits in rain and lanternlight.
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{entry.text}</p>
-                      </article>
-                    ))
-                  ) : (
-                    <div className="flex flex-1 items-center justify-center text-center text-zinc-500">
-                      <p>The story feed is empty. Describe what Taylor does, says, or notices.</p>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </section>
 
-                <form onSubmit={handleSubmit} className="border border-zinc-800 bg-zinc-900 p-4">
+                <form
+                  onSubmit={handleSubmit}
+                  className="shrink-0 border border-zinc-800 bg-zinc-900/80 p-4 shadow-2xl shadow-black/30"
+                >
                   <label htmlFor="director-input" className="text-sm font-medium text-zinc-300">
-                    Narrative input
+                    Continue
                   </label>
                   <div className="mt-2 flex flex-col gap-3 sm:flex-row">
                     <textarea
@@ -192,7 +208,7 @@ export function WorldClient() {
           </div>
         </section>
 
-        <aside className="border-t border-zinc-800 bg-zinc-900 px-5 py-6 lg:border-l lg:border-t-0">
+        <aside className="border-t border-zinc-800 bg-zinc-900 px-5 py-6 lg:h-screen lg:overflow-y-auto lg:border-l lg:border-t-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col">
             <div>
               <h2 className="text-lg font-semibold text-zinc-50">Debug panel</h2>
@@ -262,30 +278,37 @@ export function WorldClient() {
   );
 }
 
-function feedEntryClass(kind: "player" | "director" | "event") {
+function StoryEntry({ kind, text }: { kind: "player" | "director" | "event"; text: string }) {
   if (kind === "player") {
-    return "self-end border-cyan-500/40 bg-cyan-950/30 text-cyan-50";
+    return (
+      <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
+        <p className="text-xs uppercase text-cyan-300">Taylor</p>
+        <p className="mt-2 whitespace-pre-wrap text-base italic leading-7 text-cyan-50">{text}</p>
+      </article>
+    );
   }
-  if (kind === "event") {
-    return "self-center border-zinc-700 bg-zinc-950/70 text-zinc-300";
-  }
-  return "self-start border-emerald-500/40 bg-emerald-950/20 text-emerald-50";
-}
 
-function feedEntryLabel(kind: "player" | "director" | "event") {
-  if (kind === "player") {
-    return "Taylor";
-  }
   if (kind === "event") {
-    return "World event";
+    return (
+      <aside className="mx-auto max-w-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-center text-xs leading-5 text-zinc-500">
+        {text}
+      </aside>
+    );
   }
-  return "Director";
+
+  return (
+    <article>
+      <p className="whitespace-pre-wrap font-serif text-xl leading-9 text-zinc-100 sm:text-2xl sm:leading-10">
+        {text}
+      </p>
+    </article>
+  );
 }
 
 function DebugList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-400">{title}</h3>
+      <h3 className="text-sm font-medium uppercase text-zinc-400">{title}</h3>
       <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
         {items.length > 0 ? (
           items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)
@@ -300,7 +323,7 @@ function DebugList({ title, items }: { title: string; items: string[] }) {
 function DebugJson({ title, value }: { title: string; value: unknown }) {
   return (
     <div>
-      <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-400">{title}</h3>
+      <h3 className="text-sm font-medium uppercase text-zinc-400">{title}</h3>
       <pre className="mt-3 max-h-80 overflow-auto border border-zinc-800 bg-zinc-950 p-3 text-xs leading-5 text-zinc-300">
         {JSON.stringify(value, null, 2)}
       </pre>

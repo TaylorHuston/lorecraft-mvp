@@ -386,3 +386,92 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 - No unresolved implementation gap for this Story.
 - Rough reset intentionally remains a temporary single-world playtest tool until story/play-session instances exist.
+
+## Story LC-001-S5: Story Stream Reading Experience
+
+As a playtester, I want the play surface to read like an unfolding story and stay anchored near the newest turn, so that long sessions feel like interactive fiction instead of a chat log I have to manage.
+
+### Requirement R1: Story-First Feed Presentation
+
+The system SHALL present the main feed as a prose-oriented story stream instead of a chat-bubble transcript.
+
+#### Scenario R1-S1: Director narration is primary prose
+
+- WHEN the feed contains Director narration
+- THEN the narration appears as the dominant story text in the main stream
+- AND it is not styled as a chat bubble competing with player input
+
+#### Scenario R1-S2: Player input reads as an authored action
+
+- WHEN the feed contains player input
+- THEN the player input is visually distinct from Director narration
+- AND it reads as an action or authored turn within the story flow rather than as a support-chat message
+
+#### Scenario R1-S3: World events do not interrupt the story
+
+- WHEN world events appear in the feed
+- THEN they are visually quieter than narration and player input
+- AND the debug panel remains the place for full event/state inspection
+
+### Requirement R2: Bottom-Anchored Continuation
+
+The system SHALL keep the latest story turn and continuation input easy to reach as the session grows.
+
+#### Scenario R2-S1: New turn appears near the continuation point
+
+- WHEN a player submits a turn and the Director response is persisted
+- THEN the story stream settles near the newest feed content
+- AND the player does not need to manually scroll down to find the continuation point
+
+#### Scenario R2-S2: Reload resumes near latest content
+
+- WHEN a playtester reloads a world with an existing long feed
+- THEN the story surface opens near the latest story content
+- AND the input remains available for continuing the session
+
+#### Scenario R2-S3: Debug sidebar is taller than the story column
+
+- WHEN the debug sidebar contains more content than the visible story stream
+- THEN the story input is not stranded at the viewport bottom away from the feed
+- AND the main story stream remains independently usable from the debug panel
+
+### Requirement R3: Empty, Pending, And Error States Fit The Story Surface
+
+The system SHALL keep empty, pending, and error states understandable without reverting the main experience to a chat-debug layout.
+
+#### Scenario R3-S1: Empty story
+
+- WHEN the seeded world has no feed entries
+- THEN the main surface presents an empty story state that invites narrative input
+- AND it does not show placeholder chat bubbles
+
+#### Scenario R3-S2: Director response pending
+
+- WHEN the player submits a turn and waits for the Director
+- THEN the UI shows pending state near the continuation input
+- AND duplicate submission remains disabled for that turn
+
+#### Scenario R3-S3: Director response fails
+
+- WHEN the Director turn fails
+- THEN the error is shown near the continuation input
+- AND the existing story stream remains readable and unchanged
+
+### Implemented By
+
+- `src/app/world-client.tsx` renders persisted feed rows as a prose-first story stream, with Director narration as primary serif prose, player turns as authored action text, and world events as quiet inline notices.
+- `src/app/world-client.tsx` keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports.
+- `src/app/world-client.tsx` scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior.
+
+### Verified By
+
+- `npm run lint` passed.
+- `npm run build` passed.
+- Browser verification at `http://localhost:3000` showed the document body no longer scrolls at desktop height, the story pane uses independent overflow, the debug panel uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
+- Browser verification at `390x844` showed the continuation form remains in the first viewport, the story pane uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
+- Browser verification with a page-local `fetch` stub showed Enter submits the narrative textarea, the submit button changes to disabled "Director thinking" while pending, and no Convex mutation or real LLM call is required for that check.
+- Browser verification with a page-local error `fetch` stub showed Director errors appear near the continuation input and the existing story remains readable.
+
+### Verification Gaps
+
+- Live empty-feed browser verification was not run because it would require clearing the current local playtest feed with rough reset. The empty-feed branch is implemented in `src/app/world-client.tsx` and remains a focused manual check before acceptance.
