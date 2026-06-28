@@ -3,8 +3,8 @@
 ## Resume Here
 
 - Current state: implementation complete with one verification gap
-- Last completed action: Removed the explicit submit button and made the narrative textbox full width
-- Next action: run `th-review`; before acceptance, optionally verify the empty-feed state after Taylor approves clearing/resetting the local playtest feed
+- Last completed action: `th-review` passed after review artifact fixes were committed and gates were rerun
+- Next action: PR, merge, or closeout only after Taylor explicitly authorizes the next lifecycle action
 - Active branch/ref: `feature/story-stream-reading-experience`
 - Expected dirty files: none after review artifact reconciliation is committed
 - Known blockers: none
@@ -118,8 +118,8 @@ Record Taylor's manual testing feedback after implementation starts.
 - Implemented By maps current: yes
 - Verified By maps current: yes, with empty-feed live check gap recorded
 - Changelog current: yes
-- `th-review` verdict: pending
-- `review.md` findings resolved:
-- PR / merge state:
+- `th-review` verdict: ready
+- `review.md` findings resolved: yes
+- PR / merge state: not created or merged
 - Deferred scope accepted:
 - Change moved to `docs/changes/closed/`:

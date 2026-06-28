@@ -2,22 +2,22 @@
 
 ## Verdict
 
-changes-requested
+ready
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | findings | `tasks.md` had stale expected-dirty and commit-ref details; fixed during review. |
-| Epic truth | findings | `epic.md` had stale button-based pending-state evidence after the button was removed; fixed during review. |
+| Change artifacts | pass | `tasks.md` now matches branch state and records review fixes. |
+| Epic truth | pass | `epic.md` now matches the implemented no-button pending state. |
 | Requirements and Scenarios | pass | `LC-001-S5` Requirements and Scenarios are concrete and implemented, with the empty-feed live browser check explicitly recorded as a gap. |
 | ID traceability | pass | Story `LC-001-S5`, Requirement IDs, and Scenario IDs are stable and local to the Story. |
 | Tests and verification | pass | `npm run lint`, `npm run test`, `npm run build`, merge-conflict dry run, and browser smoke passed. |
 | Code review | pass | Diff is scoped to presentation, TH artifacts, and changelog; no backend, persistence, provider, or gameplay behavior changed. |
 | Security review | pass | No auth, secrets, dependencies, migrations, persistence schema, provider calls, or server-side behavior changed. |
-| Documentation | findings | Epic and task ledger artifact drift fixed during review. README and persistence docs do not need updates for this UI-only change. |
+| Documentation | pass | Epic and task ledger artifact drift fixed and committed. README and persistence docs do not need updates for this UI-only change. |
 | Changelog | pass | `CHANGELOG.md` has a public-safe `Changed` entry under `Unreleased`. |
-| Branch and merge readiness | findings | Source branch and target branch are correct and conflict check passed, but review artifact fixes are currently uncommitted. |
+| Branch and merge readiness | pass | Source branch and target branch are correct, review fixes are committed, and conflict check passed. |
 | PRD alignment | not applicable | No product-direction or PRD scope change; this stays within the accepted MVP story-stream UX proof. |
 
 ## Findings
@@ -28,8 +28,7 @@ changes-requested
 
 ### REQUIRED
 
-- [x] `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`: stale verification evidence still described the removed submit button. Impact: Epic truth no longer matched the implemented UI. Fixed during review by describing text-based pending feedback and Enter-to-submit behavior.
-- [x] `docs/changes/2026-06-27-story-stream-reading-experience/tasks.md`: ledger still listed expected dirty files and `uncommitted` implementation refs even though the branch had committed implementation slices. Impact: branch/readiness state was misleading. Fixed during review by recording current dirty-state expectation and commit refs.
+- None.
 
 ### SUGGESTION
 
@@ -49,10 +48,11 @@ changes-requested
 - Source branch: `feature/story-stream-reading-experience`
 - Target branch: `main`
 - Conflict check: passed
-- Commit state: implementation commits exist, but review artifact fixes are uncommitted
+- Commit state: clean and committed through review verdict update
 - PR status: not created
 - Merge status: not authorized
 
 ## Review Log
 
-- 2026-06-27: Review created; safe artifact drift fixed; verdict remains `changes-requested` until review artifact fixes are committed or otherwise accepted.
+- 2026-06-27: Review created; safe artifact drift fixed and committed in `ac49d12`.
+- 2026-06-27: Gates rerun clean; verdict updated to `ready`.
