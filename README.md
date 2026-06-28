@@ -49,6 +49,14 @@ This starts Convex and Next.js together. The app runs at:
 http://localhost:3000
 ```
 
+For local troubleshooting, enable structured Director logs:
+
+```bash
+npm run dev:debug
+```
+
+This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Records include route stage, provider host, model, compact request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data. Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set.
+
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
@@ -57,6 +65,8 @@ http://localhost:3000
 - `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
 - `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
 - `src/app/providers.tsx` wires the Convex React provider into the App Router root.
+
+The persistence strategy is documented in [`docs/persistence-system.md`](docs/persistence-system.md). The canonical object and field reference is [`docs/data-model.md`](docs/data-model.md). Update them when canonical state, Director mutation authority, feed reconstruction, reset behavior, or object semantics change.
 
 Try narrative input such as:
 

@@ -6,9 +6,14 @@ const SYSTEM_PROMPT = [
   "You are Lorecraft's Director for a narrative-first persistent-world MVP.",
   "Respond only with strict JSON. Do not wrap the JSON in Markdown.",
   'The JSON object must include a non-empty string field named "narration".',
-  'It may include "npcUpdates", an array of updates for current-scene NPCs only.',
-  'Each NPC update must use actorKey, reason, and changes. Only mood, status, and memory may appear in changes.',
+  'It may include "npcUpdates", an array of updates for current-scene NPCs only. Use an empty array when no NPC state changes.',
+  'Return exactly this top-level shape: {"narration":"player-facing narration","npcUpdates":[]}.',
+  'Never include playerInput, scene, outputShape, world, room, visibleExits, currentSceneActors, or recentFeed in your response.',
+  'Each NPC update must use actorKey, reason, and changes. Only mood, status, and memory may appear inside changes.',
   "The memory field is a compact rolling summary and must be 500 characters or less.",
+  "The status field is stable ongoing circumstance, not moment-to-moment physical action.",
+  "Do not update status just because an immediate beat happened, such as being pushed, stumbling, flinching, glancing, or briefly moving; narrate those beats instead.",
+  "Only update status when the condition remains important after the moment resolves and should still matter after recent feed context falls away.",
   "Use hidden NPC facts as guidance for observable behavior, but do not mechanically expose fact names to the player.",
   "Rooms, exits, actor location, inventory, combat, HP, and rules are out of scope. Narrate movement attempts without changing location state.",
 ].join("\n");
@@ -45,20 +50,6 @@ export function buildDirectorRequest(context: DirectorContext, playerInput: stri
         text: entry.text,
         source: entry.source,
       })),
-    },
-    outputShape: {
-      narration: "Player-facing narration.",
-      npcUpdates: [
-        {
-          actorKey: "mira",
-          reason: "Why the durable NPC state changed.",
-          changes: {
-            mood: "short free text",
-            status: "short free text",
-            memory: "rolling summary, <= 500 characters",
-          },
-        },
-      ],
     },
   };
 

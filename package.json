@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "convex dev --start \"next dev\"",
-    "dev:next": "next dev",
+    "dev": "CONVEX_AGENT_MODE=anonymous convex dev --start \"next dev --webpack\"",
+    "dev:debug": "CONVEX_AGENT_MODE=anonymous LORECRAFT_DEBUG_LOG=1 convex dev --start \"next dev --webpack\"",
+    "dev:next": "next dev --webpack",
+    "dev:next:turbopack": "next dev",
     "dev:convex": "convex dev",
     "convex:once": "CONVEX_AGENT_MODE=anonymous convex dev --once",
     "build": "next build",

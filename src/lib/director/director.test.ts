@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
 import { buildDirectorRequest } from "./prompt";
 import { parseDirectorOutput, validateNpcUpdates } from "./output";
 import { readLlmConfig, requestOpenAICompatibleChat } from "./provider";
+import { normalizeWorldLoadError } from "./turn-errors";
 import type { DirectorActor, DirectorContext } from "./types";
 
 const mira: DirectorActor = {
@@ -61,6 +63,7 @@ const context: DirectorContext = {
 describe("Director request construction", () => {
   it("builds a bounded stateless request from current scene context", () => {
     const request = buildDirectorRequest(context, "I ask Mira about the storm.");
+    const systemMessage = request.messages.find((message) => message.role === "system");
     const userMessage = request.messages.find((message) => message.role === "user");
 
     expect(request.messages).toHaveLength(2);
@@ -74,6 +77,11 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain("I ask Mira about the storm.");
     expect(userMessage?.content).toContain("feed entry 14");
     expect(userMessage?.content).not.toContain("feed entry 0");
+    expect(userMessage?.content).not.toContain("outputShape");
+    expect(systemMessage?.content).toContain(
+      "The status field is stable ongoing circumstance, not moment-to-moment physical action.",
+    );
+    expect(systemMessage?.content).toContain("narrate those beats instead");
   });
 });
 
@@ -222,5 +230,92 @@ describe("OpenAI-compatible provider boundary", () => {
     });
 
     expect(content).toBe('{"narration":"Hello."}');
+  });
+});
+
+describe("Director turn route errors", () => {
+  it("maps malformed Convex world ids to a structured 400 response", () => {
+    const result = normalizeWorldLoadError(
+      new Error('ArgumentValidationError: Value does not match validator for field "worldId"'),
+    );
+
+    expect(result).toEqual({
+      httpStatus: 400,
+      clientMessage: "The selected world id is invalid. Seed or reload the world and try again.",
+      logMessage: "The selected world id is invalid.",
+    });
+  });
+
+  it("keeps unexpected context load errors as server errors", () => {
+    const result = normalizeWorldLoadError(new Error("Convex deployment unavailable"));
+
+    expect(result).toEqual({
+      httpStatus: 500,
+      clientMessage: "The selected world could not be loaded. Seed or reload the world and try again.",
+      logMessage: "The selected world could not be loaded.",
+    });
+  });
+});
+
+describe("Director debug logging", () => {
+  it("omits raw LLM text unless explicitly enabled", () => {
+    const record = buildDirectorDebugLogRecord(
+      {
+        event: "director.turn.invalid_output",
+        stage: "parse_director_output",
+        provider: "localhost:11434",
+        model: "llama3.1:8b",
+        rawResponse: '{"narration":"Hello."}',
+        status: "invalid_output",
+      },
+      {
+        env: { LORECRAFT_DEBUG_LOG: "1" },
+        now: () => new Date("2026-06-27T19:30:00.000Z"),
+      },
+    );
+
+    expect(record).toMatchObject({
+      ts: "2026-06-27T19:30:00.000Z",
+      event: "director.turn.invalid_output",
+      rawResponseLength: 22,
+    });
+    expect(record).not.toHaveProperty("rawResponse");
+  });
+
+  it("writes JSONL records only when local debug logging is enabled", async () => {
+    const writes: string[] = [];
+    const mkdirs: string[] = [];
+    const entry = { event: "director.turn.completed", stage: "complete_director_turn" };
+
+    const disabled = await writeDirectorDebugLog(entry, {
+      env: {},
+      mkdirImpl: async (path) => {
+        mkdirs.push(String(path));
+        return undefined;
+      },
+      appendFileImpl: async (_path, data) => {
+        writes.push(String(data));
+      },
+    });
+
+    const enabled = await writeDirectorDebugLog(entry, {
+      env: { LORECRAFT_DEBUG_LOG: "1", LORECRAFT_DEBUG_LOG_PATH: "logs/test.jsonl" },
+      cwd: "/tmp/lorecraft",
+      now: () => new Date("2026-06-27T19:31:00.000Z"),
+      mkdirImpl: async (path) => {
+        mkdirs.push(String(path));
+        return undefined;
+      },
+      appendFileImpl: async (path, data) => {
+        writes.push(`${path}:${data}`);
+      },
+    });
+
+    expect(disabled).toBe(false);
+    expect(enabled).toBe(true);
+    expect(mkdirs).toEqual(["/tmp/lorecraft/logs"]);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain("/tmp/lorecraft/logs/test.jsonl:");
+    expect(writes[0]).toContain('"event":"director.turn.completed"');
   });
 });

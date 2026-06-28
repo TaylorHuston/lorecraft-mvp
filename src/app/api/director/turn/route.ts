@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
+import { writeDirectorDebugLog } from "@/lib/director/debug-log";
 import { buildDirectorRequest } from "@/lib/director/prompt";
 import { parseDirectorOutput, validateNpcUpdates } from "@/lib/director/output";
 import {
@@ -8,6 +9,7 @@ import {
   readLlmConfig,
   requestOpenAICompatibleChat,
 } from "@/lib/director/provider";
+import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
 
 export const runtime = "nodejs";
 
@@ -24,27 +26,85 @@ type TurnResponse =
     };
 
 export async function POST(request: Request) {
+  const startedAt = performance.now();
   const bodyResult = await readBody(request);
   if (!bodyResult.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "read_body",
+      error: bodyResult.error,
+      httpStatus: 400,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
     return json<TurnResponse>({ ok: false, error: bodyResult.error }, 400);
   }
 
   const configResult = readLlmConfig();
   if (!configResult.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "read_config",
+      worldId: bodyResult.body.worldId,
+      error: configResult.error,
+      httpStatus: 503,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
     return json<TurnResponse>({ ok: false, error: configResult.error }, 503);
   }
 
+  const provider = providerName(configResult.config.baseUrl);
   const convexResult = createConvexClient();
   if (!convexResult.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "create_convex_client",
+      worldId: bodyResult.body.worldId,
+      provider,
+      model: configResult.config.model,
+      error: convexResult.error,
+      httpStatus: 500,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
     return json<TurnResponse>({ ok: false, error: convexResult.error }, 500);
   }
 
   const { worldId, input } = bodyResult.body;
   const convex = convexResult.client;
-  const provider = providerName(configResult.config.baseUrl);
 
-  const context = await convex.query(api.world.getDirectorContext, { worldId });
+  let context: Awaited<ReturnType<typeof convex.query<typeof api.world.getDirectorContext>>>;
+  try {
+    context = await convex.query(api.world.getDirectorContext, { worldId });
+  } catch (error) {
+    const worldLoadError = normalizeWorldLoadError(error);
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "load_context",
+      worldId,
+      provider,
+      model: configResult.config.model,
+      error: worldLoadError.logMessage,
+      httpStatus: worldLoadError.httpStatus,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
+    return json<TurnResponse>(
+      {
+        ok: false,
+        error: worldLoadError.clientMessage,
+      },
+      worldLoadError.httpStatus,
+    );
+  }
   if (!context) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "load_context",
+      worldId,
+      provider,
+      model: configResult.config.model,
+      error: "The selected world is missing required state.",
+      httpStatus: 404,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
     return json<TurnResponse>(
       {
         ok: false,
@@ -56,11 +116,22 @@ export async function POST(request: Request) {
 
   const recorded = await convex.mutation(api.world.recordPlayerInput, { worldId, input });
   if (!recorded.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "record_player_input",
+      worldId,
+      provider,
+      model: configResult.config.model,
+      error: recorded.error,
+      httpStatus: 409,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
 
   const directorRequest = buildDirectorRequest(context, input);
   let rawOutput: string;
+  const providerStartedAt = performance.now();
   try {
     rawOutput = await requestOpenAICompatibleChat({
       config: configResult.config,
@@ -80,6 +151,25 @@ export async function POST(request: Request) {
       ignoredUpdates: [],
       error: providerError.message,
     });
+    await logDirectorTurn({
+      event: "director.turn.provider_error",
+      stage: "provider_request",
+      worldId,
+      commandId: recorded.commandId,
+      provider,
+      model: configResult.config.model,
+      requestSummary: directorRequest.requestSummary,
+      status: "provider_error",
+      httpStatus: 502,
+      error: providerError.message,
+      rawResponse: providerError.rawResponse,
+      acceptedUpdateCount: 0,
+      ignoredUpdateCount: 0,
+      timingsMs: {
+        provider: elapsedSince(providerStartedAt),
+        total: elapsedSince(startedAt),
+      },
+    });
     return json<TurnResponse>({ ok: false, error: providerError.message }, 502);
   }
 
@@ -97,6 +187,25 @@ export async function POST(request: Request) {
       ignoredUpdates: [],
       error: parsed.error,
     });
+    await logDirectorTurn({
+      event: "director.turn.invalid_output",
+      stage: "parse_director_output",
+      worldId,
+      commandId: recorded.commandId,
+      provider,
+      model: configResult.config.model,
+      requestSummary: directorRequest.requestSummary,
+      status: "invalid_output",
+      httpStatus: 422,
+      error: parsed.error,
+      rawResponse: rawOutput,
+      acceptedUpdateCount: 0,
+      ignoredUpdateCount: 0,
+      timingsMs: {
+        provider: elapsedSince(providerStartedAt),
+        total: elapsedSince(startedAt),
+      },
+    });
     return json<TurnResponse>({ ok: false, error: parsed.error }, 422);
   }
 
@@ -113,6 +222,24 @@ export async function POST(request: Request) {
     acceptedUpdates: validated.acceptedUpdates,
     ignoredUpdates: validated.ignoredUpdates,
     narration: parsed.output.narration,
+  });
+  await logDirectorTurn({
+    event: "director.turn.completed",
+    stage: "complete_director_turn",
+    worldId,
+    commandId: recorded.commandId,
+    provider,
+    model: configResult.config.model,
+    requestSummary: directorRequest.requestSummary,
+    status: "success",
+    httpStatus: 200,
+    rawResponse: rawOutput,
+    acceptedUpdateCount: validated.acceptedUpdates.length,
+    ignoredUpdateCount: validated.ignoredUpdates.length,
+    timingsMs: {
+      provider: elapsedSince(providerStartedAt),
+      total: elapsedSince(startedAt),
+    },
   });
 
   return json<TurnResponse>({
@@ -188,6 +315,14 @@ function providerName(baseUrl: string) {
   } catch {
     return "openai-compatible";
   }
+}
+
+async function logDirectorTurn(entry: Parameters<typeof writeDirectorDebugLog>[0]) {
+  await writeDirectorDebugLog(entry);
+}
+
+function elapsedSince(start: number) {
+  return Math.round(performance.now() - start);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
