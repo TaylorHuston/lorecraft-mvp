@@ -1,15 +1,11 @@
+# Lorecraft MVP Workspace Guide
+
+This repository is the implementation workspace for the Lorecraft MVP prototype.
+
 ## Branch Policy
 
-- Production branch: `main`.
-- Integration branch: `develop`.
-- Short-lived work branches: branch from `develop` using one of these prefixes:
-  - `change/` for planned product, UX, architecture, or feature changes.
-  - `fix/` for defects, regressions, and broken behavior.
-  - `misc/` for chores, tooling, documentation-only work, and other low-risk maintenance.
-- Reserve `release/` or `hotfix/` branches for later if release management needs them; do not use them by default.
-- Merge completed work back into `develop` after review/verification.
-- Promote `develop` to `main` only for release or explicit closeout work.
-- Documentation-only changes may land directly on `develop`; documentation-only changes to `main` require explicit Taylor approval.
+Use the default branch policy from `../../developer-guide.md`.
+
 - Do not commit, merge, rebase, push, or rewrite history unless Taylor explicitly asks in the current conversation.
 - Keep this repo independent from the surrounding Obsidian vault git history.
 
