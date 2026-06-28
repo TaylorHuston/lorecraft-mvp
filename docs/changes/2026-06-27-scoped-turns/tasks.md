@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete; ready for `/th-review`
-- Last completed action: final self-review found no in-scope code/doc fixes beyond the recorded manual/runtime verification gap.
-- Next action: run `/th-review` as the local PR gate.
+- Current state: reviewed; ready to merge and close
+- Last completed action: `/th-review` passed, then Taylor requested a small UI follow-up to surface turn numbers in the story stream.
+- Next action: merge `feature/scoped-turns` into `main`, then close the change folder.
 - Active branch/ref: `feature/scoped-turns` from `860532f`
 - Expected dirty files: `docs/changes/2026-06-27-scoped-turns/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/data-model.md`, `docs/persistence-system.md`, `CHANGELOG.md`, `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, and focused tests if practical.
 - Known blockers: `npm run convex:once` cannot run while the existing local Convex backend is already listening on port 3210; `npx convex codegen` passed as the non-destructive Convex validation.
@@ -41,7 +41,7 @@
 ### 3. Verification
 
 - [x] 3.1 Add or update focused tests for turn-scoped prompt/debug metadata and verify production path with build/codegen.
-- [ ] 3.2 Verify feed/debug output includes turn scope and failed-turn status after reload.
+- [x] 3.2 Verify feed/debug output includes turn scope by implementation and build checks; failed-turn status remains a manual playtest gap.
 - [x] 3.3 Verify rough reset clears turns with the rest of playtest history by implementation and type validation; destructive runtime reset not run against Taylor's current playtest state.
 - [x] 3.4 Run the smallest relevant app checks: tests, lint, build, and Convex validation.
 - [x] 3.5 Update Story-level Verified By maps with concrete evidence.
@@ -49,8 +49,8 @@
 ### 4. Review And Closeout
 
 - [x] 4.1 Update root `CHANGELOG.md` under `Added`.
-- [ ] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
-- [ ] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [x] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
 - [ ] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -65,6 +65,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-27 | `LC-001-S6` R1/R2/R3 | main with Convex and Next route-handler guidance; no subagents used because schema, route, debug query, and UI changes were tightly coupled | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/lib/director/debug-log.ts`, `src/lib/director/types.ts`, `src/app/world-client.tsx`, `src/lib/director/director.test.ts` | Added scoped turn table, linked rows, lifecycle completion, debug summaries, reset cleanup, local log turn ids, and focused tests. | local implementation commit |
 | 2026-06-27 | Artifact reconciliation | main | Epic, data model, persistence docs, changelog, change design/tasks | Documented `LC-001-S6`, canonical `Turn`, narrative flow, reset, and deferred snapshot rollback. | local implementation commit |
 | 2026-06-27 | Final self-review | main; no delegated subagent review used because subagent tool policy requires explicit user authorization for delegation | Changed code and TH artifacts | No in-scope code/doc fixes found; manual/runtime verification gap remains recorded for `/th-review` and Taylor playtest. | local implementation commit |
+| 2026-06-27 | Review and turn-number UI follow-up | main with `th-review` gate; Taylor manual feedback | `src/app/world-client.tsx`, Epic, tasks | Review passed, then story stream feed entries gained a subtle turn-number gutter sourced from `turnId` and `snapshot.turns`. | pending commit |
 
 ## Verification Ledger
 
@@ -80,13 +81,16 @@ Record proof as it happens.
 | 2026-06-27 | `npm run convex:once` | Intended Convex once validation | Blocked: existing local backend is running on port 3210 |
 | 2026-06-27 | `curl -I --max-time 5 http://localhost:3000` | Existing dev server responds after changes | Passed: `HTTP/1.1 200 OK` |
 | 2026-06-27 | Final self-review | Scope, design fidelity, Epic truth, ID traceability, tests, security/data safety, docs, changelog, and branch readiness | Passed with recorded manual/runtime verification gap |
+| 2026-06-27 | `/th-review` | Local PR gate for artifacts, Epic truth, requirements/scenarios, verification, manual confirmation, code, security, docs, changelog, and branch readiness | Passed: ready |
+| 2026-06-27 | `npm run lint` | Turn-number story stream UI follow-up compiles cleanly under ESLint | Passed |
+| 2026-06-27 | `npm run build` | Turn-number story stream UI follow-up passes Next production build and TypeScript checks | Passed |
 
 ## Manual UI Confirmation
 
 Use the existing local app at `http://localhost:3000`.
 
 1. Submit one normal narrative input.
-   - Expected: the story stream continues as prose, and the debug panel `Turns` section shows a new highest sequence turn with `succeeded`, the player input, one Director call status, and linked counts.
+   - Expected: the story stream continues as prose, turn-scoped feed entries show a subtle turn number in the left gutter, and the debug panel `Turns` section shows a new highest sequence turn with `succeeded`, the player input, one Director call status, and linked counts.
 2. Trigger a provider/output failure if convenient, such as temporarily pointing `LLM_MODEL` at an unavailable local model before submitting.
    - Expected: no fake narration appears, the player-facing error stays near the input, and the debug panel shows the turn as `failed` after reload.
 3. Use rough reset only if you are comfortable clearing the current playtest transcript.
@@ -98,13 +102,13 @@ Record Taylor's manual testing feedback after implementation starts.
 
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | defect / verification gap / artifact drift / requirement refinement / scope expansion / product drift | TBD | open |
+| 2026-06-27 | Surface the turn number in the story UI with a simple integer on the left of the stream. | requirement refinement | Added a subtle left-gutter turn number for turn-scoped feed entries and updated Epic/tasks verification. | addressed |
 
 ## Blockers / Open Questions
 
 - Resolved: expose minimal turn status and sequence in the debug panel now.
 - Resolved: failed provider/output attempts stay out of the player-facing story stream and remain inspectable through failed turns in debug.
-- Remaining verification gap: manual browser playtest of successful and failed turn summaries is pending.
+- Remaining verification gap: manual browser playtest of failed turn summaries is pending.
 
 ## Closeout
 
@@ -113,9 +117,9 @@ Record Taylor's manual testing feedback after implementation starts.
 - Implemented By maps current: yes
 - Verified By maps current: yes, with manual/runtime gaps recorded
 - Changelog current: yes
-- `th-review` verdict: pending; implementation is ready for review
-- `review.md` findings resolved: not applicable yet
-- PR / merge state: not started
+- `th-review` verdict: ready
+- `review.md` findings resolved: not applicable; no review findings file was created
+- PR / merge state: authorized by Taylor; in progress
 - Commit state: local implementation commit created
 - Deferred scope accepted: rollback, snapshots, branching, story instances, multiplayer ordering, command parser
 - Change moved to `docs/changes/closed/`: no

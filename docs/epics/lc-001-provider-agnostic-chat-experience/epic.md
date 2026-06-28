@@ -555,7 +555,7 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 - `convex/world.ts` creates pending turns with world-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during rough reset.
 - `src/app/api/director/turn/route.ts` passes `turnId` through successful, provider-error, and invalid-output Director completion paths while leaving pre-persistence request/config/world-load failures unpersisted.
 - `src/lib/director/debug-log.ts` includes optional `turnId` in local JSONL debug records.
-- `src/app/world-client.tsx` shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel without changing the story stream into turn cards.
+- `src/app/world-client.tsx` shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn.
 - `docs/data-model.md` and `docs/persistence-system.md` document scoped turns and defer snapshot rollback.
 
 ### Verified By
@@ -565,8 +565,10 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 - `npm run build` passed.
 - `npx convex codegen` passed, including schema/function validation and generated TypeScript bindings.
 - `curl -I --max-time 5 http://localhost:3000` returned `HTTP/1.1 200 OK` from the existing dev server.
+- `/th-review` passed as the local PR gate with no blocking or required findings.
+- `npm run lint` and `npm run build` passed after the story-stream turn-number UI follow-up.
 
 ### Verification Gaps
 
 - `npm run convex:once` could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
-- Runtime playtest verification of successful and failed turns in the browser remains pending.
+- Runtime playtest verification of failed turns in the browser remains pending.

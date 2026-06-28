@@ -32,6 +32,7 @@ export function WorldClient() {
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
+  const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -166,7 +167,12 @@ export function WorldClient() {
                     {snapshot.feed.length > 0 ? (
                       <div className="space-y-7">
                         {snapshot.feed.map((entry) => (
-                          <StoryEntry key={entry.id} kind={entry.kind} text={entry.text} />
+                          <StoryEntry
+                            key={entry.id}
+                            kind={entry.kind}
+                            text={entry.text}
+                            turnNumber={entry.turnId ? turnSequenceById.get(entry.turnId) : undefined}
+                          />
                         ))}
                       </div>
                     ) : (
@@ -276,30 +282,61 @@ export function WorldClient() {
   );
 }
 
-function StoryEntry({ kind, text }: { kind: "player" | "director" | "event"; text: string }) {
+function StoryEntry({
+  kind,
+  text,
+  turnNumber,
+}: {
+  kind: "player" | "director" | "event";
+  text: string;
+  turnNumber?: number;
+}) {
   if (kind === "player") {
     return (
-      <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
-        <p className="text-xs uppercase text-cyan-300">Player</p>
-        <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-cyan-50">{text}</p>
-      </article>
+      <StoryEntryShell turnNumber={turnNumber}>
+        <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
+          <p className="text-xs uppercase text-cyan-300">Player</p>
+          <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-cyan-50">{text}</p>
+        </article>
+      </StoryEntryShell>
     );
   }
 
   if (kind === "event") {
     return (
-      <aside className="mx-auto max-w-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-center text-xs leading-5 text-zinc-500">
-        {text}
-      </aside>
+      <StoryEntryShell turnNumber={turnNumber}>
+        <aside className="mx-auto max-w-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-center text-xs leading-5 text-zinc-500">
+          {text}
+        </aside>
+      </StoryEntryShell>
     );
   }
 
   return (
-    <article>
-      <p className="whitespace-pre-wrap text-base leading-7 text-zinc-100 sm:text-lg sm:leading-8">
-        {text}
-      </p>
-    </article>
+    <StoryEntryShell turnNumber={turnNumber}>
+      <article>
+        <p className="whitespace-pre-wrap text-base leading-7 text-zinc-100 sm:text-lg sm:leading-8">
+          {text}
+        </p>
+      </article>
+    </StoryEntryShell>
+  );
+}
+
+function StoryEntryShell({
+  turnNumber,
+  children,
+}: {
+  turnNumber?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.5rem_minmax(0,1fr)]">
+      <div className="pt-1 text-right text-xs tabular-nums text-zinc-600">
+        {turnNumber ? turnNumber : ""}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -386,6 +423,20 @@ function turnSummaryItems(turns: unknown[]) {
 function countLabel(value: unknown, label: string) {
   const count = typeof value === "number" ? value : 0;
   return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function buildTurnSequenceById(turns: unknown[]) {
+  const sequenceById = new Map<string, number>();
+
+  for (const turn of turns) {
+    if (!isRecord(turn) || typeof turn._id !== "string" || typeof turn.sequenceNumber !== "number") {
+      continue;
+    }
+
+    sequenceById.set(turn._id, turn.sequenceNumber);
+  }
+
+  return sequenceById;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
