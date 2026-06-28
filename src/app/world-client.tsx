@@ -71,30 +71,34 @@ export function WorldClient() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!worldId || !input.trim() || isSubmitting) {
+    const submittedInput = input.trim();
+
+    if (!worldId || !submittedInput || isSubmitting) {
       return;
     }
 
     setError(null);
     setNotice(null);
     setIsSubmitting(true);
+    setInput("");
     try {
       const response = await fetch("/api/director/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worldId, input }),
+        body: JSON.stringify({ worldId, input: submittedInput }),
       });
       const result = (await response.json()) as DirectorTurnResponse;
 
       if (!response.ok || !result.ok) {
         setError(result.ok ? "The Director turn failed." : result.error);
+        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
         return;
       }
 
-      setInput("");
       setNotice("Director response persisted.");
     } catch (submitError) {
       setError(errorMessage(submitError));
+      setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
     } finally {
       setIsSubmitting(false);
     }

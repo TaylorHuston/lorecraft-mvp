@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Current state: implementation complete with one verification gap
-- Last completed action: Changed the player-facing story entry label from `Taylor` to `Player` after Taylor's manual feedback
+- Last completed action: Changed submit behavior so the narrative input clears immediately while the Director turn is pending
 - Next action: run `th-review`; before acceptance, optionally verify the empty-feed state after Taylor approves clearing/resetting the local playtest feed
 - Active branch/ref: `feature/story-stream-reading-experience`
 - Expected dirty files: `src/app/world-client.tsx`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/changes/2026-06-27-story-stream-reading-experience/tasks.md`, `CHANGELOG.md`
@@ -66,6 +66,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-27 | Fresh-context review remediation | frontend subagent review, main verification | `src/app/world-client.tsx`, Epic, tasks | Fixed narrow viewport reload/continuation gap by constraining the play surface on all breakpoints while leaving debug below the first viewport on mobile | uncommitted |
 | 2026-06-27 | Manual feedback: font normalization | main | `src/app/world-client.tsx`, Epic, tasks | Reduced and normalized stream typography to app sans font, removed serif/italic presentation, and kept story hierarchy through spacing/color | uncommitted |
 | 2026-06-27 | Manual feedback: player label | main | `src/app/world-client.tsx`, tasks | Changed the story stream player label from `Taylor` to generic `Player` until username or character name exists | uncommitted |
+| 2026-06-27 | Manual feedback: optimistic input clear | main | `src/app/world-client.tsx`, tasks | Clear narrative input immediately on submit; restore the submitted text on failure only when no new draft has been typed | uncommitted |
 
 ## Verification Ledger
 
@@ -86,6 +87,9 @@ Record proof as it happens.
 | 2026-06-27 | `npm run build` after font feedback | Next.js production build still succeeds after typography change | Passed |
 | 2026-06-27 | Browser typography check at desktop | Narration uses normalized app sans font at reduced scale and story pane remains anchored to bottom | Passed |
 | 2026-06-27 | Browser typography check at `390x844` | Narrow viewport still keeps continuation form visible and story pane anchored after typography reduction | Passed |
+| 2026-06-27 | `npm run lint` after optimistic input clear | Submit-flow change remains lint-clean | Passed |
+| 2026-06-27 | Browser pending-state stub after optimistic input clear | Textarea clears immediately while the Director request is unresolved and duplicate submission remains disabled | Passed |
+| 2026-06-27 | Browser error-state stub after optimistic input clear | Failed Director request restores submitted text when no replacement draft has been typed | Passed |
 
 ## Manual Feedback
 
@@ -95,6 +99,7 @@ Record Taylor's manual testing feedback after implementation starts.
 |---|---|---|---|---|
 | 2026-06-27 | "Reduce and normalize the font" | requirement refinement | Reduced oversized story typography and normalized narration/player text to the app's sans font while preserving story-first hierarchy | resolved |
 | 2026-06-27 | Change "TAYLOR" to "PLAYER" because the future label may be username or character name | requirement refinement | Changed the player-facing story stream label to `Player`; debug actor identity remains unchanged | resolved |
+| 2026-06-27 | Message stays in the input box until the Director action resolves | defect | Changed submit flow to clear the textarea immediately after valid submit starts and preserve failure recovery behavior | resolved |
 
 ## Blockers / Open Questions
 
