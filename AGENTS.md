@@ -9,6 +9,10 @@ Use the default branch policy from `../../developer-guide.md`.
 - Do not commit, merge, rebase, push, or rewrite history unless Taylor explicitly asks in the current conversation.
 - Keep this repo independent from the surrounding Obsidian vault git history.
 
+## Local Development
+
+- For the foreseeable future, launch Lorecraft with `npm run dev:debug` instead of `npm run dev`. This must enable all current Director debug flags: local JSONL logs, raw provider request logging, raw LLM response logging, and persisted raw request storage.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

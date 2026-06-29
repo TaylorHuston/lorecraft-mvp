@@ -31,16 +31,26 @@ LLM_MODEL=<installed-ollama-model>
 
 LM Studio, OpenRouter, Vercel AI Gateway, or a direct provider can use the same variables if they expose an OpenAI-compatible chat completions endpoint.
 
+Optional local tuning variables:
+
+```bash
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=700
+LLM_TOP_P=0.9
+```
+
+Unset optional values use safe defaults. The app currently supports the OpenAI-compatible subset above and records a compact generation-settings summary in Director debug metadata.
+
 Provision or validate the local Convex deployment once:
 
 ```bash
 npm run convex:once
 ```
 
-Start the local development loop:
+Start the local development loop with Director diagnostics enabled:
 
 ```bash
-npm run dev
+npm run dev:debug
 ```
 
 This starts Convex and Next.js together. The app runs at:
@@ -49,13 +59,17 @@ This starts Convex and Next.js together. The app runs at:
 http://localhost:3000
 ```
 
-For local troubleshooting, enable structured Director logs:
+`npm run dev:debug` currently enables all local Director diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, and persisted provider request messages in `directorCalls.rawRequest`.
+
+Each recorded Director turn attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, raw request, raw response, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include hidden NPC knowledge, prompt guidance, player text, and model output, so keep it local/debug-only.
+
+Run the repeatable local Director smoke playtest against a running dev server:
 
 ```bash
-npm run dev:debug
+npm run playtest:director
 ```
 
-This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Records include route stage, provider host, model, compact request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data. Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set.
+The script seeds and rough-resets the demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Director debug metadata. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
 
 ## What Is Scaffolded
 
@@ -73,6 +87,10 @@ Try narrative input such as:
 ```text
 I ask Mira what she knows about the storm.
 ```
+
+Direct questions to present NPCs derive a required scene beat so the Director is prompted to let that NPC make a meaningful response or choice. Hidden read-only NPC facts, such as Mira's seeded `knows_about_storm` fact, are included as private context without expanding the mutable fact allowlist beyond `mood`, `status`, and `memory`.
+
+The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. These sections are sent with the next Director turn and are summarized in the latest Director call debug metadata.
 
 The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, room movement mutation, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 

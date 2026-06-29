@@ -68,11 +68,50 @@ export type DirectorRequestSummary = {
   recentFeedCount: number;
   actorKeys: string[];
   npcFactKeys: string[];
+  readOnlyKnowledgeKeys: string[];
+  requiredSceneBeat: {
+    kind: SceneBeatKind;
+    targetActorKey?: string;
+    expectsNpcResponse: boolean;
+    allowsNpcUpdates: boolean;
+  };
+  promptComponentKeys: string[];
+  promptGuidanceKeys?: string[];
+  generationSettings?: DirectorGenerationSettingsSummary;
 };
 
 export type DirectorRequest = {
   messages: DirectorMessage[];
   requestSummary: DirectorRequestSummary;
+};
+
+export type SceneBeatKind =
+  | "direct_npc_question"
+  | "direct_npc_address"
+  | "scene_question"
+  | "trivial_player_action"
+  | "player_action";
+
+export type RequiredSceneBeat = {
+  kind: SceneBeatKind;
+  targetActorKey?: string;
+  targetActorName?: string;
+  expectsNpcResponse: boolean;
+  allowsNpcUpdates: boolean;
+  instruction: string;
+};
+
+export type DirectorGenerationSettingsSummary = {
+  temperature: number;
+  maxTokens?: number;
+  topP?: number;
+  responseFormat: "json_object";
+};
+
+export type DirectorPromptGuidance = {
+  style?: string;
+  npcBehavior?: string;
+  persistence?: string;
 };
 
 export type ParsedNpcUpdate = {

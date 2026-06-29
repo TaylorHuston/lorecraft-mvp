@@ -3,12 +3,17 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { writeDirectorDebugLog } from "@/lib/director/debug-log";
 import { buildDirectorRequest } from "@/lib/director/prompt";
-import { parseDirectorOutput, validateNpcUpdates } from "@/lib/director/output";
+import {
+  applySceneBeatPersistenceBoundary,
+  parseDirectorOutput,
+  validateNpcUpdates,
+} from "@/lib/director/output";
 import {
   ProviderError,
   readLlmConfig,
   requestOpenAICompatibleChat,
 } from "@/lib/director/provider";
+import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
 
 export const runtime = "nodejs";
@@ -129,7 +134,11 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
 
-  const directorRequest = buildDirectorRequest(context, input);
+  const directorRequest = buildDirectorRequest(context, input, {
+    generationSettings: configResult.config.generationSettings,
+    promptGuidance: bodyResult.body.promptGuidance,
+  });
+  const rawRequest = rawDirectorRequestForStorage(directorRequest.messages);
   let rawOutput: string;
   const providerStartedAt = performance.now();
   try {
@@ -146,6 +155,7 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      ...(rawRequest !== undefined ? { rawRequest } : {}),
       rawResponse: providerError.rawResponse ?? "",
       status: "provider_error",
       acceptedUpdates: [],
@@ -153,14 +163,16 @@ export async function POST(request: Request) {
       error: providerError.message,
     });
     await logDirectorTurn({
-      event: "director.turn.provider_error",
+      event: "director.turn.unit",
       stage: "provider_request",
       worldId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
+      playerInput: input,
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      rawRequest: directorRequest.messages,
       status: "provider_error",
       httpStatus: 502,
       error: providerError.message,
@@ -184,6 +196,7 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      ...(rawRequest !== undefined ? { rawRequest } : {}),
       rawResponse: rawOutput,
       status: "invalid_output",
       acceptedUpdates: [],
@@ -191,14 +204,16 @@ export async function POST(request: Request) {
       error: parsed.error,
     });
     await logDirectorTurn({
-      event: "director.turn.invalid_output",
+      event: "director.turn.unit",
       stage: "parse_director_output",
       worldId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
+      playerInput: input,
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      rawRequest: directorRequest.messages,
       status: "invalid_output",
       httpStatus: 422,
       error: parsed.error,
@@ -213,7 +228,10 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: parsed.error }, 422);
   }
 
-  const validated = validateNpcUpdates(parsed.output.npcUpdates, context.actors);
+  const validated = applySceneBeatPersistenceBoundary(
+    validateNpcUpdates(parsed.output.npcUpdates, context.actors),
+    directorRequest.requestSummary.requiredSceneBeat,
+  );
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
     turnId: recorded.turnId,
@@ -221,6 +239,7 @@ export async function POST(request: Request) {
     provider,
     model: configResult.config.model,
     requestSummary: directorRequest.requestSummary,
+    ...(rawRequest !== undefined ? { rawRequest } : {}),
     rawResponse: rawOutput,
     parsedResponse: parsed.output,
     status: "success",
@@ -229,19 +248,23 @@ export async function POST(request: Request) {
     narration: parsed.output.narration,
   });
   await logDirectorTurn({
-    event: "director.turn.completed",
+    event: "director.turn.unit",
     stage: "complete_director_turn",
     worldId,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
+    playerInput: input,
     provider,
     model: configResult.config.model,
     requestSummary: directorRequest.requestSummary,
+    rawRequest: directorRequest.messages,
     status: "success",
     httpStatus: 200,
     rawResponse: rawOutput,
-    acceptedUpdateCount: validated.acceptedUpdates.length,
-    ignoredUpdateCount: validated.ignoredUpdates.length,
+    parsedResponse: parsed.output,
+    narration: parsed.output.narration,
+    acceptedUpdates: validated.acceptedUpdates,
+    ignoredUpdates: validated.ignoredUpdates,
     timingsMs: {
       provider: elapsedSince(providerStartedAt),
       total: elapsedSince(startedAt),
@@ -280,13 +303,50 @@ async function readBody(request: Request) {
     return { ok: false as const, error: "Narrative input is required." };
   }
 
+  const promptGuidance = readPromptGuidance(parsed.promptGuidance);
+  if (!promptGuidance.ok) {
+    return promptGuidance;
+  }
+
   return {
     ok: true as const,
     body: {
       worldId: parsed.worldId as Id<"worlds">,
       input: parsed.input.trim(),
+      promptGuidance: promptGuidance.value,
     },
   };
+}
+
+function readPromptGuidance(value: unknown) {
+  if (value === undefined) {
+    return { ok: true as const, value: undefined };
+  }
+
+  if (!isRecord(value)) {
+    return { ok: false as const, error: "promptGuidance must be an object when provided." };
+  }
+
+  const guidance: Record<string, string> = {};
+  for (const key of ["style", "npcBehavior", "persistence"]) {
+    const rawValue = value[key];
+    if (rawValue === undefined) {
+      continue;
+    }
+    if (typeof rawValue !== "string") {
+      return { ok: false as const, error: `promptGuidance.${key} must be a string.` };
+    }
+
+    const trimmed = rawValue.trim();
+    if (trimmed.length > 1200) {
+      return { ok: false as const, error: `promptGuidance.${key} must be 1200 characters or less.` };
+    }
+    if (trimmed.length > 0) {
+      guidance[key] = trimmed;
+    }
+  }
+
+  return { ok: true as const, value: guidance };
 }
 
 function createConvexClient() {

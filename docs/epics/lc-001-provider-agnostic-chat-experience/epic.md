@@ -319,13 +319,15 @@ The system SHALL optionally write local-only structured debug logs for Director 
 
 - WHEN `LORECRAFT_DEBUG_LOG=1` is set during local development
 - THEN the backend appends newline-delimited JSON records under a gitignored local log path
-- AND each record includes timestamp, event name, route stage, provider host, model, request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data without API keys or full environment dumps
+- AND each recorded Director turn attempt writes one `director.turn.unit` record with timestamp, event name, route stage, turn ID, command ID, player input, provider host, model, request summary, outcome, errors, parsed output when available, accepted/ignored updates, response length metadata, and timing data without API keys or full environment dumps
+- AND pre-turn failures may still write `director.turn.rejected` records because no concrete turn exists yet
 
 #### Scenario R2-S2: Raw LLM logging gated
 
 - WHEN `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is not set
 - THEN local log records do not include full raw LLM response text
 - AND raw response content can still be inspected from the persisted `directorCalls` debug table when appropriate
+- AND raw provider request text is also gated separately behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1`
 
 ### Requirement R3: Accepted And Ignored Update Visibility
 
@@ -365,8 +367,8 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 - `convex/schema.ts` defines `directorCalls` for provider/model metadata, compact request summaries, raw/parsed responses, status, accepted updates, ignored updates, and errors.
 - `convex/world.ts` persists Director call audit records, accepted NPC fact diffs, generic world events, and rough reset behavior.
-- `src/lib/director/debug-log.ts` writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM`.
-- `src/app/api/director/turn/route.ts` records local log entries for rejected, provider-error, invalid-output, and successful Director turns when `LORECRAFT_DEBUG_LOG=1` is enabled.
+- `src/lib/director/debug-log.ts` writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM` and raw provider request text behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST`.
+- `src/app/api/director/turn/route.ts` records pre-turn rejection logs and one local `director.turn.unit` log entry for each recorded provider-error, invalid-output, or successful Director turn when `LORECRAFT_DEBUG_LOG=1` is enabled.
 - `src/app/world-client.tsx` renders hidden facts, events, narrations, state diffs, and Director calls in the debug panel and exposes rough reset.
 - `.gitignore`, `package.json`, and `README.md` document and support the local-only debug log path.
 
@@ -572,3 +574,184 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 
 - `npm run convex:once` could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
 - Runtime playtest verification of failed turns in the browser remains pending.
+
+## Story LC-001-S7: Active Director Guidance And Context Assembly
+
+As a playtester, I want the Director to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
+
+### Requirement R1: Prompt Context Components
+
+The system SHALL assemble Director prompts from explicit components with clear source ownership.
+
+#### Scenario R1-S1: Prompt separates instructions from state and history
+
+- WHEN the backend builds a Director request
+- THEN the request distinguishes Director instructions, scene state, visible facts, hidden NPC knowledge, recent feed, current player input, and required scene beat
+- AND the recent feed remains bounded and does not include internal turn or command IDs
+
+#### Scenario R1-S2: Editable and derived components have clear ownership
+
+- WHEN prompt components are documented or inspected in tests
+- THEN Director instructions, author/tone guidance, and model settings are treated as editable configuration
+- AND scene state, visible facts, hidden NPC knowledge, recent feed, and required scene beat are derived from Convex state, player input, and engine logic
+
+### Requirement R2: Read-Only Knowledge Context
+
+The system SHALL include relevant read-only knowledge facts in Director context without expanding LLM mutation authority.
+
+#### Scenario R2-S1: Seeded NPC knowledge reaches the Director
+
+- WHEN Mira has a seeded read-only fact such as `knows_about_storm`
+- AND the player asks Mira what she knows about the storm
+- THEN the Director request includes that knowledge as hidden context
+- AND the model can use it to write player-facing narration or dialogue
+
+#### Scenario R2-S2: Read-only facts are not mutable output fields
+
+- WHEN the Director returns `npcUpdates`
+- THEN validation still accepts only the bounded mutable NPC fields currently allowed by the MVP
+- AND read-only facts such as knowledge, secrets, occupation, or relationships are ignored if returned as attempted updates
+
+### Requirement R3: Required Scene Beat
+
+The system SHALL derive a lightweight scene-beat instruction from player input and current scene context.
+
+#### Scenario R3-S1: Direct NPC question expects response
+
+- WHEN the player directly asks Mira a question
+- THEN the Director request includes a required scene beat indicating Mira is directly addressed and a meaningful response is expected
+- AND the response may be an answer, refusal, deflection, warning, lie, counter-question, or visibly intentional silence
+
+#### Scenario R3-S2: Non-dialogue action does not force speech
+
+- WHEN the player performs a non-dialogue action such as jumping, smiling, or inspecting an object
+- THEN the required scene beat does not force an NPC line of dialogue
+- AND the Director may still narrate relevant observable reactions when they make sense
+
+### Requirement R4: Active NPC Narrative Behavior
+
+The system SHALL guide the Director to write active scene progression rather than passive acknowledgement.
+
+#### Scenario R4-S1: NPC response advances the story
+
+- WHEN the player directly engages a present NPC
+- THEN the Director narration includes a concrete response or choice from that NPC
+- AND it avoids merely repeating that the NPC is watchful, thoughtful, hesitant, or unchanged unless that silence is intentionally meaningful in the scene
+
+#### Scenario R4-S2: Dialogue is allowed in narration
+
+- WHEN the Director writes player-facing narration for an NPC response
+- THEN it may include quoted or clearly attributed NPC speech inside the `narration` field
+- AND no separate dialogue schema is required for this change
+
+### Requirement R5: Conservative Persistence Boundary
+
+The system SHALL keep transient story beats out of durable NPC facts unless they should matter after recent context falls away.
+
+#### Scenario R5-S1: Ephemeral reactions stay in narration
+
+- WHEN Mira glances, flinches, smiles, pauses, or briefly reacts to a player action
+- THEN the Director can narrate the beat without returning an `npcUpdates` entry
+- AND existing NPC facts remain unchanged
+
+#### Scenario R5-S2: Durable changes remain bounded
+
+- WHEN an interaction meaningfully changes Mira's current attitude, ongoing circumstance, or rolling memory
+- THEN the Director may propose updates only for `mood`, `status`, or `memory`
+- AND the backend validates, accepts, ignores, and records updates through the existing persistence boundary
+
+### Requirement R6: Dev-Configurable Generation Settings
+
+The system SHALL let developers tune supported provider generation settings without code edits.
+
+#### Scenario R6-S1: Optional settings configured
+
+- WHEN optional LLM generation environment variables are configured
+- THEN the provider adapter includes supported settings in the OpenAI-compatible request body
+- AND unset settings fall back to safe defaults
+
+#### Scenario R6-S2: Settings are visible in debug summaries
+
+- WHEN a Director call is persisted or locally logged
+- THEN debug metadata includes a compact summary of the effective generation settings
+- AND secrets, API keys, and full environment dumps remain excluded
+
+### Requirement R7: Debug Prompt Guidance
+
+The system SHALL let developer-playtesters adjust text-only Director guidance from the debug panel.
+
+#### Scenario R7-S1: Prompt guidance sections affect the next turn
+
+- WHEN a developer-playtester edits the style, NPC behavior, or persistence guidance fields
+- AND submits a narrative turn
+- THEN those text sections are included in the Director prompt context for that turn
+- AND they do not change the required JSON output shape or backend validation authority
+
+#### Scenario R7-S2: Prompt guidance is debug-visible
+
+- WHEN a Director call is persisted
+- THEN the request summary records which prompt guidance sections were included
+- AND the debug panel can show those section keys with the latest Director summary
+
+### Requirement R8: Debug-Gated Raw Request Persistence
+
+The system SHALL optionally persist the exact Director provider request for local troubleshooting.
+
+#### Scenario R8-S1: Raw request stored only when explicitly enabled
+
+- WHEN local raw request debug storage is enabled
+- AND a Director call is attempted
+- THEN the persisted Director call includes the exact provider messages sent to the OpenAI-compatible adapter
+- AND the raw request can be inspected in the existing debug JSON
+
+#### Scenario R8-S2: Raw request omitted by default
+
+- WHEN local raw request debug storage is not enabled
+- AND a Director call is persisted
+- THEN the Director call stores compact request metadata but omits the full raw request messages
+- AND hidden world facts, prompt guidance, and player text are not duplicated into raw request storage by default
+
+### Requirement R9: Turn-Centered Local Logs
+
+The system SHALL make local Director logs inspectable by turn rather than by scattered post-turn route events.
+
+#### Scenario R9-S1: Completed turn attempts write one unit record
+
+- WHEN a player input has been recorded as a turn
+- AND the Director attempt succeeds, fails at the provider, or returns invalid output
+- THEN the local debug log writes one `director.turn.unit` record for that turn
+- AND the record includes turn ID, command ID, player input, provider/model, request summary, status, error when present, parsed output when present, accepted/ignored updates, response length metadata, and timings
+
+#### Scenario R9-S2: Raw turn artifacts remain gated
+
+- WHEN the local turn-unit log records a provider request or response
+- THEN the exact raw provider request is omitted unless `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1` is set
+- AND the exact raw LLM response is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is set
+- AND pre-turn validation/configuration failures may still write `director.turn.rejected` records because no concrete turn exists yet
+
+### Implemented By
+
+- `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
+- `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
+- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled.
+- `src/lib/director/debug-log.ts` emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags.
+- `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes.
+- `src/app/world-client.tsx` renders debug prompt guidance text sections and includes them with the next narrative turn.
+- `src/lib/director/raw-request.ts` gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`.
+- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, raw request storage gating, and local turn-unit debug log shape.
+- `scripts/director-playtest.mjs` runs the repeatable local Director playtest against a running dev server.
+
+### Verified By
+
+- `npm run test` passed, including prompt component structure, debug prompt guidance inclusion, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, generation setting request bodies, and raw request storage gating.
+- `npm run ci:required` passed after the initial implementation.
+- `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
+- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."
+- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced no accepted durable updates for "I jump."
+- Local Convex snapshot showed `directorCalls.requestSummary` includes `promptComponentKeys`, `readOnlyKnowledgeKeys`, `requiredSceneBeat`, and `generationSettings`.
+- Final `npm run ci:required` passed after documentation and prompt refinements.
+- `npm run playtest:director` passed against local Convex/Next/Ollama after the script caught and the implementation fixed accepted Mira mood churn for "I jump."
+
+### Verification Gaps
+
+- Broader provider-specific behavior for LM Studio, OpenRouter, Vercel AI Gateway, or direct hosted providers remains future playtest coverage.

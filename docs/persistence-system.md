@@ -64,10 +64,10 @@ Current synchronous flow:
 3. The route loads bounded Director context from Convex.
 4. Convex creates a pending turn with the next world-scoped sequence number.
 5. Convex records the player input command and links it to the turn.
-6. The backend builds a stateless provider request from current state plus recent feed.
+6. The backend builds a stateless provider request from explicit prompt components: Director instructions, current scene state, visible facts, hidden read-only NPC knowledge, bounded recent feed, player input, and an engine-derived required scene beat.
 7. The provider returns strict JSON with `narration` and optional `npcUpdates`.
 8. The backend parses and validates the output.
-9. Convex records the Director call for debugging and links it to the turn.
+9. Convex records the Director call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
 10. On success, Convex stores the narration and marks the turn `succeeded`.
 11. Convex applies accepted NPC fact changes.
 12. Convex stores turn-linked events and state diffs for accepted changes.
@@ -75,6 +75,8 @@ Current synchronous flow:
 14. The UI updates from Convex state.
 
 The important bit is that the provider does not own continuity. The next turn starts from Convex again.
+
+Exact raw request storage is diagnostic evidence only. It can include hidden NPC knowledge, prompt guidance, and player text, so it is omitted by default and should not be treated as canonical game state.
 
 Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid world ids, and missing required world state.
 
@@ -138,6 +140,31 @@ Mira remembers Taylor asking about the storm, promising to check the shutters, a
 ```
 
 `memory` is not an audit log. It should not absorb occupation, spouse, faction, visible condition, every recent action, or stable biography. Older details can be merged, compressed, or dropped as newer interactions become more important.
+
+### Read-only knowledge facts
+
+NPC facts outside `mood`, `status`, and `memory` are treated as read-only Director context in the current scene. They can guide what an NPC knows, hides, implies, refuses to explain, or chooses to reveal through narration.
+
+Example:
+
+```text
+knows_about_storm = "Mira knows the storm began after the chapel bell rang at midnight, and she is afraid to say that too plainly."
+```
+
+Read-only does not mean player-visible. The Director should not mechanically expose hidden fact keys or reveal private knowledge without an in-scene reason. These facts also remain non-mutable through Director output: if the model returns `knows_about_storm`, `secret`, `occupation`, or relationship fields inside `npcUpdates`, the backend ignores them.
+
+## Prompt Context Strategy
+
+Director requests are still stateless, but the prompt is no longer one flat payload. The request separates:
+
+- Director instructions and tone guidance, which are editable configuration.
+- Scene state and visible facts, which come from Convex world data.
+- Hidden NPC knowledge, which comes from current-scene read-only actor facts.
+- Recent feed, which is bounded history and omits internal turn and command IDs.
+- Player input, which is the current narrative intent.
+- Required scene beat, which is deterministic engine guidance derived from player input and present actors.
+
+The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech or durable fact churn. The backend enforces that second boundary after normal NPC update validation.
 
 ## Feed Strategy
 

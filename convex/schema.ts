@@ -163,6 +163,7 @@ export default defineSchema({
     provider: v.string(),
     model: v.string(),
     requestSummary: v.any(),
+    rawRequest: v.optional(v.any()),
     rawResponse: v.optional(v.string()),
     parsedResponse: v.optional(v.any()),
     status: v.union(
