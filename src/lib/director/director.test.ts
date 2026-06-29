@@ -490,7 +490,7 @@ describe("Director debug logging", () => {
   it("omits raw LLM text unless explicitly enabled", () => {
     const record = buildDirectorDebugLogRecord(
       {
-        event: "director.turn.invalid_output",
+        event: "director.turn.unit",
         stage: "parse_director_output",
         turnId: "turn-id",
         provider: "localhost:11434",
@@ -506,17 +506,79 @@ describe("Director debug logging", () => {
 
     expect(record).toMatchObject({
       ts: "2026-06-27T19:30:00.000Z",
-      event: "director.turn.invalid_output",
+      event: "director.turn.unit",
       rawResponseLength: 22,
       turnId: "turn-id",
     });
     expect(record).not.toHaveProperty("rawResponse");
   });
 
+  it("builds a turn-centered debug unit without raw request text by default", () => {
+    const record = buildDirectorDebugLogRecord(
+      {
+        event: "director.turn.unit",
+        stage: "complete_director_turn",
+        turnId: "turn-id",
+        commandId: "command-id",
+        playerInput: "I ask Mira about the storm.",
+        requestSummary: { roomKey: "chapel" },
+        rawRequest: [
+          { role: "system", content: "Hidden context." },
+          { role: "user", content: "I ask Mira about the storm." },
+        ],
+        rawResponse: '{"narration":"Mira answers."}',
+        parsedResponse: { narration: "Mira answers.", npcUpdates: [] },
+        narration: "Mira answers.",
+        acceptedUpdates: [{ actorKey: "mira" }],
+        ignoredUpdates: [],
+        status: "success",
+      },
+      {
+        env: { LORECRAFT_DEBUG_LOG: "1" },
+        now: () => new Date("2026-06-27T19:32:00.000Z"),
+      },
+    );
+
+    expect(record).toMatchObject({
+      event: "director.turn.unit",
+      stage: "complete_director_turn",
+      turnId: "turn-id",
+      commandId: "command-id",
+      playerInput: "I ask Mira about the storm.",
+      rawRequestMessageCount: 2,
+      rawResponseLength: 29,
+      parsedResponse: { narration: "Mira answers.", npcUpdates: [] },
+      narration: "Mira answers.",
+      acceptedUpdateCount: 1,
+      ignoredUpdateCount: 0,
+    });
+    expect(record).not.toHaveProperty("rawRequest");
+    expect(record).not.toHaveProperty("rawResponse");
+  });
+
+  it("includes raw provider request text in local logs only when explicitly enabled", () => {
+    const rawRequest = [{ role: "user", content: "Exact provider message." }];
+    const record = buildDirectorDebugLogRecord(
+      {
+        event: "director.turn.unit",
+        stage: "complete_director_turn",
+        rawRequest,
+      },
+      {
+        env: { LORECRAFT_DEBUG_LOG: "1", LORECRAFT_DEBUG_LOG_RAW_REQUEST: "1" },
+      },
+    );
+
+    expect(record).toMatchObject({
+      rawRequestMessageCount: 1,
+      rawRequest,
+    });
+  });
+
   it("writes JSONL records only when local debug logging is enabled", async () => {
     const writes: string[] = [];
     const mkdirs: string[] = [];
-    const entry = { event: "director.turn.completed", stage: "complete_director_turn" };
+    const entry = { event: "director.turn.unit", stage: "complete_director_turn" };
 
     const disabled = await writeDirectorDebugLog(entry, {
       env: {},
@@ -547,6 +609,6 @@ describe("Director debug logging", () => {
     expect(mkdirs).toEqual(["/tmp/lorecraft/logs"]);
     expect(writes).toHaveLength(1);
     expect(writes[0]).toContain("/tmp/lorecraft/logs/test.jsonl:");
-    expect(writes[0]).toContain('"event":"director.turn.completed"');
+    expect(writes[0]).toContain('"event":"director.turn.unit"');
   });
 });

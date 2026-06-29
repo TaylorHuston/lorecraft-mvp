@@ -65,7 +65,9 @@ For local troubleshooting, enable structured Director logs:
 npm run dev:debug
 ```
 
-This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Records include route stage, provider host, model, compact request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data. Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set.
+This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Once a turn has been recorded, each attempted Director turn writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet.
+
+Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set. Full raw provider request messages are omitted unless `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1` is set.
 
 To persist the exact provider request messages in `directorCalls.rawRequest`, start the app with:
 

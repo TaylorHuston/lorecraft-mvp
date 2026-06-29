@@ -182,12 +182,31 @@ The system SHALL optionally persist the exact Director provider request for loca
 - THEN the Director call stores compact request metadata but omits the full raw request messages
 - AND hidden world facts, prompt guidance, and player text are not duplicated into raw request storage by default
 
+##### R9: Turn-Centered Local Logs
+
+The system SHALL make local Director logs inspectable by turn rather than by scattered post-turn route events.
+
+###### Scenario R9-S1: Completed turn attempts write one unit record
+
+- WHEN a player input has been recorded as a turn
+- AND the Director attempt succeeds, fails at the provider, or returns invalid output
+- THEN the local debug log writes one `director.turn.unit` record for that turn
+- AND the record includes turn ID, command ID, player input, provider/model, request summary, status, error when present, parsed output when present, accepted/ignored updates, response length metadata, and timings
+
+###### Scenario R9-S2: Raw turn artifacts remain gated
+
+- WHEN the local turn-unit log records a provider request or response
+- THEN the exact raw provider request is omitted unless local raw-request logging is explicitly enabled
+- AND the exact raw LLM response is omitted unless local raw LLM logging is explicitly enabled
+- AND pre-turn validation/configuration failures may still write `director.turn.rejected` records because no concrete turn exists yet
+
 ##### Implemented By
 
 - `src/lib/director/prompt.ts`
 - `src/lib/director/provider.ts`
 - `src/app/api/director/turn/route.ts`
 - `src/lib/director/output.ts`
+- `src/lib/director/debug-log.ts`
 - `src/lib/director/director.test.ts`
 - `convex/world.ts`
 - `src/app/world-client.tsx`
@@ -226,6 +245,7 @@ Implement the change in the backend Director layer rather than the React UI. The
 - Extend provider configuration to read optional generation settings from environment variables. Implement only settings supported cleanly by the current OpenAI-compatible request body.
 - Update `requestSummary`, local debug logs, or `directorCalls` metadata enough to diagnose prompt component and generation-setting behavior without logging secrets or full prompts by default.
 - Add optional `rawRequest` or `requestMessages` persistence to `directorCalls` behind an explicit local debug flag. Store the exact `DirectorMessage[]` sent to the provider, not a reconstructed summary.
+- Emit one local `director.turn.unit` JSONL record after each recorded turn attempt resolves so the full turn can be inspected from one log line. Keep pre-turn request/configuration failures as rejection records.
 - Update docs that explain persistence and data-model boundaries if read-only knowledge context or generation settings change the canonical guidance.
 
 ## Alternatives Considered

@@ -19,6 +19,7 @@ This change should make the Director actively write a story while preserving the
 - Add dev/config-level LLM generation settings for local playtesting, such as response length and sampling controls, without adding a polished player-facing settings UI.
 - Add debug-panel text guidance sections for style, NPC behavior, and persistence prompt tuning, inspired by AI Dungeon-style prompt guidance rather than model-parameter sliders.
 - Add debug-gated raw Director request persistence so local playtesting can inspect the exact provider messages alongside the raw provider response.
+- Change local Director logs so each recorded turn attempt is inspectable as one `director.turn.unit` JSONL record rather than scattered post-turn route events.
 - Add focused tests and playtest fixtures that prove asking Mira about the storm produces a meaningful scene beat and that ephemeral reactions do not force durable fact churn.
 
 ## Epic Actions
@@ -45,8 +46,8 @@ This change should make the Director actively write a story while preserving the
 ## Impact
 
 - Product: The play surface should feel more like an unfolding story, with direct NPC interactions producing meaningful narrative responses instead of passive description.
-- Code: Expected changes are mainly in Director prompt/context construction, provider configuration, tests, debug payload shape, and optional raw request persistence.
-- Tests: Focused Director tests should cover context components, read-only knowledge inclusion, required scene-beat derivation, prompt instructions, configurable provider options, and debug-gated raw request storage.
+- Code: Expected changes are mainly in Director prompt/context construction, provider configuration, tests, debug payload shape, local turn-unit logs, and optional raw request persistence.
+- Tests: Focused Director tests should cover context components, read-only knowledge inclusion, required scene-beat derivation, prompt instructions, configurable provider options, debug-gated raw request storage, and turn-unit local logging.
 - Docs: Update Epic, `docs/persistence-system.md`, `docs/data-model.md`, README if new environment variables are added, and this change ledger during implementation.
 
 ## Changelog Impact
@@ -62,6 +63,7 @@ This change should make the Director actively write a story while preserving the
 - Include current-scene NPC facts outside `mood`, `status`, and `memory` as read-only hidden knowledge context for the MVP.
 - Add text-only prompt guidance controls in the debug panel; leave model-parameter sliders and a polished settings UI deferred.
 - Store exact Director provider request messages only when explicitly enabled with a local debug flag such as `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`.
+- Emit one local `director.turn.unit` record for each recorded Director turn attempt; gate exact raw provider request and response text behind explicit local debug flags.
 
 ## Deferred Scope
 

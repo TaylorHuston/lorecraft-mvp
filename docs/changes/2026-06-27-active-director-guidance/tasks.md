@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: R8 debug-gated raw request persistence implemented and verified; ready for `/th-review` rerun
-- Last completed action: `npm run ci:required` and `npx convex codegen` passed after R8 implementation
+- Current state: R9 turn-centered local logs implemented and verified; ready for `/th-review` rerun
+- Last completed action: `npm run ci:required` passed after R9 implementation
 - Next action: rerun `/th-review` because the branch changed after the prior clean review
 - Active branch/ref: `change/active-director-guidance` from `develop`
 - Expected dirty files: `docs/changes/2026-06-27-active-director-guidance/`
@@ -29,6 +29,7 @@
 - [x] 2.7 Update Story-level Implemented By maps with current code locations.
 - [x] 2.8 Implement `LC-001-S7` R7/R7-S1 and R7-S2: debug prompt guidance text sections for style, NPC behavior, and persistence guidance.
 - [x] 2.9 Implement `LC-001-S7` R8/R8-S1 and R8-S2: debug-gated raw request persistence for exact provider messages.
+- [x] 2.10 Implement `LC-001-S7` R9/R9-S1 and R9-S2: one local debug unit record per recorded Director turn attempt.
 
 ### 3. Verification
 
@@ -46,6 +47,7 @@
 - [x] 3.10 Update Story-level Verified By maps with concrete evidence.
 - [x] 3.11 Run final verification after debug prompt guidance follow-up.
 - [x] 3.12 Run final verification after R8 raw request persistence.
+- [x] 3.13 Run final verification after R9 turn-centered local logs.
 
 ### 4. Review And Closeout
 
@@ -69,6 +71,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-28 | Trivial-action persistence boundary | main | `src/lib/director/prompt.ts`, `src/lib/director/output.ts`, `src/app/api/director/turn/route.ts`, tests, script | Script exposed accepted Mira mood churn for `I jump`; added a deterministic `trivial_player_action` scene beat and post-validation boundary that ignores durable NPC updates for those actions | working tree |
 | 2026-06-28 | Debug prompt guidance follow-up | main after Taylor feedback | `src/app/world-client.tsx`, `src/app/api/director/turn/route.ts`, `src/lib/director/prompt.ts`, Epic/docs | Added AI Dungeon-inspired text guidance sections for style, NPC behavior, and persistence; skipped sliders/model-parameter UI per Taylor feedback | working tree |
 | 2026-06-28 | R8 raw request diagnostics | main with `th-apply`; delegation skipped for small backend/debug slice | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/lib/director/raw-request.ts`, docs/Epic | Added optional exact provider message persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`; omitted by default because it can include hidden knowledge and player text | working tree |
+| 2026-06-28 | R9 turn-centered local logs | main with `th-apply` manual feedback loop | `src/lib/director/debug-log.ts`, `src/app/api/director/turn/route.ts`, README, docs/Epic | Replaced post-recording route-event logs with one `director.turn.unit` JSONL record per recorded turn attempt; full raw request/response text remains opt-in | working tree |
 
 ## Verification Ledger
 
@@ -91,6 +94,8 @@ Record proof as it happens.
 | 2026-06-28 | `npm run ci:required` after debug prompt guidance follow-up | Lint, Director tests, TypeScript, and Next build accept text-only prompt guidance controls and prompt context wiring | Passed |
 | 2026-06-28 | `npm run ci:required` after R8 raw request persistence | Lint, Director tests, TypeScript, and Next build accept debug-gated raw request storage and schema consumers | Passed |
 | 2026-06-28 | `npx convex codegen` after R8 raw request persistence | Convex schema/function validation accepts optional `directorCalls.rawRequest` and mutation/query validator updates | Passed |
+| 2026-06-28 | `npm run test` after R9 turn-centered local logs | Director tests cover turn-unit debug records, raw request gating, and raw response gating | Passed |
+| 2026-06-28 | `npm run ci:required` after R9 turn-centered local logs | Lint, Director tests, TypeScript, and Next build accept one local debug unit record per recorded turn attempt | Passed |
 
 ## Manual UI Confirmation
 
@@ -102,7 +107,8 @@ Use this checklist for Taylor's manual playtest after pulling this branch or run
 4. Enter `I ask Mira what she knows about the storm.` Expected: Mira gives a concrete response, refusal, deflection, warning, counter-question, action, or intentional silence; facial expression alone is not enough.
 5. Inspect the latest Director call in debug. Expected: `requiredSceneBeat.kind` is `direct_npc_question`, `targetActorKey` is `mira`, `readOnlyKnowledgeKeys` includes `mira.knows_about_storm`, `promptGuidanceKeys` lists the non-empty guidance sections, and generation settings are summarized without secrets.
 6. Enter `I jump.` Expected: the Director narrates the immediate action or observable reaction without forcing Mira dialogue and without accepting durable NPC fact updates.
-7. Optional raw-request debug check: restart with `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run dev`, send a turn, and inspect the latest Director call JSON. Expected: `rawRequest` contains the exact provider messages. Without that flag, `rawRequest` should be omitted.
+7. Optional persisted raw-request debug check: restart with `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run dev`, send a turn, and inspect the latest Director call JSON. Expected: `rawRequest` contains the exact provider messages. Without that flag, `rawRequest` should be omitted.
+8. Optional local log check: restart with `LORECRAFT_DEBUG_LOG=1 npm run dev`, send a turn, and inspect `logs/director-debug.jsonl`. Expected: the recorded turn writes one `director.turn.unit` JSONL record with turn ID, command ID, player input, request summary, parsed output when available, accepted/ignored updates, status, and timings. Full raw request text requires `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1`; full raw response text requires `LORECRAFT_DEBUG_LOG_RAW_LLM=1`.
 
 Manual confirmation status: pending Taylor after prompt-guidance follow-up.
 
@@ -119,6 +125,7 @@ Record Taylor's manual testing feedback after implementation starts.
 | 2026-06-27 | Current playtest feels passive; Mira does not speak or meaningfully answer direct questions. | requirement refinement | Proposed `LC-001-S7` with active scene-beat guidance and read-only knowledge context. | captured |
 | 2026-06-27 | RNG may be useful later but near-term work should focus on better prompting and LLM guidance. | scope boundary | Deferred RNG implementation; kept deterministic prompt/context changes in current scope. | captured |
 | 2026-06-28 | AI Dungeon-style prompt controls should be text-related prompt guidance sections, not sliders or model-parameter controls. | requirement refinement | Added `LC-001-S7` R7 for debug prompt guidance, removed the aborted slider direction, and implemented style/NPC behavior/persistence text sections. | implemented; review rerun pending |
+| 2026-06-28 | Local logs should essentially be each turn as a concrete, inspectable unit. | requirement refinement | Added `LC-001-S7` R9 and changed local logs so recorded turns emit one `director.turn.unit` record with the inspectable turn artifacts. | implemented and verified |
 
 ## Blockers / Open Questions
 
@@ -129,7 +136,7 @@ Record Taylor's manual testing feedback after implementation starts.
 ## Closeout
 
 - Epic files updated: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
-- Story/Requirement/Scenario IDs current: yes, `LC-001-S7` with `R1`-`R8` and scoped `R#-S#` scenarios
+- Story/Requirement/Scenario IDs current: yes, `LC-001-S7` with `R1`-`R9` and scoped `R#-S#` scenarios
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes, `CHANGELOG.md` under `Unreleased / Changed`

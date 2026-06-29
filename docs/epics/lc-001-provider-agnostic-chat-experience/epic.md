@@ -319,13 +319,15 @@ The system SHALL optionally write local-only structured debug logs for Director 
 
 - WHEN `LORECRAFT_DEBUG_LOG=1` is set during local development
 - THEN the backend appends newline-delimited JSON records under a gitignored local log path
-- AND each record includes timestamp, event name, route stage, provider host, model, request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data without API keys or full environment dumps
+- AND each recorded Director turn attempt writes one `director.turn.unit` record with timestamp, event name, route stage, turn ID, command ID, player input, provider host, model, request summary, outcome, errors, parsed output when available, accepted/ignored updates, response length metadata, and timing data without API keys or full environment dumps
+- AND pre-turn failures may still write `director.turn.rejected` records because no concrete turn exists yet
 
 #### Scenario R2-S2: Raw LLM logging gated
 
 - WHEN `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is not set
 - THEN local log records do not include full raw LLM response text
 - AND raw response content can still be inspected from the persisted `directorCalls` debug table when appropriate
+- AND raw provider request text is also gated separately behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1`
 
 ### Requirement R3: Accepted And Ignored Update Visibility
 
@@ -365,8 +367,8 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 - `convex/schema.ts` defines `directorCalls` for provider/model metadata, compact request summaries, raw/parsed responses, status, accepted updates, ignored updates, and errors.
 - `convex/world.ts` persists Director call audit records, accepted NPC fact diffs, generic world events, and rough reset behavior.
-- `src/lib/director/debug-log.ts` writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM`.
-- `src/app/api/director/turn/route.ts` records local log entries for rejected, provider-error, invalid-output, and successful Director turns when `LORECRAFT_DEBUG_LOG=1` is enabled.
+- `src/lib/director/debug-log.ts` writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM` and raw provider request text behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST`.
+- `src/app/api/director/turn/route.ts` records pre-turn rejection logs and one local `director.turn.unit` log entry for each recorded provider-error, invalid-output, or successful Director turn when `LORECRAFT_DEBUG_LOG=1` is enabled.
 - `src/app/world-client.tsx` renders hidden facts, events, narrations, state diffs, and Director calls in the debug panel and exposes rough reset.
 - `.gitignore`, `package.json`, and `README.md` document and support the local-only debug log path.
 
@@ -709,15 +711,34 @@ The system SHALL optionally persist the exact Director provider request for loca
 - THEN the Director call stores compact request metadata but omits the full raw request messages
 - AND hidden world facts, prompt guidance, and player text are not duplicated into raw request storage by default
 
+### Requirement R9: Turn-Centered Local Logs
+
+The system SHALL make local Director logs inspectable by turn rather than by scattered post-turn route events.
+
+#### Scenario R9-S1: Completed turn attempts write one unit record
+
+- WHEN a player input has been recorded as a turn
+- AND the Director attempt succeeds, fails at the provider, or returns invalid output
+- THEN the local debug log writes one `director.turn.unit` record for that turn
+- AND the record includes turn ID, command ID, player input, provider/model, request summary, status, error when present, parsed output when present, accepted/ignored updates, response length metadata, and timings
+
+#### Scenario R9-S2: Raw turn artifacts remain gated
+
+- WHEN the local turn-unit log records a provider request or response
+- THEN the exact raw provider request is omitted unless `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1` is set
+- AND the exact raw LLM response is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is set
+- AND pre-turn validation/configuration failures may still write `director.turn.rejected` records because no concrete turn exists yet
+
 ### Implemented By
 
 - `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
 - `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
-- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled.
+- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled.
+- `src/lib/director/debug-log.ts` emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags.
 - `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes.
 - `src/app/world-client.tsx` renders debug prompt guidance text sections and includes them with the next narrative turn.
 - `src/lib/director/raw-request.ts` gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`.
-- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, and raw request storage gating.
+- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, raw request storage gating, and local turn-unit debug log shape.
 - `scripts/director-playtest.mjs` runs the repeatable local Director playtest against a running dev server.
 
 ### Verified By
