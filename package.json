@@ -15,7 +15,9 @@
     "playtest:director": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/director-playtest.mjs",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "playtest:director:transcript": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/director-transcript-playtest.mjs",
+    "playtest:director:persistenceless": "npm run playtest:director:transcript"
   },
   "dependencies": {
     "convex": "^1.42.0",

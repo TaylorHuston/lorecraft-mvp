@@ -1,14 +1,19 @@
 import {
   NPC_FACT_KEYS,
   type DirectorActor,
+  type DirectorFeedEntry,
   type DirectorContext,
   type DirectorGenerationSettingsSummary,
   type DirectorPromptGuidance,
   type DirectorRequest,
   type RequiredSceneBeat,
+  type SceneBeatSource,
+  type TranscriptDirectorContext,
 } from "./types";
+import { validateNarrativeInput } from "./input";
 
 export const RECENT_FEED_LIMIT = 12;
+export const IMMEDIATE_CONTEXT_LIMIT = 6;
 
 const MUTABLE_NPC_FACT_KEYS = new Set<string>(NPC_FACT_KEYS);
 
@@ -39,16 +44,246 @@ const DIRECTOR_INSTRUCTIONS = [
 
 const SYSTEM_PROMPT = DIRECTOR_INSTRUCTIONS.join("\n");
 
+const TRANSCRIPT_DIRECTOR_INSTRUCTIONS = [
+  "You are Lorecraft's Director for a transcript-only story playtest.",
+  "Write active, player-facing story prose that continues from the actual transcript.",
+  "The prompt is ordered by priority: worldSeed sets the premise, transcript provides older continuity, immediateContext shows the current exchange, lastAction is the player action to resolve now, and sceneDirective is near-output guidance.",
+  "The world seed is only the opening premise. After play begins, the transcript is the source of story continuity.",
+  "The immediateContext field is the high-priority recent transcript. Use it before older transcript entries when deciding what is happening now.",
+  "The lastAction field is the only new action for this turn and has priority over prior Director prose when the player clearly changes course.",
+  "Treat lastAction as player intent for the Director to resolve, not as already-canonical story prose.",
+  "Do not copy lastAction verbatim as the next story paragraph unless it is quoted player dialogue.",
+  "Respond directly to lastAction before advancing the scene. Do not silently ignore it or continue a previous beat as if the input did not happen.",
+  "If lastAction is dialogue, a request, an answer, an order, or a question directed at a nearby established character from immediateContext, include that character's answer, refusal, action, or intentional silence in this same response.",
+  "Do not merely restate that the player said the line. Resolve the exchange unless transcript continuity makes that impossible.",
+  "Do not repeat prior setup unless one brief sentence is needed to orient the reader.",
+  "If the transcript says the player traveled, time passed, or the scene changed, continue from that transcript continuity.",
+  "If lastAction conflicts with transcript continuity, resolve the conflict in the narration from the transcript's point of view. For example, if the player addresses Mira after leaving her days behind, narrate the attempted address, memory, or impossible call; do not make Mira answer unless the transcript establishes she is present.",
+  "Do not snap the story back to the opening scene unless the transcript supports returning there.",
+  "Respond with plain prose only.",
+  "Do not return JSON, Markdown, headings, bullets, schemas, npcUpdates, state diffs, events, or machine-readable mutation proposals.",
+  "When the player directly engages a character established by the seed or transcript, that character should make a concrete choice: answer, refuse, deflect, warn, lie, ask back, act, or make intentionally meaningful silence visible.",
+  "NPC dialogue is allowed as quoted or clearly attributed speech.",
+  "No canonical runtime world state is provided in this mode. Do not infer hidden backend state beyond the seed and transcript.",
+].join("\n");
+
 export function buildDirectorRequest(
   context: DirectorContext,
   playerInput: string,
   options: {
     generationSettings?: DirectorGenerationSettingsSummary;
     promptGuidance?: DirectorPromptGuidance;
+    requiredSceneBeat?: RequiredSceneBeat;
+    sceneBeatSource?: SceneBeatSource;
+    sceneBeatReason?: string;
   } = {},
 ): DirectorRequest {
+  const prompt = buildPromptComponents(context, playerInput, {
+    promptGuidance: options.promptGuidance,
+    requiredSceneBeat: options.requiredSceneBeat,
+  });
+
+  return {
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: JSON.stringify({ promptComponents: prompt.components }, null, 2) },
+    ],
+    requestSummary: {
+      directorMode: "persistent",
+      outputContract: "json_npc_updates",
+      worldName: context.world.name,
+      roomKey: context.room.key,
+      playerInputLength: playerInput.length,
+      recentFeedCount: prompt.recentFeed.length,
+      actorKeys: context.actors.map((actor) => actor.key),
+      npcFactKeys: NPC_FACT_KEYS.filter((key) =>
+        context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
+      ),
+      readOnlyKnowledgeKeys: prompt.readOnlyKnowledgeKeys,
+      requiredSceneBeat: {
+        kind: prompt.requiredSceneBeat.kind,
+        ...(prompt.requiredSceneBeat.targetActorKey
+          ? { targetActorKey: prompt.requiredSceneBeat.targetActorKey }
+          : {}),
+        expectsNpcResponse: prompt.requiredSceneBeat.expectsNpcResponse,
+        allowsNpcUpdates: prompt.requiredSceneBeat.allowsNpcUpdates,
+      },
+      sceneBeatSource: options.sceneBeatSource ?? "engine",
+      ...(options.sceneBeatReason ? { sceneBeatReason: options.sceneBeatReason } : {}),
+      promptComponentKeys: Object.keys(prompt.components),
+      ...(prompt.promptGuidanceKeys.length > 0 ? { promptGuidanceKeys: prompt.promptGuidanceKeys } : {}),
+      ...(options.generationSettings ? { generationSettings: options.generationSettings } : {}),
+    },
+  };
+}
+
+export function buildTranscriptDirectorRequest(
+  context: TranscriptDirectorContext,
+  playerInput: string,
+  options: {
+    generationSettings?: DirectorGenerationSettingsSummary;
+    promptGuidance?: DirectorPromptGuidance;
+  } = {},
+): DirectorRequest {
+  const transcript = sanitizeTranscript(context.transcript).slice(-RECENT_FEED_LIMIT);
+  const immediateContext = transcript.slice(-IMMEDIATE_CONTEXT_LIMIT);
+  const promptGuidance = normalizePromptGuidance(options.promptGuidance);
+  const lastAction = {
+    rawInput: playerInput,
+    inferredMode: inferPlayerInputMode(playerInput),
+    directive:
+      "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
+  };
+  const sceneDirective = buildTranscriptSceneDirective(lastAction.inferredMode);
+  const components = {
+    sourceOwnership: {
+      editableConfiguration: [
+        "directorInstructions",
+        "authorToneGuidance",
+        "promptGuidance",
+        "providerGenerationSettings",
+      ],
+      seedOnly: ["worldSeed"],
+      transcriptContinuity: ["transcript"],
+      highPriorityContinuity: ["immediateContext"],
+      latestPlayerAction: ["lastAction"],
+      nearOutputGuidance: ["sceneDirective"],
+      noRuntimeWorldState: true,
+    },
+    directorInstructions: "See system message. Respond with plain prose only.",
+    authorToneGuidance:
+      "Write grounded, active, player-facing prose. Use immediateContext to determine the current exchange, nearby characters, and unresolved prompts before consulting older transcript.",
+    promptGuidance,
+    worldSeed: {
+      name: context.world.name,
+      description: context.world.description,
+      initialSeed: context.initialSeed,
+    },
+    transcript: transcript.map(toTranscriptPromptEntry),
+    immediateContext: immediateContext.map(toTranscriptPromptEntry),
+    lastAction,
+    sceneDirective,
+  };
+
+  return {
+    messages: [
+      { role: "system", content: TRANSCRIPT_DIRECTOR_INSTRUCTIONS },
+      { role: "user", content: JSON.stringify({ promptComponents: components }, null, 2) },
+    ],
+    requestSummary: {
+      directorMode: "transcript",
+      outputContract: "plain_prose",
+      worldName: context.world.name,
+      roomKey: "transcript",
+      playerInputLength: playerInput.length,
+      recentFeedCount: transcript.length,
+      actorKeys: [],
+      npcFactKeys: [],
+      readOnlyKnowledgeKeys: [],
+      requiredSceneBeat: {
+        kind: "player_action",
+        expectsNpcResponse: false,
+        allowsNpcUpdates: false,
+      },
+      promptComponentKeys: Object.keys(components),
+      ...(Object.keys(promptGuidance).length > 0
+        ? { promptGuidanceKeys: Object.keys(promptGuidance) }
+        : {}),
+      ...(options.generationSettings ? { generationSettings: options.generationSettings } : {}),
+    },
+  };
+}
+
+function inferPlayerInputMode(input: string) {
+  const trimmed = input.trim();
+  const quotedOnly = /^"[^"]+"$/.test(trimmed) || /^'[^']+'$/.test(trimmed);
+  if (quotedOnly) {
+    return "speech" as const;
+  }
+
+  if (/[?]$/.test(trimmed) || /\b(ask|tell|say|reply|answer|whisper|shout)\b/i.test(trimmed)) {
+    return "speech_or_address" as const;
+  }
+
+  if (/^\s*(you|i)\s+/i.test(trimmed)) {
+    return "action" as const;
+  }
+
+  return "storylike" as const;
+}
+
+function buildTranscriptSceneDirective(inferredMode: ReturnType<typeof inferPlayerInputMode>) {
+  const base = [
+    "Resolve lastAction in the immediate scene established by immediateContext.",
+    "Player input is intent for the Director to resolve, not already-canonical story prose.",
+    "Do not copy lastAction verbatim as the next story paragraph unless it is quoted dialogue.",
+    "Keep the response concise and avoid replaying earlier setup.",
+    "Do not decide new player actions, thoughts, feelings, or dialogue beyond the submitted input.",
+  ];
+
+  if (inferredMode === "speech" || inferredMode === "speech_or_address") {
+    base.push(
+      "Treat lastAction as something the player says or addresses to the most plausible nearby character from immediateContext.",
+      "If a nearby character has been directly engaged, include that character's response, refusal, action, or meaningful silence now.",
+    );
+  }
+
+  if (inferredMode === "action") {
+    base.push("Treat lastAction as the player's attempted action and narrate the immediate consequence.");
+  }
+
+  return base.join(" ");
+}
+
+function sanitizeTranscript(transcript: DirectorFeedEntry[]) {
+  const invalidTurnKeys = new Set<string>();
+  const invalidEntryIds = new Set<string>();
+
+  for (const entry of transcript) {
+    if (entry.kind !== "player") {
+      continue;
+    }
+
+    if (validateNarrativeInput(entry.text).ok) {
+      continue;
+    }
+
+    const turnKey = entry.turnId ?? entry.commandId;
+    if (turnKey) {
+      invalidTurnKeys.add(turnKey);
+    } else {
+      invalidEntryIds.add(entry.id);
+    }
+  }
+
+  if (invalidTurnKeys.size === 0 && invalidEntryIds.size === 0) {
+    return transcript;
+  }
+
+  return transcript.filter((entry) => {
+    const turnKey = entry.turnId ?? entry.commandId;
+    return !(turnKey && invalidTurnKeys.has(turnKey)) && !invalidEntryIds.has(entry.id);
+  });
+}
+
+function toTranscriptPromptEntry(entry: DirectorFeedEntry) {
+  return {
+    kind: entry.kind,
+    text: entry.text,
+    source: entry.source,
+  };
+}
+
+function buildPromptComponents(
+  context: DirectorContext,
+  playerInput: string,
+  options: {
+    promptGuidance?: DirectorPromptGuidance;
+    requiredSceneBeat?: RequiredSceneBeat;
+  },
+) {
   const recentFeed = context.recentFeed.slice(-RECENT_FEED_LIMIT);
-  const requiredSceneBeat = deriveRequiredSceneBeat(context, playerInput);
+  const requiredSceneBeat = options.requiredSceneBeat ?? deriveRequiredSceneBeat(context, playerInput);
   const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const currentSceneActors = context.actors.map((actor) => ({
     key: actor.key,
@@ -65,83 +300,57 @@ export function buildDirectorRequest(
       readOnlyFacts: actor.facts.filter((fact) => !MUTABLE_NPC_FACT_KEYS.has(fact.key)),
     }))
     .filter((actor) => actor.readOnlyFacts.length > 0);
-
-  const scenePayload = {
-    promptComponents: {
-      currentTurn: {
-        playerInput,
-        requiredSceneBeat,
-      },
-      sourceOwnership: {
-        editableConfiguration: [
-          "directorInstructions",
-          "authorToneGuidance",
-          "promptGuidance",
-          "providerGenerationSettings",
-        ],
-        derivedFromWorldState: ["sceneState", "visibleFacts", "hiddenNpcKnowledge", "recentFeed"],
-        derivedFromPlayerInput: ["currentTurn.playerInput", "currentTurn.requiredSceneBeat"],
-      },
-      directorInstructions: "See system message.",
-      authorToneGuidance:
-        "Write grounded, active, player-facing prose. Let present NPCs speak or act when the player engages them, but keep durable state changes conservative.",
-      promptGuidance,
-      sceneState: {
-        world: {
-          name: context.world.name,
-          description: context.world.description,
-        },
-        room: {
-          key: context.room.key,
-          name: context.room.name,
-          description: context.room.description,
-        },
-      },
-      visibleFacts: {
-        visibleExits: context.exits,
-        visibleObjects: context.objects,
-        currentSceneActors,
-      },
-      hiddenNpcKnowledge,
-      recentFeed: recentFeed.map((entry) => ({
-        kind: entry.kind,
-        text: entry.text,
-        source: entry.source,
-      })),
+  const components = {
+    currentTurn: {
+      playerInput,
+      requiredSceneBeat,
     },
+    sourceOwnership: {
+      editableConfiguration: [
+        "directorInstructions",
+        "authorToneGuidance",
+        "promptGuidance",
+        "providerGenerationSettings",
+      ],
+      derivedFromWorldState: ["sceneState", "visibleFacts", "hiddenNpcKnowledge", "recentFeed"],
+      derivedFromPlayerInput: ["currentTurn.playerInput", "currentTurn.requiredSceneBeat"],
+    },
+    directorInstructions: "See system message.",
+    authorToneGuidance:
+      "Write grounded, active, player-facing prose. Let present NPCs speak or act when the player engages them, but keep durable state changes conservative.",
+    promptGuidance,
+    sceneState: {
+      world: {
+        name: context.world.name,
+        description: context.world.description,
+      },
+      room: {
+        key: context.room.key,
+        name: context.room.name,
+        description: context.room.description,
+      },
+    },
+    visibleFacts: {
+      visibleExits: context.exits,
+      visibleObjects: context.objects,
+      currentSceneActors,
+    },
+    hiddenNpcKnowledge,
+    recentFeed: recentFeed.map((entry) => ({
+      kind: entry.kind,
+      text: entry.text,
+      source: entry.source,
+    })),
   };
-  const readOnlyKnowledgeKeys = hiddenNpcKnowledge.flatMap((actor) =>
-    actor.readOnlyFacts.map((fact) => `${actor.key}.${fact.key}`),
-  );
-  const promptGuidanceKeys = Object.keys(promptGuidance);
 
   return {
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: JSON.stringify(scenePayload, null, 2) },
-    ],
-    requestSummary: {
-      worldName: context.world.name,
-      roomKey: context.room.key,
-      playerInputLength: playerInput.length,
-      recentFeedCount: recentFeed.length,
-      actorKeys: context.actors.map((actor) => actor.key),
-      npcFactKeys: NPC_FACT_KEYS.filter((key) =>
-        context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
-      ),
-      readOnlyKnowledgeKeys,
-      requiredSceneBeat: {
-        kind: requiredSceneBeat.kind,
-        ...(requiredSceneBeat.targetActorKey
-          ? { targetActorKey: requiredSceneBeat.targetActorKey }
-          : {}),
-        expectsNpcResponse: requiredSceneBeat.expectsNpcResponse,
-        allowsNpcUpdates: requiredSceneBeat.allowsNpcUpdates,
-      },
-      promptComponentKeys: Object.keys(scenePayload.promptComponents),
-      ...(promptGuidanceKeys.length > 0 ? { promptGuidanceKeys } : {}),
-      ...(options.generationSettings ? { generationSettings: options.generationSettings } : {}),
-    },
+    components,
+    recentFeed,
+    requiredSceneBeat,
+    promptGuidanceKeys: Object.keys(promptGuidance),
+    readOnlyKnowledgeKeys: hiddenNpcKnowledge.flatMap((actor) =>
+      actor.readOnlyFacts.map((fact) => `${actor.key}.${fact.key}`),
+    ),
   };
 }
 

@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
-import { buildDirectorRequest, deriveRequiredSceneBeat } from "./prompt";
+import { readDirectorMode } from "./mode";
+import { validateNarrativeInput } from "./input";
+import {
+  buildDirectorRequest,
+  buildTranscriptDirectorRequest,
+  deriveRequiredSceneBeat,
+} from "./prompt";
 import { rawDirectorRequestForStorage, shouldStoreRawDirectorRequest } from "./raw-request";
 import {
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
+  parsePlainProseDirectorOutput,
   validateNpcUpdates,
 } from "./output";
 import { readLlmConfig, requestOpenAICompatibleChat } from "./provider";
 import { normalizeWorldLoadError } from "./turn-errors";
-import type { DirectorActor, DirectorContext } from "./types";
+import type { DirectorActor, DirectorContext, TranscriptDirectorContext } from "./types";
 
 const mira: DirectorActor = {
   key: "mira",
@@ -73,6 +80,75 @@ const context: DirectorContext = {
   })),
 };
 
+const transcriptContext: TranscriptDirectorContext = {
+  world: {
+    id: "world-id",
+    name: "Stormbound Chapel",
+    description: "A chapel in a storm.",
+  },
+  initialSeed:
+    "Stormbound Chapel: A chapel in a storm.\nOpening scene: Rain taps against warped shutters. Mira waits near the aisle.",
+  transcript: [
+    {
+      id: "command-1",
+      kind: "player",
+      text: "I leave the chapel and walk for days.",
+      source: "player",
+      createdAt: 1,
+    },
+    {
+      id: "narration-1",
+      kind: "director",
+      text: "You leave the chapel behind. Days later, the road opens into a gray valley.",
+      source: "llm",
+      createdAt: 2,
+    },
+  ],
+};
+
+const transcriptWithInvalidTurn: TranscriptDirectorContext = {
+  ...transcriptContext,
+  transcript: [
+    ...transcriptContext.transcript,
+    {
+      id: "command-bad",
+      kind: "player",
+      text: "√",
+      source: "player",
+      createdAt: 3,
+      turnId: "turn-bad",
+      commandId: "command-bad",
+    },
+    {
+      id: "narration-bad",
+      kind: "director",
+      text: "You walk into a deserted inn because the symbol was treated as a turn.",
+      source: "llm",
+      createdAt: 4,
+      turnId: "turn-bad",
+      commandId: "command-bad",
+    },
+    {
+      id: "command-2",
+      kind: "player",
+      text: "You sit at the bar.",
+      source: "player",
+      createdAt: 5,
+      turnId: "turn-2",
+      commandId: "command-2",
+    },
+    {
+      id: "narration-2",
+      kind: "director",
+      text: "The bartender leans close and asks what you want.",
+      source: "llm",
+      createdAt: 6,
+      turnId: "turn-2",
+      commandId: "command-2",
+    },
+  ],
+};
+
 describe("Director request construction", () => {
   it("builds a bounded stateless request from explicit prompt components", () => {
     const request = buildDirectorRequest(context, "I ask Mira about the storm.", {
@@ -95,6 +171,8 @@ describe("Director request construction", () => {
 
     expect(request.messages).toHaveLength(2);
     expect(request.requestSummary).toMatchObject({
+      directorMode: "persistent",
+      outputContract: "json_npc_updates",
       worldName: "Stormbound Chapel",
       roomKey: "chapel",
       recentFeedCount: 12,
@@ -187,6 +265,120 @@ describe("Director request construction", () => {
     expect(systemMessage?.content).toContain("NPC dialogue is allowed inside narration");
   });
 
+  it("builds a transcript-only plain-prose request from seed and transcript", () => {
+    const request = buildTranscriptDirectorRequest(transcriptContext, "What do I see now?", {
+      generationSettings: {
+        temperature: 0.7,
+        responseFormat: "text",
+      },
+    });
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const userMessage = request.messages.find((message) => message.role === "user");
+    const payload = JSON.parse(userMessage?.content ?? "{}");
+
+    expect(request.requestSummary).toMatchObject({
+      directorMode: "transcript",
+      outputContract: "plain_prose",
+      roomKey: "transcript",
+      actorKeys: [],
+      npcFactKeys: [],
+      readOnlyKnowledgeKeys: [],
+      recentFeedCount: 2,
+      generationSettings: {
+        temperature: 0.7,
+        responseFormat: "text",
+      },
+    });
+    expect(systemMessage?.content).toContain("Do not return JSON");
+    expect(systemMessage?.content).toContain("prompt is ordered by priority");
+    expect(systemMessage?.content).toContain("transcript is the source of story continuity");
+    expect(systemMessage?.content).toContain("immediateContext field is the high-priority");
+    expect(systemMessage?.content).toContain("lastAction field is the only new action");
+    expect(systemMessage?.content).toContain("not as already-canonical story prose");
+    expect(systemMessage?.content).toContain("Do not copy lastAction verbatim");
+    expect(systemMessage?.content).toContain("Respond directly to lastAction");
+    expect(systemMessage?.content).toContain("include that character's answer, refusal, action");
+    expect(systemMessage?.content).toContain("Do not merely restate that the player said the line");
+    expect(systemMessage?.content).toContain("conflicts with transcript continuity");
+    expect(systemMessage?.content).toContain("do not make Mira answer unless the transcript establishes she is present");
+    expect(systemMessage?.content).toContain("plain prose only");
+    expect(systemMessage?.content).not.toContain("strict JSON");
+    expect(systemMessage?.content).not.toContain("Return exactly this top-level shape");
+    expect(payload.promptComponents.sourceOwnership).toMatchObject({
+      seedOnly: ["worldSeed"],
+      transcriptContinuity: ["transcript"],
+      highPriorityContinuity: ["immediateContext"],
+      latestPlayerAction: ["lastAction"],
+      nearOutputGuidance: ["sceneDirective"],
+      noRuntimeWorldState: true,
+    });
+    expect(Object.keys(payload.promptComponents)).toEqual([
+      "sourceOwnership",
+      "directorInstructions",
+      "authorToneGuidance",
+      "promptGuidance",
+      "worldSeed",
+      "transcript",
+      "immediateContext",
+      "lastAction",
+      "sceneDirective",
+    ]);
+    expect(payload.promptComponents.lastAction).toEqual({
+      rawInput: "What do I see now?",
+      inferredMode: "speech_or_address",
+      directive:
+        "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
+    });
+    expect(payload.promptComponents.sceneDirective).toContain("Resolve lastAction");
+    expect(payload.promptComponents.sceneDirective).toContain(
+      "not already-canonical story prose",
+    );
+    expect(payload.promptComponents.sceneDirective).toContain("Do not copy lastAction verbatim");
+    expect(payload.promptComponents.sceneDirective).toContain("nearby character has been directly engaged");
+    expect(payload.promptComponents.worldSeed.initialSeed).toContain("Mira waits near the aisle");
+    expect(payload.promptComponents.immediateContext).toEqual(payload.promptComponents.transcript);
+    expect(payload.promptComponents.transcript.at(-1).text).toContain("gray valley");
+    expect(userMessage?.content).not.toContain("sceneState");
+    expect(userMessage?.content).not.toContain("visibleFacts");
+    expect(userMessage?.content).not.toContain("hiddenNpcKnowledge");
+    expect(userMessage?.content).not.toContain("requiredSceneBeat");
+    expect(userMessage?.content).not.toContain("currentTurn");
+  });
+
+  it("highlights immediate transcript context and omits invalid historical turns", () => {
+    const request = buildTranscriptDirectorRequest(
+      transcriptWithInvalidTurn,
+      '"Just some ale please"',
+    );
+    const userMessage = request.messages.find((message) => message.role === "user");
+    const payload = JSON.parse(userMessage?.content ?? "{}");
+
+    expect(request.requestSummary.recentFeedCount).toBe(4);
+    expect(payload.promptComponents.lastAction).toEqual({
+      rawInput: '"Just some ale please"',
+      inferredMode: "speech",
+      directive:
+        "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
+    });
+    expect(payload.promptComponents.sceneDirective).toContain(
+      "Treat lastAction as something the player says",
+    );
+    expect(payload.promptComponents.sceneDirective).toContain(
+      "include that character's response",
+    );
+    expect(payload.promptComponents.transcript.map((entry: { text: string }) => entry.text)).toEqual([
+      "I leave the chapel and walk for days.",
+      "You leave the chapel behind. Days later, the road opens into a gray valley.",
+      "You sit at the bar.",
+      "The bartender leans close and asks what you want.",
+    ]);
+    expect(payload.promptComponents.immediateContext.at(-1).text).toBe(
+      "The bartender leans close and asks what you want.",
+    );
+    expect(userMessage?.content).not.toContain("√");
+    expect(userMessage?.content).not.toContain("symbol was treated as a turn");
+  });
+
   it("derives a direct NPC question scene beat without forcing dialogue for plain actions", () => {
     expect(deriveRequiredSceneBeat(context, "I ask Mira what she knows about the storm.")).toMatchObject({
       kind: "direct_npc_question",
@@ -199,6 +391,38 @@ describe("Director request construction", () => {
       kind: "trivial_player_action",
       expectsNpcResponse: false,
       allowsNpcUpdates: false,
+    });
+  });
+});
+
+describe("Narrative input validation", () => {
+  it("rejects empty and symbol-only narrative inputs before they become turns", () => {
+    expect(validateNarrativeInput("")).toEqual({
+      ok: false,
+      error: "Narrative input is required.",
+    });
+    expect(validateNarrativeInput("   ")).toEqual({
+      ok: false,
+      error: "Narrative input is required.",
+    });
+    expect(validateNarrativeInput("√")).toEqual({
+      ok: false,
+      error: "Narrative input must include words or numbers.",
+    });
+    expect(validateNarrativeInput("...")).toEqual({
+      ok: false,
+      error: "Narrative input must include words or numbers.",
+    });
+  });
+
+  it("accepts trimmed prose, dialogue, and numeric narrative input", () => {
+    expect(validateNarrativeInput('  "Please."  ')).toEqual({
+      ok: true,
+      input: '"Please."',
+    });
+    expect(validateNarrativeInput("I wait for 10 minutes.")).toEqual({
+      ok: true,
+      input: "I wait for 10 minutes.",
     });
   });
 });
@@ -231,6 +455,25 @@ describe("Director output parsing", () => {
     expect(result).toEqual({
       ok: false,
       error: "Director response was not valid JSON.",
+    });
+  });
+
+  it("accepts non-empty plain prose without JSON parsing for transcript mode", () => {
+    const result = parsePlainProseDirectorOutput("  Mira says, 'Enough to be afraid.'  ");
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        narration: "Mira says, 'Enough to be afraid.'",
+        npcUpdates: [],
+      },
+    });
+  });
+
+  it("rejects empty plain prose without inventing narration", () => {
+    expect(parsePlainProseDirectorOutput("   ")).toEqual({
+      ok: false,
+      error: "Director returned an empty response.",
     });
   });
 });
@@ -353,6 +596,22 @@ describe("NPC update validation", () => {
 });
 
 describe("OpenAI-compatible provider boundary", () => {
+  it("defaults to persistent mode and rejects unknown director modes", () => {
+    expect(readDirectorMode({})).toEqual({ ok: true, mode: "persistent" });
+    expect(readDirectorMode({ LORECRAFT_DIRECTOR_MODE: "transcript" })).toEqual({
+      ok: true,
+      mode: "transcript",
+    });
+    expect(readDirectorMode({ LORECRAFT_DIRECTOR_MODE: "transcript" })).toEqual({
+      ok: true,
+      mode: "transcript",
+    });
+    expect(readDirectorMode({ LORECRAFT_DIRECTOR_MODE: "weird" })).toEqual({
+      ok: false,
+      error: 'LORECRAFT_DIRECTOR_MODE must be "persistent" or "transcript".',
+    });
+  });
+
   it("reports missing config without choosing a provider", () => {
     const config = readLlmConfig({});
 
@@ -396,6 +655,38 @@ describe("OpenAI-compatible provider boundary", () => {
       top_p: 0.85,
       response_format: { type: "json_object" },
     });
+  });
+
+  it("omits provider JSON response_format for plain-text generation settings", async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    const content = await requestOpenAICompatibleChat({
+      config: {
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "ollama",
+        model: "local-model",
+        generationSettings: {
+          temperature: 0.7,
+          responseFormat: "text",
+        },
+      },
+      messages: [{ role: "user", content: "continue the scene" }],
+      fetchImpl: async (_input, init) => {
+        capturedBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "Mira answers in plain prose." } }],
+          }),
+          { status: 200 },
+        );
+      },
+    });
+
+    expect(content).toBe("Mira answers in plain prose.");
+    expect(capturedBody).toMatchObject({
+      model: "local-model",
+      temperature: 0.7,
+    });
+    expect(capturedBody).not.toHaveProperty("response_format");
   });
 
   it("reads optional generation settings with safe defaults", () => {

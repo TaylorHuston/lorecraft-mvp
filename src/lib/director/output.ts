@@ -53,6 +53,21 @@ export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
   };
 }
 
+export function parsePlainProseDirectorOutput(rawOutput: string): DirectorParseResult {
+  const narration = rawOutput.trim();
+  if (!narration) {
+    return { ok: false, error: "Director returned an empty response." };
+  }
+
+  return {
+    ok: true,
+    output: {
+      narration,
+      npcUpdates: [],
+    },
+  };
+}
+
 export function validateNpcUpdates(
   parsedUpdates: ParsedNpcUpdate[],
   currentSceneActors: DirectorActor[],

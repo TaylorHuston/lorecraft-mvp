@@ -23,7 +23,7 @@ const convex = new ConvexHttpClient(convexUrl);
 
 console.log(`Director playtest target: ${baseUrl}`);
 
-const worldId = await seedAndResetWorld();
+const worldId = await seedFreshWorld();
 const directQuestion = await submitTurn(baseUrl, worldId, DIRECT_QUESTION_INPUT);
 assertDirectQuestion(directQuestion);
 
@@ -38,14 +38,12 @@ console.log("Director playtest passed.");
 console.log(`- Direct question narration: ${directQuestion.narration}`);
 console.log(`- Plain action narration: ${plainAction.narration}`);
 
-async function seedAndResetWorld() {
+async function seedFreshWorld() {
   try {
-    const seededWorldId = await convex.mutation(api.world.seedDemoWorld, {});
-    await convex.mutation(api.world.resetPlaytestWorld, { worldId: seededWorldId });
-    return seededWorldId;
+    return await convex.mutation(api.world.seedDemoWorld, {});
   } catch (error) {
     fail(
-      `Could not seed/reset Convex world at ${convexUrl}. Is Convex running? ${errorMessage(error)}`,
+      `Could not seed a fresh Convex world at ${convexUrl}. Is Convex running? ${errorMessage(error)}`,
     );
   }
 }
@@ -197,7 +195,7 @@ function printHelp() {
   console.log(`Usage: npm run playtest:director -- [--base-url ${DEFAULT_BASE_URL}] [--timeout-ms 180000]
 
 Runs a local Director smoke playtest against a running Lorecraft app:
-1. Seeds and rough-resets the demo world through Convex.
+1. Seeds a fresh demo world through Convex.
 2. Sends a direct Mira question through /api/director/turn.
 3. Sends a plain action through /api/director/turn.
 4. Verifies narration, durable update behavior, and Director debug metadata.

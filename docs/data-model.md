@@ -10,16 +10,18 @@ Table: `worlds`
 
 A world is the top-level container for the current playtest state.
 
+For the current MVP, the Stormbound Chapel world is boot-scoped demo data. Reseeding creates a fresh demo world and deletes prior demo worlds plus their dependent rows. Durable world identity and campaign/world-instance persistence are deferred.
+
 | Field | Meaning |
 |---|---|
-| `slug` | Stable human-readable identifier for the world. The MVP uses `stormbound-chapel`. |
+| `slug` | Human-readable identifier for the seeded demo world. The MVP uses a `stormbound-chapel-*` boot-scoped slug. |
 | `name` | Display name shown to the player/debug UI. |
 | `description` | Stable baseline description of the world. Used as Director context. |
 | `currentPlayerActorId` | The actor currently controlled by the player. Optional so seed/repair flows can create the world before wiring the player. |
 
 Strategy:
 
-- The MVP has one editable world.
+- The MVP has one active boot-scoped demo world at a time.
 - Later, canonical worlds will likely become templates and active play will happen in copied story instances.
 
 ## Room
@@ -219,6 +221,7 @@ Strategy:
 - Narration is part of the visible feed.
 - Narration can contain transient beats without making them durable state.
 - If a narrated change must matter later, persist a fact and state diff too.
+- In transcript Director mode, LLM narrations still persist even though canonical world mutations are disabled.
 
 ## Event
 
@@ -295,7 +298,8 @@ Strategy:
 - Director calls are diagnostics, not canonical game state.
 - They explain provider failures, invalid JSON, accepted updates, and ignored updates.
 - Do not use this table as the source of truth for what the world remembers.
-- Current request summaries include compact prompt/debug metadata such as prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+- Current request summaries include compact prompt/debug metadata such as `directorMode`, `outputContract`, prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+- In transcript mode, `acceptedUpdates` and `ignoredUpdates` are empty and `parsedResponse` is normalized to a narration with no `npcUpdates`.
 - `rawRequest` is omitted by default and only stored when local raw request debug storage is explicitly enabled. It can contain hidden NPC knowledge, prompt guidance, and player text, so it is diagnostic evidence rather than canonical game state.
 
 ## Director Prompt Context
@@ -319,7 +323,8 @@ Strategy:
 - Prompt context is diagnostic/request state, not canonical world state.
 - Prompt guidance text is an experimental playtest control. It should guide narration, not override schema, validation, hidden knowledge boundaries, or durable-state rules.
 - Generation settings are developer configuration and are summarized in Director call debug metadata.
-- Required scene beats should stay narrow until playtesting proves broader automation is needed.
+- Persistent mode uses `outputContract: "json_npc_updates"` and requests strict JSON. Transcript mode uses `outputContract: "plain_prose"` and requests plain story prose from the opening seed plus transcript only.
+- Required scene beats should stay narrow until playtesting proves broader automation is needed. They currently belong to the persistent mode path, not transcript mode.
 - Trivial physical actions such as `I jump.` derive a `trivial_player_action` scene beat that disallows durable NPC updates for that turn; passing reactions stay in narration/debug instead.
 
 ## Derived Feed Entry

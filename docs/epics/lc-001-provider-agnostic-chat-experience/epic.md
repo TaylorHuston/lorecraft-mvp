@@ -755,3 +755,156 @@ The system SHALL make local Director logs inspectable by turn rather than by sca
 ### Verification Gaps
 
 - Broader provider-specific behavior for LM Studio, OpenRouter, Vercel AI Gateway, or direct hosted providers remains future playtest coverage.
+
+## Story LC-001-S8: Transcript Director Mode
+
+As a developer-playtester, I want a story-only Director mode that saves the transcript but does not mutate canonical world state, so that I can isolate story quality from persistence mechanics before adding mutation pressure back in.
+
+### Requirement R1: Director Mode Configuration
+
+The system SHALL support explicit Director modes selected by application server startup configuration.
+
+#### Scenario R1-S1: Persistent mode remains default
+
+- WHEN the application server starts without a transcript Director flag
+- AND the player submits a narrative turn
+- THEN the route uses the existing persistent mode
+- AND the current strict JSON, NPC update validation, narration persistence, state diff, and event behavior remains available
+
+#### Scenario R1-S2: Transcript startup flag enabled
+
+- WHEN the application server starts with `LORECRAFT_DIRECTOR_MODE=transcript`
+- AND the player submits a narrative turn
+- THEN the backend Director boundary resolves the mode as transcript
+- AND React does not own the mode's persistence rules
+
+#### Scenario R1-S3: Invalid startup mode rejected before persistence
+
+- WHEN the application server is configured with an unknown Director mode value
+- AND the player submits a narrative turn
+- THEN the route returns a structured setup or validation error
+- AND it does not create a turn, record player input, or call the provider
+
+### Requirement R2: Plain-Prose Story Contract
+
+The system SHALL use a plain-prose output contract for transcript Director calls.
+
+#### Scenario R2-S1: Transcript prompt asks for prose
+
+- WHEN the backend builds a transcript Director request
+- THEN the system prompt asks for player-facing story prose rather than strict JSON
+- AND it does not ask the model to return `npcUpdates`, state diffs, events, or machine-readable mutation proposals
+
+#### Scenario R2-S2: Non-empty prose succeeds
+
+- WHEN the provider returns non-empty plain text in transcript mode
+- THEN the backend treats the trimmed text as the Director narration
+- AND the turn can succeed without JSON parsing
+
+#### Scenario R2-S3: Empty prose fails cleanly
+
+- WHEN the provider returns an empty response in transcript mode
+- THEN the turn is marked failed
+- AND no fake narration or state change is stored
+
+#### Scenario R2-S4: Transcript context excludes runtime world state
+
+- WHEN the application runs in transcript mode
+- AND the player submits a narrative turn
+- THEN the backend builds the plain-prose Director request from the canonical opening seed, bounded transcript, prompt guidance, and current player input
+- AND it does not include current room state, present actor rows, visible exits, object state, mutable NPC facts, hidden NPC knowledge, or scene-beat classification
+
+### Requirement R3: Transcript And Debug Persistence Without World Mutation
+
+The system SHALL persist inspectable transcript/debug records for transcript turns while leaving canonical world state unchanged.
+
+#### Scenario R3-S1: Transcript turn resumes after reload
+
+- WHEN a transcript turn succeeds and the app reloads
+- THEN the feed shows the player's input and the Director narration
+- AND the turn/debug records remain inspectable after reload
+
+#### Scenario R3-S2: Director debug identifies mode and output contract
+
+- WHEN a transcript Director call is persisted or locally logged
+- THEN the debug metadata includes `directorMode: "transcript"` and `outputContract: "plain_prose"`
+- AND accepted and ignored update lists are empty
+
+#### Scenario R3-S3: Raw artifacts remain gated
+
+- WHEN transcript mode records local logs or persisted Director calls
+- THEN exact raw provider request and response text follows the existing raw debug flag behavior
+- AND API keys, secrets, and full environment dumps remain excluded
+
+### Requirement R4: Canonical State Mutation Disabled
+
+The system SHALL prevent transcript Director responses from changing canonical world state.
+
+#### Scenario R4-S1: NPC facts do not change
+
+- WHEN a transcript turn succeeds
+- THEN current NPC facts such as Mira's `mood`, `status`, and `memory` remain unchanged
+- AND no `npcUpdates` from the model are parsed, accepted, or ignored
+
+#### Scenario R4-S2: No LLM state diffs or world events
+
+- WHEN a transcript turn succeeds
+- THEN no LLM-authored state diffs are recorded
+- AND no LLM-authored world event such as "Mira's state changed after the exchange" is recorded
+
+#### Scenario R4-S3: Runtime world state is not prompt context
+
+- WHEN a transcript request is built
+- THEN canonical runtime state such as current room, visible facts, hidden NPC knowledge, and actor locations is not included as read-only context
+- AND story continuity comes from the seed plus transcript instead
+
+### Requirement R5: Mode Comparison Remains Testable
+
+The system SHALL make persistent and transcript behavior easy to compare during local playtesting.
+
+#### Scenario R5-S1: Same input can be tested in either mode
+
+- WHEN the same seeded world and player input are used after starting the application server in persistent mode and transcript mode
+- THEN both modes can produce a player-facing narration
+- AND only persistent mode may produce validated world/NPC mutations
+
+#### Scenario R5-S2: Smoke playtest can prove no-mutation behavior
+
+- WHEN a local transcript smoke playtest sends a direct Mira question
+- THEN the response includes non-empty narration
+- AND Convex snapshot/debug evidence shows the command, turn, narration, and Director call without new NPC fact changes, state diffs, or LLM world events
+
+#### Scenario R5-S3: Fresh demo world per seed
+
+- WHEN the demo world is seeded during the current MVP
+- THEN prior Stormbound Chapel demo worlds and dependent rows are deleted
+- AND the new world uses the current server boot's demo slug
+- AND playtesting starts from the initial seed instead of resuming older world state
+
+### Implemented By
+
+- `src/lib/director/mode.ts` reads `LORECRAFT_DIRECTOR_MODE`, defaults to persistent mode, and rejects unknown values before turn persistence.
+- `src/lib/director/prompt.ts` builds separate persistent JSON and transcript plain-prose Director requests; transcript requests use seed plus transcript rather than live world state.
+- `src/lib/director/provider.ts` omits OpenAI-compatible `response_format` when the effective generation settings request plain text.
+- `src/lib/director/output.ts` parses transcript plain prose as narration with no NPC updates.
+- `src/app/api/director/turn/route.ts` branches backend Director orchestration by startup mode, loads transcript context for transcript mode, and sends transcript completions through a no-mutation path.
+- `convex/world.ts` seeds fresh boot-scoped demo worlds, stores successful transcript narrations and Director calls, and skips NPC fact writes, LLM events, and state diffs.
+- `src/app/world-client.tsx` shows the latest Director mode and output contract in the debug summary.
+- `scripts/director-transcript-playtest.mjs` verifies the local transcript no-mutation smoke path.
+
+### Verified By
+
+- `npm run test` passed, including mode defaulting/validation, transcript prose prompt shape, plain-prose output parsing, and provider request body behavior.
+- Focused Director tests cover transcript prompt shape, seed/transcript-only context, mode aliasing, plain-prose parsing, and persistent-mode scene-beat behavior.
+- `npm run typecheck` passed after adding the Director mode and output-contract type split.
+- `npm run ci:required` passed after implementation and documentation updates.
+- `npx convex codegen` passed after adding the no-mutation completion argument.
+- `LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug` plus `npm run playtest:director:transcript` passed against local Convex/Next/Ollama, producing non-empty prose while preserving baseline Mira facts and creating no LLM state diffs or LLM world events.
+- After final review found and fixed contradictory nested prompt guidance, `npm run test`, `npm run typecheck`, `npm run ci:required`, and `npm run playtest:director:transcript` passed again.
+- `npm run dev:debug` plus `npm run playtest:director` passed in default persistent mode, proving the existing strict JSON smoke path still works.
+- After changing transcript mode to seed-plus-transcript context, `npm run ci:required` and `npm run playtest:director:transcript` passed; latest log inspection confirmed the raw prompt includes `worldSeed` and `transcript` while omitting `sceneState`, `visibleFacts`, `hiddenNpcKnowledge`, and `requiredSceneBeat`.
+- Fresh demo seeding verified through `npx convex codegen`, `npm run ci:required`, `npm run playtest:director:transcript`, and latest log inspection showing a new transcript turn with seed/transcript prompt components and zero accepted/ignored updates.
+
+### Verification Gaps
+
+- Taylor manual browser confirmation remains pending.

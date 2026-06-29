@@ -64,7 +64,7 @@ Current synchronous flow:
 3. The route loads bounded Director context from Convex.
 4. Convex creates a pending turn with the next world-scoped sequence number.
 5. Convex records the player input command and links it to the turn.
-6. The backend builds a stateless provider request from explicit prompt components: Director instructions, current scene state, visible facts, hidden read-only NPC knowledge, bounded recent feed, player input, and an engine-derived required scene beat.
+6. The backend builds a stateless provider request from explicit prompt components: Director instructions, current scene state, visible facts, hidden read-only NPC knowledge, bounded recent feed, player input, and a required scene beat.
 7. The provider returns strict JSON with `narration` and optional `npcUpdates`.
 8. The backend parses and validates the output.
 9. Convex records the Director call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
@@ -79,6 +79,51 @@ The important bit is that the provider does not own continuity. The next turn st
 Exact raw request storage is diagnostic evidence only. It can include hidden NPC knowledge, prompt guidance, and player text, so it is omitted by default and should not be treated as canonical game state.
 
 Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid world ids, and missing required world state.
+
+## Director Modes
+
+Lorecraft currently has two Director modes. The application server selects the mode at startup with `LORECRAFT_DIRECTOR_MODE`.
+
+### Persistent mode
+
+Persistent mode is the default. It uses the strict JSON Director contract with `narration` and optional `npcUpdates`. The backend validates proposed NPC updates and may persist accepted `mood`, `status`, and `memory` fact changes, LLM events, and state diffs.
+
+Use this mode to test Lorecraft's state-first thesis: the transcript, debug records, and canonical world state all move forward together when the backend accepts a mutation.
+
+## Demo World Lifetime
+
+For this MVP experiment, the Stormbound Chapel demo world is not durable product data. The seed mutation creates a fresh boot-scoped demo world and deletes prior demo worlds plus their rooms, actors, objects, facts, turns, commands, narrations, events, state diffs, and Director calls. After a server restart, the app should seed a fresh world instead of resuming an older one.
+
+This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Director loop. Durable world identity, campaign instances, and long-lived save files are deferred until the core story loop is worth preserving.
+
+### Transcript mode
+
+Transcript mode is enabled with:
+
+```bash
+LORECRAFT_DIRECTOR_MODE=transcript
+```
+
+The name means "no canonical world mutation from the Director response." It does not mean "nothing is saved."
+
+Transcript turns still save:
+
+- the scoped turn
+- the player input command
+- the Director narration
+- the Director call debug record
+- local debug logs when enabled
+
+Transcript turns do not save or consume as live prompt truth:
+
+- accepted NPC fact updates
+- ignored NPC update validation records
+- LLM-authored world events
+- LLM-authored state diffs
+- room, exit, object, actor-location, inventory, combat, or rule changes
+- current room state, current actor presence, exits, object state, mutable NPC facts, or hidden NPC knowledge
+
+The provider request uses a canonical opening seed plus the actual player/Director transcript. It asks for plain prose rather than strict JSON. The transcript is the source of runtime story continuity: if the transcript says the player traveled away from the chapel, the next turn continues from that transcript rather than snapping back to the canonical `chapel` room. This creates a comparison baseline: if prose improves when runtime world-state pressure is removed, persistence can be reintroduced one layer at a time.
 
 ## NPC State Strategy
 
@@ -155,16 +200,18 @@ Read-only does not mean player-visible. The Director should not mechanically exp
 
 ## Prompt Context Strategy
 
-Director requests are still stateless, but the prompt is no longer one flat payload. The request separates:
+Persistent Director requests are still stateless, but the prompt is no longer one flat payload. The request separates:
 
 - Director instructions and tone guidance, which are editable configuration.
 - Scene state and visible facts, which come from Convex world data.
 - Hidden NPC knowledge, which comes from current-scene read-only actor facts.
 - Recent feed, which is bounded history and omits internal turn and command IDs.
 - Player input, which is the current narrative intent.
-- Required scene beat, which is deterministic engine guidance derived from player input and present actors.
+- Required scene beat, which is deterministic guidance derived from player input and present actors in persistent mode.
 
 The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech or durable fact churn. The backend enforces that second boundary after normal NPC update validation.
+
+Transcript Director requests are simpler. They separate only editable Director/tone guidance, the canonical opening seed, the bounded transcript, and the current player input. They intentionally omit current scene state, visible facts, hidden NPC knowledge, and required scene beats.
 
 ## Feed Strategy
 
@@ -190,9 +237,9 @@ The debug panel also exposes recent turn summaries: sequence number, status, pla
 
 ## Reset Strategy
 
-The MVP has one editable world and a rough reset. Reset clears scoped turns, playtest history, and debug records, then restores Mira's baseline `mood`, `status`, and `memory`.
+The primary MVP reset path is fresh seeding. The seed mutation deletes prior Stormbound Chapel demo worlds and dependent rows, then recreates the world graph from the current seed.
 
-It does not delete the seeded world graph.
+The debug panel still has a rough reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, then restores Mira's baseline `mood`, `status`, and `memory`. It is a convenience tool, not the preferred server-restart workflow.
 
 Long term, reset is not the product model. The likely product model is independent story/play-session instances created from world templates, but that is intentionally deferred until the single-world persistence loop proves itself.
 

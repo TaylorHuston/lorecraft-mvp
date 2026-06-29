@@ -82,7 +82,9 @@ export async function requestOpenAICompatibleChat({
         ? { max_tokens: config.generationSettings.maxTokens }
         : {}),
       ...(config.generationSettings.topP !== undefined ? { top_p: config.generationSettings.topP } : {}),
-      response_format: { type: "json_object" },
+      ...(config.generationSettings.responseFormat === "json_object"
+        ? { response_format: { type: "json_object" } }
+        : {}),
     }),
   });
 

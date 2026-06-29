@@ -2,19 +2,19 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { writeDirectorDebugLog } from "@/lib/director/debug-log";
-import { buildDirectorRequest } from "@/lib/director/prompt";
+import { readDirectorMode } from "@/lib/director/mode";
+import { buildDirectorRequest, buildTranscriptDirectorRequest } from "@/lib/director/prompt";
 import {
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
+  parsePlainProseDirectorOutput,
   validateNpcUpdates,
 } from "@/lib/director/output";
-import {
-  ProviderError,
-  readLlmConfig,
-  requestOpenAICompatibleChat,
-} from "@/lib/director/provider";
+import { ProviderError, readLlmConfig, requestOpenAICompatibleChat } from "@/lib/director/provider";
+import { validateNarrativeInput } from "@/lib/director/input";
 import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
+import type { DirectorContext, TranscriptDirectorContext } from "@/lib/director/types";
 
 export const runtime = "nodejs";
 
@@ -44,12 +44,28 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: bodyResult.error }, 400);
   }
 
+  const modeResult = readDirectorMode();
+  if (!modeResult.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "read_director_mode",
+      worldId: bodyResult.body.worldId,
+      error: modeResult.error,
+      httpStatus: 500,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
+    return json<TurnResponse>({ ok: false, error: modeResult.error }, 500);
+  }
+
   const configResult = readLlmConfig();
   if (!configResult.ok) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "read_config",
       worldId: bodyResult.body.worldId,
+      requestSummary: {
+        directorMode: modeResult.mode,
+      },
       error: configResult.error,
       httpStatus: 503,
       timingsMs: { total: elapsedSince(startedAt) },
@@ -75,10 +91,16 @@ export async function POST(request: Request) {
 
   const { worldId, input } = bodyResult.body;
   const convex = convexResult.client;
+  const directorMode = modeResult.mode;
 
-  let context: Awaited<ReturnType<typeof convex.query<typeof api.world.getDirectorContext>>>;
+  let context:
+    | Awaited<ReturnType<typeof convex.query<typeof api.world.getDirectorContext>>>
+    | Awaited<ReturnType<typeof convex.query<typeof api.world.getTranscriptDirectorContext>>>;
   try {
-    context = await convex.query(api.world.getDirectorContext, { worldId });
+    context =
+      directorMode === "transcript"
+        ? await convex.query(api.world.getTranscriptDirectorContext, { worldId })
+        : await convex.query(api.world.getDirectorContext, { worldId });
   } catch (error) {
     const worldLoadError = normalizeWorldLoadError(error);
     await logDirectorTurn({
@@ -99,6 +121,7 @@ export async function POST(request: Request) {
       worldLoadError.httpStatus,
     );
   }
+
   if (!context) {
     await logDirectorTurn({
       event: "director.turn.rejected",
@@ -134,16 +157,27 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
 
-  const directorRequest = buildDirectorRequest(context, input, {
-    generationSettings: configResult.config.generationSettings,
-    promptGuidance: bodyResult.body.promptGuidance,
-  });
+  const generationSettings =
+    directorMode === "transcript"
+      ? { ...configResult.config.generationSettings, responseFormat: "text" as const }
+      : configResult.config.generationSettings;
+  const directorRequest =
+    directorMode === "transcript"
+      ? buildTranscriptDirectorRequest(context as TranscriptDirectorContext, input, {
+          generationSettings,
+          promptGuidance: bodyResult.body.promptGuidance,
+        })
+      : buildDirectorRequest(context as DirectorContext, input, {
+          generationSettings,
+          promptGuidance: bodyResult.body.promptGuidance,
+        });
   const rawRequest = rawDirectorRequestForStorage(directorRequest.messages);
+
   let rawOutput: string;
   const providerStartedAt = performance.now();
   try {
     rawOutput = await requestOpenAICompatibleChat({
-      config: configResult.config,
+      config: { ...configResult.config, generationSettings },
       messages: directorRequest.messages,
     });
   } catch (error) {
@@ -187,7 +221,10 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: providerError.message }, 502);
   }
 
-  const parsed = parseDirectorOutput(rawOutput);
+  const parsed =
+    directorMode === "transcript"
+      ? parsePlainProseDirectorOutput(rawOutput)
+      : parseDirectorOutput(rawOutput);
   if (!parsed.ok) {
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
@@ -228,10 +265,13 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: parsed.error }, 422);
   }
 
-  const validated = applySceneBeatPersistenceBoundary(
-    validateNpcUpdates(parsed.output.npcUpdates, context.actors),
-    directorRequest.requestSummary.requiredSceneBeat,
-  );
+  const validated =
+    directorMode === "transcript"
+      ? { acceptedUpdates: [], ignoredUpdates: [] }
+      : applySceneBeatPersistenceBoundary(
+          validateNpcUpdates(parsed.output.npcUpdates, (context as DirectorContext).actors),
+          directorRequest.requestSummary.requiredSceneBeat,
+        );
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
     turnId: recorded.turnId,
@@ -246,6 +286,7 @@ export async function POST(request: Request) {
     acceptedUpdates: validated.acceptedUpdates,
     ignoredUpdates: validated.ignoredUpdates,
     narration: parsed.output.narration,
+    applyWorldMutations: directorMode === "persistent",
   });
   await logDirectorTurn({
     event: "director.turn.unit",
@@ -299,8 +340,9 @@ async function readBody(request: Request) {
     return { ok: false as const, error: "A worldId is required." };
   }
 
-  if (typeof parsed.input !== "string" || parsed.input.trim().length === 0) {
-    return { ok: false as const, error: "Narrative input is required." };
+  const inputResult = validateNarrativeInput(parsed.input);
+  if (!inputResult.ok) {
+    return inputResult;
   }
 
   const promptGuidance = readPromptGuidance(parsed.promptGuidance);
@@ -312,7 +354,7 @@ async function readBody(request: Request) {
     ok: true as const,
     body: {
       worldId: parsed.worldId as Id<"worlds">,
-      input: parsed.input.trim(),
+      input: inputResult.input,
       promptGuidance: promptGuidance.value,
     },
   };

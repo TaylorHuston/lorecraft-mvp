@@ -56,12 +56,28 @@ export type DirectorContext = {
   recentFeed: DirectorFeedEntry[];
 };
 
+export type TranscriptDirectorContext = {
+  world: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  initialSeed: string;
+  transcript: DirectorFeedEntry[];
+};
+
 export type DirectorMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
+export type DirectorMode = "persistent" | "transcript";
+export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
+export type SceneBeatSource = "engine" | "llm" | "fallback";
+
 export type DirectorRequestSummary = {
+  directorMode: DirectorMode;
+  outputContract: DirectorOutputContract;
   worldName: string;
   roomKey: string;
   playerInputLength: number;
@@ -75,6 +91,8 @@ export type DirectorRequestSummary = {
     expectsNpcResponse: boolean;
     allowsNpcUpdates: boolean;
   };
+  sceneBeatSource?: SceneBeatSource;
+  sceneBeatReason?: string;
   promptComponentKeys: string[];
   promptGuidanceKeys?: string[];
   generationSettings?: DirectorGenerationSettingsSummary;
@@ -105,7 +123,7 @@ export type DirectorGenerationSettingsSummary = {
   temperature: number;
   maxTokens?: number;
   topP?: number;
-  responseFormat: "json_object";
+  responseFormat: "json_object" | "text";
 };
 
 export type DirectorPromptGuidance = {

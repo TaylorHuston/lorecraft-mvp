@@ -65,7 +65,7 @@ export function WorldClient() {
     setError(null);
     const seededWorldId = await seedWorld();
     setSelectedWorldId(seededWorldId);
-    setNotice("Stormbound Chapel is ready.");
+    setNotice("Fresh Stormbound Chapel world seeded.");
   }
 
   async function handleReset() {
@@ -153,7 +153,7 @@ export function WorldClient() {
             {!worldId ? (
               <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4">
                 <p className="max-w-xl text-lg text-zinc-300">
-                  Seed the demo world to begin the persistent scene playtest.
+                  Seed a fresh demo world to begin the transcript playtest.
                 </p>
                 <button
                   type="button"
@@ -245,7 +245,7 @@ export function WorldClient() {
                 onClick={handleSeed}
                 className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
               >
-                Ensure seed
+                Fresh seed
               </button>
               <button
                 type="button"
@@ -433,6 +433,10 @@ function DirectorPromptControls({
             <>
               <dt className="text-zinc-500">Beat</dt>
               <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.requiredSceneBeat)}</dd>
+              <dt className="text-zinc-500">Mode</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.directorMode)}</dd>
+              <dt className="text-zinc-500">Output</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.outputContract)}</dd>
               <dt className="text-zinc-500">Settings</dt>
               <dd className="min-w-0 text-zinc-300">
                 {summaryText(latestSummary.generationSettings)}

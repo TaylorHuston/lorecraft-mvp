@@ -61,7 +61,17 @@ http://localhost:3000
 
 `npm run dev:debug` currently enables all local Director diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, and persisted provider request messages in `directorCalls.rawRequest`.
 
-Each recorded Director turn attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, raw request, raw response, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include hidden NPC knowledge, prompt guidance, player text, and model output, so keep it local/debug-only.
+Each recorded Director turn attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, raw request, raw response, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include prompt guidance, player text, model output, and in persistent mode hidden NPC knowledge, so keep it local/debug-only.
+
+Persistent Director mode is the default. To compare story-only prose generation without canonical world mutation, start the app with transcript mode:
+
+```bash
+LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug
+```
+
+Transcript mode still persists turns, player input, Director narrations, Director debug calls, and local logs. Its prompt is built from the canonical opening seed plus the transcript only; it does not include current room state, present actors, exits, object state, NPC facts, hidden NPC knowledge, or a scene-beat classifier. It does not apply NPC fact changes, LLM-authored world events, or LLM-authored state diffs from the Director response.
+
+The demo world is intentionally fresh seed data for now. Seeding Stormbound Chapel deletes prior demo worlds and starts a new boot-scoped world, so after a server restart the expected workflow is to seed again and test the initial world setup.
 
 Run the repeatable local Director smoke playtest against a running dev server:
 
@@ -69,12 +79,18 @@ Run the repeatable local Director smoke playtest against a running dev server:
 npm run playtest:director
 ```
 
-The script seeds and rough-resets the demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Director debug metadata. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
+The script seeds a fresh demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Director debug metadata. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
+
+When the app is running in transcript mode, run the no-mutation smoke check:
+
+```bash
+npm run playtest:director:transcript
+```
 
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
-- `convex/world.ts` seeds the Stormbound Chapel world, reconstructs the feed, persists Director debug records, stores accepted NPC facts, and resets playtest state.
+- `convex/world.ts` seeds a fresh boot-scoped Stormbound Chapel demo world, reconstructs the feed, persists Director debug records, stores accepted NPC facts in persistent mode, and resets playtest state.
 - `src/app/api/director/turn/route.ts` coordinates synchronous Director turns through a provider-neutral backend boundary.
 - `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
 - `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
