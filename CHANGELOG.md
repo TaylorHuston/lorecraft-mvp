@@ -17,6 +17,7 @@ The format is based on Keep a Changelog 1.1.0.
 
 - Improved Director prompt context so direct NPC questions can produce meaningful NPC responses while read-only NPC knowledge remains outside the mutable state allowlist.
 - Changed local Director debug logs to write one inspectable `director.turn.unit` record per recorded turn attempt.
+- Changed `npm run dev:debug` to enable full local Director diagnostics, including raw provider requests, raw LLM responses, and persisted raw request storage.
 - Changed the Lorecraft play surface from chat-like feed cards to a prose-first story stream with independent story/debug scrolling and bottom anchoring.
 - Replaced the player-facing command parser surface with one narrative input and a split debug layout.
 

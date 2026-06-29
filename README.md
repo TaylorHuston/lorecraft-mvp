@@ -47,10 +47,10 @@ Provision or validate the local Convex deployment once:
 npm run convex:once
 ```
 
-Start the local development loop:
+Start the local development loop with Director diagnostics enabled:
 
 ```bash
-npm run dev
+npm run dev:debug
 ```
 
 This starts Convex and Next.js together. The app runs at:
@@ -59,23 +59,9 @@ This starts Convex and Next.js together. The app runs at:
 http://localhost:3000
 ```
 
-For local troubleshooting, enable structured Director logs:
+`npm run dev:debug` currently enables all local Director diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, and persisted provider request messages in `directorCalls.rawRequest`.
 
-```bash
-npm run dev:debug
-```
-
-This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Once a turn has been recorded, each attempted Director turn writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet.
-
-Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set. Full raw provider request messages are omitted unless `LORECRAFT_DEBUG_LOG_RAW_REQUEST=1` is set.
-
-To persist the exact provider request messages in `directorCalls.rawRequest`, start the app with:
-
-```bash
-LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run dev
-```
-
-This can include hidden NPC knowledge, prompt guidance, and player text, so keep it local/debug-only.
+Each recorded Director turn attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, raw request, raw response, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include hidden NPC knowledge, prompt guidance, player text, and model output, so keep it local/debug-only.
 
 Run the repeatable local Director smoke playtest against a running dev server:
 
