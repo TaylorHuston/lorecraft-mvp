@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: `sdd-review` safe artifact/docs consistency fixes applied and verified; ready for fresh `/sdd-review` rerun after commit
-- Last completed action: `npm run ci:required` and `npx convex codegen` passed during `/sdd-review`
-- Next action: rerun `/sdd-review` for a fresh-context clean gate
+- Current state: fresh `/sdd-review` passed; branch is locally ready for integration into `develop`
+- Last completed action: `npm run ci:required`, `npx convex codegen`, and merge-tree conflict check passed during the fresh `/sdd-review`
+- Next action: merge to `develop` only after Taylor explicitly authorizes merge/closeout
 - Active branch/ref: `change/active-director-guidance` from `develop`
 - Expected dirty files: none after the safe review-fix commit
 - Known blockers: none; discovery choices recorded below
@@ -54,9 +54,9 @@
 ### 4. Review And Closeout
 
 - [x] 4.1 Update root `CHANGELOG.md` under `Changed`.
-- [ ] 4.2 Rerun `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
-- [ ] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [x] 4.2 Rerun `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [x] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [ ] 4.4 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
 - [ ] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
@@ -103,6 +103,9 @@ Record proof as it happens.
 | 2026-06-28 | `/sdd-review` `npm run ci:required` | Lint, Director tests, TypeScript, and Next build pass after full-debug launch docs/config consistency fixes | Passed |
 | 2026-06-28 | `/sdd-review` `npx convex codegen` | Convex function/schema validation and generated bindings remain valid after the review pass | Passed |
 | 2026-06-28 | `/sdd-review` merge-tree conflict check | Source branch `change/active-director-guidance` has no detected merge conflicts against `develop` | Passed |
+| 2026-06-28 | Fresh `/sdd-review` `npm run ci:required` | Lint, Director tests, TypeScript, and Next build pass on the committed branch after the prior safe-fix pass | Passed |
+| 2026-06-28 | Fresh `/sdd-review` `npx convex codegen` | Convex function/schema validation and generated bindings remain valid on the committed branch | Passed |
+| 2026-06-28 | Fresh `/sdd-review` merge-tree conflict check | Source branch `change/active-director-guidance` has no detected merge conflicts against `develop` | Passed |
 
 ## Manual UI Confirmation
 
@@ -148,8 +151,8 @@ Record Taylor's manual testing feedback after implementation starts.
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes, `CHANGELOG.md` under `Unreleased / Changed`
-- `sdd-review` verdict: safe artifact/docs consistency fixes applied; rerun needed for a fresh clean gate after commit
-- `review.md` findings resolved: not applicable for the prior clean review; rerun pending after follow-up
-- PR / merge state: local branch `change/active-director-guidance`, not pushed or merged
+- `sdd-review` verdict: ready on 2026-06-28; no `review.md` created because no blocking or required findings remain
+- `review.md` findings resolved: not applicable; no active review findings
+- PR / merge state: local branch `change/active-director-guidance`, not pushed or merged; merge not authorized in this request
 - Deferred scope accepted: RNG, fine-tuning, settings UI, world-builder editing, slash commands, combat, inventory, relationship graph, story instances, rollback, and offscreen NPC autonomy remain out of scope.
-- Change moved to `docs/changes/closed/`: no, pending `/th-review` and closeout authorization
+- Change moved to `docs/changes/closed/`: no, pending merge/closeout authorization
