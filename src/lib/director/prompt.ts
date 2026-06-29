@@ -3,6 +3,7 @@ import {
   type DirectorActor,
   type DirectorContext,
   type DirectorGenerationSettingsSummary,
+  type DirectorPromptGuidance,
   type DirectorRequest,
   type RequiredSceneBeat,
 } from "./types";
@@ -41,10 +42,14 @@ const SYSTEM_PROMPT = DIRECTOR_INSTRUCTIONS.join("\n");
 export function buildDirectorRequest(
   context: DirectorContext,
   playerInput: string,
-  options: { generationSettings?: DirectorGenerationSettingsSummary } = {},
+  options: {
+    generationSettings?: DirectorGenerationSettingsSummary;
+    promptGuidance?: DirectorPromptGuidance;
+  } = {},
 ): DirectorRequest {
   const recentFeed = context.recentFeed.slice(-RECENT_FEED_LIMIT);
   const requiredSceneBeat = deriveRequiredSceneBeat(context, playerInput);
+  const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const currentSceneActors = context.actors.map((actor) => ({
     key: actor.key,
     name: actor.name,
@@ -71,6 +76,7 @@ export function buildDirectorRequest(
         editableConfiguration: [
           "directorInstructions",
           "authorToneGuidance",
+          "promptGuidance",
           "providerGenerationSettings",
         ],
         derivedFromWorldState: ["sceneState", "visibleFacts", "hiddenNpcKnowledge", "recentFeed"],
@@ -79,6 +85,7 @@ export function buildDirectorRequest(
       directorInstructions: "See system message.",
       authorToneGuidance:
         "Write grounded, active, player-facing prose. Let present NPCs speak or act when the player engages them, but keep durable state changes conservative.",
+      promptGuidance,
       sceneState: {
         world: {
           name: context.world.name,
@@ -106,6 +113,7 @@ export function buildDirectorRequest(
   const readOnlyKnowledgeKeys = hiddenNpcKnowledge.flatMap((actor) =>
     actor.readOnlyFacts.map((fact) => `${actor.key}.${fact.key}`),
   );
+  const promptGuidanceKeys = Object.keys(promptGuidance);
 
   return {
     messages: [
@@ -131,9 +139,18 @@ export function buildDirectorRequest(
         allowsNpcUpdates: requiredSceneBeat.allowsNpcUpdates,
       },
       promptComponentKeys: Object.keys(scenePayload.promptComponents),
+      ...(promptGuidanceKeys.length > 0 ? { promptGuidanceKeys } : {}),
       ...(options.generationSettings ? { generationSettings: options.generationSettings } : {}),
     },
   };
+}
+
+export function normalizePromptGuidance(guidance: DirectorPromptGuidance | undefined) {
+  return Object.fromEntries(
+    Object.entries(guidance ?? {})
+      .map(([key, value]) => [key, typeof value === "string" ? value.trim().slice(0, 1200) : ""])
+      .filter(([, value]) => value.length > 0),
+  ) as DirectorPromptGuidance;
 }
 
 export function deriveRequiredSceneBeat(

@@ -674,18 +674,36 @@ The system SHALL let developers tune supported provider generation settings with
 - THEN debug metadata includes a compact summary of the effective generation settings
 - AND secrets, API keys, and full environment dumps remain excluded
 
+### Requirement R7: Debug Prompt Guidance
+
+The system SHALL let developer-playtesters adjust text-only Director guidance from the debug panel.
+
+#### Scenario R7-S1: Prompt guidance sections affect the next turn
+
+- WHEN a developer-playtester edits the style, NPC behavior, or persistence guidance fields
+- AND submits a narrative turn
+- THEN those text sections are included in the Director prompt context for that turn
+- AND they do not change the required JSON output shape or backend validation authority
+
+#### Scenario R7-S2: Prompt guidance is debug-visible
+
+- WHEN a Director call is persisted
+- THEN the request summary records which prompt guidance sections were included
+- AND the debug panel can show those section keys with the latest Director summary
+
 ### Implemented By
 
 - `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
 - `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
-- `src/app/api/director/turn/route.ts` passes effective generation settings into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them.
+- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them.
 - `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes.
-- `src/lib/director/director.test.ts` covers prompt component structure, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, and provider generation settings.
+- `src/app/world-client.tsx` renders debug prompt guidance text sections and includes them with the next narrative turn.
+- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, and provider generation settings.
 - `scripts/director-playtest.mjs` runs the repeatable local Director playtest against a running dev server.
 
 ### Verified By
 
-- `npm run test` passed, including prompt component structure, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, and generation setting request bodies.
+- `npm run test` passed, including prompt component structure, debug prompt guidance inclusion, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, and generation setting request bodies.
 - `npm run ci:required` passed after the initial implementation.
 - `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
 - Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."

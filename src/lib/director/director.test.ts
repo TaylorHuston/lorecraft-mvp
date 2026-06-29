@@ -81,6 +81,11 @@ describe("Director request construction", () => {
         topP: 0.9,
         responseFormat: "json_object",
       },
+      promptGuidance: {
+        style: "  Write like a tense chapel scene.  ",
+        npcBehavior: "Mira should answer direct questions with a concrete choice.",
+        persistence: "Keep passing reactions out of durable facts.",
+      },
     });
     const systemMessage = request.messages.find((message) => message.role === "system");
     const userMessage = request.messages.find((message) => message.role === "user");
@@ -107,18 +112,25 @@ describe("Director request construction", () => {
         topP: 0.9,
         responseFormat: "json_object",
       },
+      promptGuidanceKeys: ["style", "npcBehavior", "persistence"],
     });
     expect(request.requestSummary.promptComponentKeys).toEqual([
       "currentTurn",
       "sourceOwnership",
       "directorInstructions",
       "authorToneGuidance",
+      "promptGuidance",
       "sceneState",
       "visibleFacts",
       "hiddenNpcKnowledge",
       "recentFeed",
     ]);
     expect(components.currentTurn.playerInput).toBe("I ask Mira about the storm.");
+    expect(components.promptGuidance).toEqual({
+      style: "Write like a tense chapel scene.",
+      npcBehavior: "Mira should answer direct questions with a concrete choice.",
+      persistence: "Keep passing reactions out of durable facts.",
+    });
     expect(components.currentTurn.requiredSceneBeat.instruction).toContain("meaningful response");
     expect(components.currentTurn.requiredSceneBeat.instruction).toContain(
       "Do not stop at setup",
@@ -158,6 +170,7 @@ describe("Director request construction", () => {
       editableConfiguration: [
         "directorInstructions",
         "authorToneGuidance",
+        "promptGuidance",
         "providerGenerationSettings",
       ],
       derivedFromPlayerInput: ["currentTurn.playerInput", "currentTurn.requiredSceneBeat"],

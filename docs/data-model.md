@@ -304,6 +304,7 @@ There is no separate prompt table. Director prompt context is derived per turn f
 |---|---|---|
 | `directorInstructions` | Editable backend configuration | Story-first behavior, output shape, dialogue allowance, and persistence boundaries. |
 | `authorToneGuidance` | Editable backend configuration | Current prose style and interaction guidance. |
+| `promptGuidance` | Debug UI request input | Per-turn text guidance for style, NPC behavior, and persistence strategy during playtesting. |
 | `sceneState` | Derived from world and room rows | Current world, room, and baseline scene descriptions. |
 | `visibleFacts` | Derived from current scene rows and mutable actor facts | Exits, objects, actors, descriptions, and mutable NPC state facts. |
 | `hiddenNpcKnowledge` | Derived from current-scene actor facts outside mutable keys | Read-only NPC knowledge available to the Director but not automatically visible to the player. |
@@ -314,6 +315,7 @@ There is no separate prompt table. Director prompt context is derived per turn f
 Strategy:
 
 - Prompt context is diagnostic/request state, not canonical world state.
+- Prompt guidance text is an experimental playtest control. It should guide narration, not override schema, validation, hidden knowledge boundaries, or durable-state rules.
 - Generation settings are developer configuration and are summarized in Director call debug metadata.
 - Required scene beats should stay narrow until playtesting proves broader automation is needed.
 - Trivial physical actions such as `I jump.` derive a `trivial_player_action` scene beat that disallows durable NPC updates for that turn; passing reactions stay in narration/debug instead.

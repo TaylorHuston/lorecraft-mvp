@@ -135,6 +135,7 @@ export async function POST(request: Request) {
 
   const directorRequest = buildDirectorRequest(context, input, {
     generationSettings: configResult.config.generationSettings,
+    promptGuidance: bodyResult.body.promptGuidance,
   });
   let rawOutput: string;
   const providerStartedAt = performance.now();
@@ -289,13 +290,50 @@ async function readBody(request: Request) {
     return { ok: false as const, error: "Narrative input is required." };
   }
 
+  const promptGuidance = readPromptGuidance(parsed.promptGuidance);
+  if (!promptGuidance.ok) {
+    return promptGuidance;
+  }
+
   return {
     ok: true as const,
     body: {
       worldId: parsed.worldId as Id<"worlds">,
       input: parsed.input.trim(),
+      promptGuidance: promptGuidance.value,
     },
   };
+}
+
+function readPromptGuidance(value: unknown) {
+  if (value === undefined) {
+    return { ok: true as const, value: undefined };
+  }
+
+  if (!isRecord(value)) {
+    return { ok: false as const, error: "promptGuidance must be an object when provided." };
+  }
+
+  const guidance: Record<string, string> = {};
+  for (const key of ["style", "npcBehavior", "persistence"]) {
+    const rawValue = value[key];
+    if (rawValue === undefined) {
+      continue;
+    }
+    if (typeof rawValue !== "string") {
+      return { ok: false as const, error: `promptGuidance.${key} must be a string.` };
+    }
+
+    const trimmed = rawValue.trim();
+    if (trimmed.length > 1200) {
+      return { ok: false as const, error: `promptGuidance.${key} must be 1200 characters or less.` };
+    }
+    if (trimmed.length > 0) {
+      guidance[key] = trimmed;
+    }
+  }
+
+  return { ok: true as const, value: guidance };
 }
 
 function createConvexClient() {

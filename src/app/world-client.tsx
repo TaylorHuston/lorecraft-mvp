@@ -17,6 +17,20 @@ type DirectorTurnResponse =
       error: string;
     };
 
+type DirectorPromptGuidance = {
+  style: string;
+  npcBehavior: string;
+  persistence: string;
+};
+
+const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
+  style: "Grounded, concise prose with concrete sensory detail. Keep the scene moving.",
+  npcBehavior:
+    "Present NPCs should make clear choices when directly engaged: answer, refuse, deflect, warn, ask back, act, or intentionally stay silent.",
+  persistence:
+    "Keep fleeting gestures and reactions in narration. Only update durable NPC facts when the change should matter after recent context falls away.",
+};
+
 export function WorldClient() {
   const defaultWorldId = useQuery(api.world.getDefaultWorld);
   const seedWorld = useMutation(api.world.seedDemoWorld);
@@ -27,6 +41,9 @@ export function WorldClient() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
+    DEFAULT_PROMPT_GUIDANCE,
+  );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
@@ -86,7 +103,11 @@ export function WorldClient() {
       const response = await fetch("/api/director/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worldId, input: submittedInput }),
+        body: JSON.stringify({
+          worldId,
+          input: submittedInput,
+          promptGuidance,
+        }),
       });
       const result = (await response.json()) as DirectorTurnResponse;
 
@@ -239,6 +260,11 @@ export function WorldClient() {
 
           {snapshot ? (
             <div className="mt-6 space-y-6">
+              <DirectorPromptControls
+                value={promptGuidance}
+                onChange={setPromptGuidance}
+                latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
+              />
               <DebugList
                 title="Scene"
                 items={[
@@ -355,6 +381,115 @@ function DebugList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function DirectorPromptControls({
+  value,
+  onChange,
+  latestSummary,
+}: {
+  value: DirectorPromptGuidance;
+  onChange: (value: DirectorPromptGuidance) => void;
+  latestSummary: Record<string, unknown> | null;
+}) {
+  return (
+    <section className="border border-zinc-800 bg-zinc-950/50 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-medium uppercase text-zinc-300">Prompt guidance</h3>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            Editable text sections for the next Director turn. These guide style and behavior without changing the output schema.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(DEFAULT_PROMPT_GUIDANCE)}
+          className="shrink-0 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <PromptGuidanceTextarea
+          label="Style"
+          value={value.style}
+          onChange={(style) => onChange({ ...value, style })}
+        />
+        <PromptGuidanceTextarea
+          label="NPC behavior"
+          value={value.npcBehavior}
+          onChange={(npcBehavior) => onChange({ ...value, npcBehavior })}
+        />
+        <PromptGuidanceTextarea
+          label="Persistence"
+          value={value.persistence}
+          onChange={(persistence) => onChange({ ...value, persistence })}
+        />
+      </div>
+
+      <div className="mt-5 border-t border-zinc-800 pt-4">
+        <h4 className="text-xs font-medium uppercase text-zinc-500">Last Director summary</h4>
+        <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5">
+          {latestSummary ? (
+            <>
+              <dt className="text-zinc-500">Beat</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.requiredSceneBeat)}</dd>
+              <dt className="text-zinc-500">Settings</dt>
+              <dd className="min-w-0 text-zinc-300">
+                {summaryText(latestSummary.generationSettings)}
+              </dd>
+              <dt className="text-zinc-500">Guidance</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.promptGuidanceKeys)}
+              </dd>
+              <dt className="text-zinc-500">Knowledge</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.readOnlyKnowledgeKeys)}
+              </dd>
+              <dt className="text-zinc-500">Components</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.promptComponentKeys)}
+              </dd>
+            </>
+          ) : (
+            <dd className="col-span-2 text-zinc-500">No Director turn yet.</dd>
+          )}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function PromptGuidanceTextarea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = `director-${label.toLowerCase().replaceAll(" ", "-")}`;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+          {label}
+        </label>
+        <span className="text-xs tabular-nums text-zinc-600">{value.length}/1200</span>
+      </div>
+      <textarea
+        id={id}
+        value={value}
+        maxLength={1200}
+        rows={3}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-20 w-full resize-y border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-cyan-300"
+      />
+    </div>
+  );
+}
+
 function DebugJson({ title, value }: { title: string; value: unknown }) {
   return (
     <div>
@@ -364,6 +499,27 @@ function DebugJson({ title, value }: { title: string; value: unknown }) {
       </pre>
     </div>
   );
+}
+
+function latestDirectorRequestSummary(directorCalls: unknown[]) {
+  const latest = directorCalls.find(isRecord);
+  return isRecord(latest?.requestSummary) ? latest.requestSummary : null;
+}
+
+function summaryList(value: unknown) {
+  return Array.isArray(value) && value.length > 0 ? value.join(", ") : "None";
+}
+
+function summaryText(value: unknown) {
+  if (value === undefined || value === null) {
+    return "None";
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
 }
 
 function directorUpdateItems(directorCalls: unknown[]) {

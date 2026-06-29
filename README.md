@@ -94,6 +94,8 @@ I ask Mira what she knows about the storm.
 
 Direct questions to present NPCs derive a required scene beat so the Director is prompted to let that NPC make a meaningful response or choice. Hidden read-only NPC facts, such as Mira's seeded `knows_about_storm` fact, are included as private context without expanding the mutable fact allowlist beyond `mood`, `status`, and `memory`.
 
+The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. These sections are sent with the next Director turn and are summarized in the latest Director call debug metadata.
+
 The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, room movement mutation, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 
 ## Current Intent

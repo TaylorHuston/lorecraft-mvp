@@ -17,6 +17,7 @@ The current provider adapter also hard-codes generation options such as `tempera
 - Include read-only NPC/world knowledge in Director context while keeping mutation authority bounded.
 - Keep durable NPC fact updates conservative and separate from transient narration.
 - Add dev/config-level generation settings that help local model playtesting.
+- Add debug-panel text guidance sections for style, NPC behavior, and persistence prompt tuning.
 - Add focused tests that catch passive responses, missing hidden knowledge context, and accidental fact churn.
 
 **Non-Goals:**
@@ -142,6 +143,23 @@ The system SHALL let developers tune supported provider generation settings with
 - THEN debug metadata includes a compact summary of the effective generation settings
 - AND secrets, API keys, and full environment dumps remain excluded
 
+##### R7: Debug Prompt Guidance
+
+The system SHALL let developer-playtesters adjust text-only Director guidance from the debug panel.
+
+###### Scenario R7-S1: Prompt guidance sections affect the next turn
+
+- WHEN a developer-playtester edits the style, NPC behavior, or persistence guidance fields
+- AND submits a narrative turn
+- THEN those text sections are included in the Director prompt context for that turn
+- AND they do not change the required JSON output shape or backend validation authority
+
+###### Scenario R7-S2: Prompt guidance is debug-visible
+
+- WHEN a Director call is persisted
+- THEN the request summary records which prompt guidance sections were included
+- AND the debug panel can show those section keys with the latest Director summary
+
 ##### Implemented By
 
 - `src/lib/director/prompt.ts`
@@ -150,6 +168,7 @@ The system SHALL let developers tune supported provider generation settings with
 - `src/lib/director/output.ts`
 - `src/lib/director/director.test.ts`
 - `convex/world.ts`
+- `src/app/world-client.tsx`
 
 ##### Verified By
 
@@ -180,6 +199,7 @@ Implement the change in the backend Director layer rather than the React UI. The
 - Add a lightweight input/context classifier for the current scene beat. The first version can be deterministic and narrow: detect direct references to present NPC names/pronouns and question-like inputs well enough to set `directTarget`, `interactionKind`, and a human-readable `requiredSceneBeat`.
 - Split actor facts into mutable state facts and read-only knowledge facts before prompt construction. Mutable update validation remains limited to `mood`, `status`, and `memory`.
 - Include read-only knowledge facts in the prompt as hidden context. Start with a conservative allowlist or all current-scene actor facts outside `NPC_FACT_KEYS`; document the choice during implementation.
+- Include optional debug prompt guidance text in prompt context for style, NPC behavior, and persistence strategy. Treat it as guidance only; it must not override schema, validation, or hidden-knowledge boundaries.
 - Keep output shape unchanged: `{"narration":"...","npcUpdates":[]}`. Dialogue can live inside `narration` for this change.
 - Extend provider configuration to read optional generation settings from environment variables. Implement only settings supported cleanly by the current OpenAI-compatible request body.
 - Update `requestSummary`, local debug logs, or `directorCalls` metadata enough to diagnose prompt component and generation-setting behavior without logging secrets or full prompts by default.
@@ -228,6 +248,7 @@ This approach fixes the most concrete failure with the least new machinery. The 
 - Implement only OpenAI-compatible tuning variables for the first pass: `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`.
 - Include all current-scene NPC facts outside `mood`, `status`, and `memory` as read-only hidden knowledge context.
 - Persist compact required scene-beat and generation-setting metadata in `directorCalls.requestSummary` through the existing debug path.
+- Add debug-panel text guidance sections for prompt tuning before adding model-parameter sliders or a polished settings UI.
 
 ## Risks / Trade-Offs
 

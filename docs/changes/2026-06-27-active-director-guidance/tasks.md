@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete, ready for `/th-review`
-- Last completed action: follow-up script and trivial-action persistence boundary verified with `npm run playtest:director`, `npm run ci:required`, and `npx convex codegen`
-- Next action: run `/th-review` as the local PR gate
+- Current state: post-review prompt-guidance follow-up implemented and verified; ready for `/th-review` rerun
+- Last completed action: recorded Taylor's manual feedback loop correction that this should be text-related prompt guidance, not model-parameter sliders
+- Next action: rerun `/th-review` because the branch changed after the prior clean review
 - Active branch/ref: `change/active-director-guidance` from `develop`
 - Expected dirty files: `docs/changes/2026-06-27-active-director-guidance/`
 - Known blockers: none; discovery choices recorded below
@@ -27,6 +27,7 @@
 - [x] 2.5 Implement `LC-001-S7` R5/R5-S1 and R5-S2: conservative persistence guidance and validation coverage for non-churn.
 - [x] 2.6 Implement `LC-001-S7` R6/R6-S1 and R6-S2: dev-configurable provider generation settings and compact debug metadata.
 - [x] 2.7 Update Story-level Implemented By maps with current code locations.
+- [x] 2.8 Implement `LC-001-S7` R7/R7-S1 and R7-S2: debug prompt guidance text sections for style, NPC behavior, and persistence guidance.
 
 ### 3. Verification
 
@@ -42,12 +43,13 @@
   - [x] Direct question: "I ask Mira what she knows about the storm" produces a meaningful Mira response.
   - [x] Non-dialogue action: "I jump" does not create durable fact churn unless something meaningful changes.
 - [x] 3.10 Update Story-level Verified By maps with concrete evidence.
+- [x] 3.11 Run final verification after debug prompt guidance follow-up.
 
 ### 4. Review And Closeout
 
 - [x] 4.1 Update root `CHANGELOG.md` under `Changed`.
-- [x] 4.2 Run `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
-- [x] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [ ] 4.2 Rerun `th-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [ ] 4.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 4.4 Create a PR or merge only after `th-review` is ready and the app branch policy plus Taylor authorization allow it.
 - [ ] 4.5 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -63,6 +65,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-28 | Prompt refinement from live playtest | main | `src/lib/director/prompt.ts`, `src/lib/director/director.test.ts` | Tightened direct-question guidance after local model initially stopped before Mira's answer and tightened trivial-action guidance after it continued a prior question | working tree |
 | 2026-06-28 | Repeatable playtest script | main | `scripts/director-playtest.mjs`, `package.json`, README | Added a local smoke script that seeds/resets Convex, sends the direct-question and plain-action turns, and verifies response/debug metadata | working tree |
 | 2026-06-28 | Trivial-action persistence boundary | main | `src/lib/director/prompt.ts`, `src/lib/director/output.ts`, `src/app/api/director/turn/route.ts`, tests, script | Script exposed accepted Mira mood churn for `I jump`; added a deterministic `trivial_player_action` scene beat and post-validation boundary that ignores durable NPC updates for those actions | working tree |
+| 2026-06-28 | Debug prompt guidance follow-up | main after Taylor feedback | `src/app/world-client.tsx`, `src/app/api/director/turn/route.ts`, `src/lib/director/prompt.ts`, Epic/docs | Added AI Dungeon-inspired text guidance sections for style, NPC behavior, and persistence; skipped sliders/model-parameter UI per Taylor feedback | working tree |
 
 ## Verification Ledger
 
@@ -82,6 +85,7 @@ Record proof as it happens.
 | 2026-06-28 | Follow-up `npm run ci:required` | Final lint/test/typecheck/build gate after adding the script and trivial-action boundary | Passed |
 | 2026-06-28 | Follow-up `npx convex codegen` | Convex function validation after trivial-action boundary and script follow-up | Passed |
 | 2026-06-28 | `/th-review` local gate | Requirements, Scenarios, Epic truth, implementation, tests, security/privacy, docs, changelog, merge readiness, and local playtest script were reviewed from `change/active-director-guidance` against `develop` | Passed with no findings |
+| 2026-06-28 | `npm run ci:required` after debug prompt guidance follow-up | Lint, Director tests, TypeScript, and Next build accept text-only prompt guidance controls and prompt context wiring | Passed |
 
 ## Manual UI Confirmation
 
@@ -89,11 +93,14 @@ Use this checklist for Taylor's manual playtest after pulling this branch or run
 
 1. Start local Convex and Next with Ollama config, for example `LLM_BASE_URL=http://localhost:11434/v1 LLM_API_KEY=ollama LLM_MODEL=llama3.1:8b npm run dev`.
 2. Open `http://localhost:3000`, enable the debug panel, and rough reset if you want a clean transcript.
-3. Enter `I ask Mira what she knows about the storm.` Expected: Mira gives a concrete response, refusal, deflection, warning, counter-question, action, or intentional silence; facial expression alone is not enough.
-4. Inspect the latest Director call in debug. Expected: `requiredSceneBeat.kind` is `direct_npc_question`, `targetActorKey` is `mira`, `readOnlyKnowledgeKeys` includes `mira.knows_about_storm`, and generation settings are summarized without secrets.
-5. Enter `I jump.` Expected: the Director narrates the immediate action or observable reaction without forcing Mira dialogue and without accepting durable NPC fact updates.
+3. In the debug panel, edit the `Prompt guidance` text sections for style, NPC behavior, and persistence if you want to test different Director guidance.
+4. Enter `I ask Mira what she knows about the storm.` Expected: Mira gives a concrete response, refusal, deflection, warning, counter-question, action, or intentional silence; facial expression alone is not enough.
+5. Inspect the latest Director call in debug. Expected: `requiredSceneBeat.kind` is `direct_npc_question`, `targetActorKey` is `mira`, `readOnlyKnowledgeKeys` includes `mira.knows_about_storm`, `promptGuidanceKeys` lists the non-empty guidance sections, and generation settings are summarized without secrets.
+6. Enter `I jump.` Expected: the Director narrates the immediate action or observable reaction without forcing Mira dialogue and without accepting durable NPC fact updates.
 
-Feedback classification: missing Mira response is a defect; no debug evidence is a verification gap; desired extra behavior beyond direct questions/read-only knowledge/dev settings is scope expansion.
+Manual confirmation status: pending Taylor after prompt-guidance follow-up.
+
+Feedback classification: missing Mira response is a defect; no debug evidence is a verification gap; prompt guidance text that does not affect a turn is a defect; desired model-parameter sliders or polished player-facing settings are scope expansion.
 
 The same flow can be run from the command line with `npm run playtest:director` while `npm run dev` is running.
 
@@ -105,6 +112,7 @@ Record Taylor's manual testing feedback after implementation starts.
 |---|---|---|---|---|
 | 2026-06-27 | Current playtest feels passive; Mira does not speak or meaningfully answer direct questions. | requirement refinement | Proposed `LC-001-S7` with active scene-beat guidance and read-only knowledge context. | captured |
 | 2026-06-27 | RNG may be useful later but near-term work should focus on better prompting and LLM guidance. | scope boundary | Deferred RNG implementation; kept deterministic prompt/context changes in current scope. | captured |
+| 2026-06-28 | AI Dungeon-style prompt controls should be text-related prompt guidance sections, not sliders or model-parameter controls. | requirement refinement | Added `LC-001-S7` R7 for debug prompt guidance, removed the aborted slider direction, and implemented style/NPC behavior/persistence text sections. | implemented; review rerun pending |
 
 ## Blockers / Open Questions
 
@@ -119,8 +127,8 @@ Record Taylor's manual testing feedback after implementation starts.
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes, `CHANGELOG.md` under `Unreleased / Changed`
-- `th-review` verdict: ready, passed on 2026-06-28 with no findings
-- `review.md` findings resolved: not applicable; no `review.md` was needed for this clean review
+- `th-review` verdict: stale; passed on 2026-06-28 before the debug prompt guidance follow-up, needs rerun
+- `review.md` findings resolved: not applicable for the prior clean review; rerun pending after follow-up
 - PR / merge state: local branch `change/active-director-guidance`, not pushed or merged
 - Deferred scope accepted: RNG, fine-tuning, settings UI, world-builder editing, slash commands, combat, inventory, relationship graph, story instances, rollback, and offscreen NPC autonomy remain out of scope.
 - Change moved to `docs/changes/closed/`: no, pending `/th-review` and closeout authorization

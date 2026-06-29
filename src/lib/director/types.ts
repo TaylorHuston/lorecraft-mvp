@@ -76,6 +76,7 @@ export type DirectorRequestSummary = {
     allowsNpcUpdates: boolean;
   };
   promptComponentKeys: string[];
+  promptGuidanceKeys?: string[];
   generationSettings?: DirectorGenerationSettingsSummary;
 };
 
@@ -105,6 +106,12 @@ export type DirectorGenerationSettingsSummary = {
   maxTokens?: number;
   topP?: number;
   responseFormat: "json_object";
+};
+
+export type DirectorPromptGuidance = {
+  style?: string;
+  npcBehavior?: string;
+  persistence?: string;
 };
 
 export type ParsedNpcUpdate = {

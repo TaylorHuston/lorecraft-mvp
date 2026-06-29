@@ -15,6 +15,7 @@ This change should make the Director actively write a story while preserving the
 - Include read-only NPC/world knowledge facts in Director context without expanding the LLM's mutation authority beyond the current mutable NPC fields.
 - Strengthen Director instructions so NPCs can speak, deflect, refuse, warn, ask back, or visibly choose silence instead of merely being described as passive.
 - Add dev/config-level LLM generation settings for local playtesting, such as response length and sampling controls, without adding a polished player-facing settings UI.
+- Add debug-panel text guidance sections for style, NPC behavior, and persistence prompt tuning, inspired by AI Dungeon-style prompt guidance rather than model-parameter sliders.
 - Add focused tests and playtest fixtures that prove asking Mira about the storm produces a meaningful scene beat and that ephemeral reactions do not force durable fact churn.
 
 ## Epic Actions
@@ -56,6 +57,7 @@ This change should make the Director actively write a story while preserving the
 - Implement only the OpenAI-compatible generation subset needed for local playtesting: `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`.
 - Store compact required scene-beat metadata in `directorCalls.requestSummary` and local debug records through the existing request-summary path.
 - Include current-scene NPC facts outside `mood`, `status`, and `memory` as read-only hidden knowledge context for the MVP.
+- Add text-only prompt guidance controls in the debug panel; leave model-parameter sliders and a polished settings UI deferred.
 
 ## Deferred Scope
 
@@ -63,4 +65,5 @@ This change should make the Director actively write a story while preserving the
 - No fine-tuned model work.
 - No polished player-facing model settings UI.
 - No world-builder UI for editing prompt components.
+- No model-parameter slider UI in this change.
 - No slash commands, combat, inventory, relationship graph, story instances, rollback, or autonomous offscreen NPC behavior.
