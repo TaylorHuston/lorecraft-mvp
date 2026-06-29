@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: post-review prompt-guidance follow-up implemented and verified; ready for `/th-review` rerun
-- Last completed action: recorded Taylor's manual feedback loop correction that this should be text-related prompt guidance, not model-parameter sliders
+- Current state: R8 debug-gated raw request persistence implemented and verified; ready for `/th-review` rerun
+- Last completed action: `npm run ci:required` and `npx convex codegen` passed after R8 implementation
 - Next action: rerun `/th-review` because the branch changed after the prior clean review
 - Active branch/ref: `change/active-director-guidance` from `develop`
 - Expected dirty files: `docs/changes/2026-06-27-active-director-guidance/`
@@ -28,6 +28,7 @@
 - [x] 2.6 Implement `LC-001-S7` R6/R6-S1 and R6-S2: dev-configurable provider generation settings and compact debug metadata.
 - [x] 2.7 Update Story-level Implemented By maps with current code locations.
 - [x] 2.8 Implement `LC-001-S7` R7/R7-S1 and R7-S2: debug prompt guidance text sections for style, NPC behavior, and persistence guidance.
+- [x] 2.9 Implement `LC-001-S7` R8/R8-S1 and R8-S2: debug-gated raw request persistence for exact provider messages.
 
 ### 3. Verification
 
@@ -44,6 +45,7 @@
   - [x] Non-dialogue action: "I jump" does not create durable fact churn unless something meaningful changes.
 - [x] 3.10 Update Story-level Verified By maps with concrete evidence.
 - [x] 3.11 Run final verification after debug prompt guidance follow-up.
+- [x] 3.12 Run final verification after R8 raw request persistence.
 
 ### 4. Review And Closeout
 
@@ -66,6 +68,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-28 | Repeatable playtest script | main | `scripts/director-playtest.mjs`, `package.json`, README | Added a local smoke script that seeds/resets Convex, sends the direct-question and plain-action turns, and verifies response/debug metadata | working tree |
 | 2026-06-28 | Trivial-action persistence boundary | main | `src/lib/director/prompt.ts`, `src/lib/director/output.ts`, `src/app/api/director/turn/route.ts`, tests, script | Script exposed accepted Mira mood churn for `I jump`; added a deterministic `trivial_player_action` scene beat and post-validation boundary that ignores durable NPC updates for those actions | working tree |
 | 2026-06-28 | Debug prompt guidance follow-up | main after Taylor feedback | `src/app/world-client.tsx`, `src/app/api/director/turn/route.ts`, `src/lib/director/prompt.ts`, Epic/docs | Added AI Dungeon-inspired text guidance sections for style, NPC behavior, and persistence; skipped sliders/model-parameter UI per Taylor feedback | working tree |
+| 2026-06-28 | R8 raw request diagnostics | main with `th-apply`; delegation skipped for small backend/debug slice | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/lib/director/raw-request.ts`, docs/Epic | Added optional exact provider message persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`; omitted by default because it can include hidden knowledge and player text | working tree |
 
 ## Verification Ledger
 
@@ -86,6 +89,8 @@ Record proof as it happens.
 | 2026-06-28 | Follow-up `npx convex codegen` | Convex function validation after trivial-action boundary and script follow-up | Passed |
 | 2026-06-28 | `/th-review` local gate | Requirements, Scenarios, Epic truth, implementation, tests, security/privacy, docs, changelog, merge readiness, and local playtest script were reviewed from `change/active-director-guidance` against `develop` | Passed with no findings |
 | 2026-06-28 | `npm run ci:required` after debug prompt guidance follow-up | Lint, Director tests, TypeScript, and Next build accept text-only prompt guidance controls and prompt context wiring | Passed |
+| 2026-06-28 | `npm run ci:required` after R8 raw request persistence | Lint, Director tests, TypeScript, and Next build accept debug-gated raw request storage and schema consumers | Passed |
+| 2026-06-28 | `npx convex codegen` after R8 raw request persistence | Convex schema/function validation accepts optional `directorCalls.rawRequest` and mutation/query validator updates | Passed |
 
 ## Manual UI Confirmation
 
@@ -97,6 +102,7 @@ Use this checklist for Taylor's manual playtest after pulling this branch or run
 4. Enter `I ask Mira what she knows about the storm.` Expected: Mira gives a concrete response, refusal, deflection, warning, counter-question, action, or intentional silence; facial expression alone is not enough.
 5. Inspect the latest Director call in debug. Expected: `requiredSceneBeat.kind` is `direct_npc_question`, `targetActorKey` is `mira`, `readOnlyKnowledgeKeys` includes `mira.knows_about_storm`, `promptGuidanceKeys` lists the non-empty guidance sections, and generation settings are summarized without secrets.
 6. Enter `I jump.` Expected: the Director narrates the immediate action or observable reaction without forcing Mira dialogue and without accepting durable NPC fact updates.
+7. Optional raw-request debug check: restart with `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run dev`, send a turn, and inspect the latest Director call JSON. Expected: `rawRequest` contains the exact provider messages. Without that flag, `rawRequest` should be omitted.
 
 Manual confirmation status: pending Taylor after prompt-guidance follow-up.
 
@@ -123,11 +129,11 @@ Record Taylor's manual testing feedback after implementation starts.
 ## Closeout
 
 - Epic files updated: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
-- Story/Requirement/Scenario IDs current: yes, `LC-001-S7` with `R1`-`R6` and scoped `R#-S#` scenarios
+- Story/Requirement/Scenario IDs current: yes, `LC-001-S7` with `R1`-`R8` and scoped `R#-S#` scenarios
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes, `CHANGELOG.md` under `Unreleased / Changed`
-- `th-review` verdict: stale; passed on 2026-06-28 before the debug prompt guidance follow-up, needs rerun
+- `th-review` verdict: stale; passed on 2026-06-28 before the debug prompt guidance and raw request diagnostics follow-ups, needs rerun
 - `review.md` findings resolved: not applicable for the prior clean review; rerun pending after follow-up
 - PR / merge state: local branch `change/active-director-guidance`, not pushed or merged
 - Deferred scope accepted: RNG, fine-tuning, settings UI, world-builder editing, slash commands, combat, inventory, relationship graph, story instances, rollback, and offscreen NPC autonomy remain out of scope.

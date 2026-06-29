@@ -282,6 +282,7 @@ A Director call records provider interaction and validation results.
 | `provider` | Provider host/name derived from configuration. |
 | `model` | Configured model string. |
 | `requestSummary` | Compact summary of the request shape, not a full prompt dump. |
+| `rawRequest` | Optional exact provider messages sent to the LLM. |
 | `rawResponse` | Optional raw provider text. Useful for debugging invalid outputs. |
 | `parsedResponse` | Optional parsed structured output. |
 | `status` | `success`, `provider_error`, or `invalid_output`. |
@@ -295,6 +296,7 @@ Strategy:
 - They explain provider failures, invalid JSON, accepted updates, and ignored updates.
 - Do not use this table as the source of truth for what the world remembers.
 - Current request summaries include compact prompt/debug metadata such as prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+- `rawRequest` is omitted by default and only stored when local raw request debug storage is explicitly enabled. It can contain hidden NPC knowledge, prompt guidance, and player text, so it is diagnostic evidence rather than canonical game state.
 
 ## Director Prompt Context
 

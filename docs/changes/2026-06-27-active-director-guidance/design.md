@@ -8,6 +8,8 @@ The current seeded world includes facts beyond mutable NPC state, such as Mira k
 
 The current provider adapter also hard-codes generation options such as `temperature: 0.7`. That makes it harder to compare local models and tune the prose loop without code edits.
 
+The current `directorCalls` record stores `rawResponse`, `parsedResponse`, and a compact `requestSummary`, but it does not store the exact provider request messages. During prompt-guidance playtesting, that means a developer can see what the model returned but not exactly what the model saw.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -18,6 +20,7 @@ The current provider adapter also hard-codes generation options such as `tempera
 - Keep durable NPC fact updates conservative and separate from transient narration.
 - Add dev/config-level generation settings that help local model playtesting.
 - Add debug-panel text guidance sections for style, NPC behavior, and persistence prompt tuning.
+- Add debug-gated raw request persistence for exact provider messages during local troubleshooting.
 - Add focused tests that catch passive responses, missing hidden knowledge context, and accidental fact churn.
 
 **Non-Goals:**
@@ -26,6 +29,7 @@ The current provider adapter also hard-codes generation options such as `tempera
 - Add a player-facing settings panel.
 - Add a world-builder UI for editing prompt components.
 - Fine-tune a model.
+- Store raw provider request messages unconditionally.
 - Expand the LLM's allowed mutation fields beyond current-scene NPC `mood`, `status`, and `memory`.
 - Add combat, inventory, movement mutation, relationship graph traversal, story instances, rollback, or offscreen consequence propagation.
 
@@ -160,6 +164,24 @@ The system SHALL let developer-playtesters adjust text-only Director guidance fr
 - THEN the request summary records which prompt guidance sections were included
 - AND the debug panel can show those section keys with the latest Director summary
 
+##### R8: Debug-Gated Raw Request Persistence
+
+The system SHALL optionally persist the exact Director provider request for local troubleshooting.
+
+###### Scenario R8-S1: Raw request stored only when explicitly enabled
+
+- WHEN local raw request debug storage is enabled
+- AND a Director call is attempted
+- THEN the persisted Director call includes the exact provider messages sent to the OpenAI-compatible adapter
+- AND the raw request can be inspected in the existing debug JSON
+
+###### Scenario R8-S2: Raw request omitted by default
+
+- WHEN local raw request debug storage is not enabled
+- AND a Director call is persisted
+- THEN the Director call stores compact request metadata but omits the full raw request messages
+- AND hidden world facts, prompt guidance, and player text are not duplicated into raw request storage by default
+
 ##### Implemented By
 
 - `src/lib/director/prompt.ts`
@@ -203,6 +225,7 @@ Implement the change in the backend Director layer rather than the React UI. The
 - Keep output shape unchanged: `{"narration":"...","npcUpdates":[]}`. Dialogue can live inside `narration` for this change.
 - Extend provider configuration to read optional generation settings from environment variables. Implement only settings supported cleanly by the current OpenAI-compatible request body.
 - Update `requestSummary`, local debug logs, or `directorCalls` metadata enough to diagnose prompt component and generation-setting behavior without logging secrets or full prompts by default.
+- Add optional `rawRequest` or `requestMessages` persistence to `directorCalls` behind an explicit local debug flag. Store the exact `DirectorMessage[]` sent to the provider, not a reconstructed summary.
 - Update docs that explain persistence and data-model boundaries if read-only knowledge context or generation settings change the canonical guidance.
 
 ## Alternatives Considered
@@ -217,6 +240,8 @@ Implement the change in the backend Director layer rather than the React UI. The
   - Why not: The product does not yet have stable target behavior, fixtures, or enough examples to justify fine-tuning.
 - Add a settings UI:
   - Why not: Dev-level config is enough for MVP playtesting and keeps UI scope focused on the story loop.
+- Always store raw requests:
+  - Why not: Raw requests can contain hidden NPC knowledge, debug prompt guidance, and player text. They are highly useful during local playtesting, but they should be opt-in diagnostics rather than default canonical state.
 
 ## Why This Approach
 
@@ -227,6 +252,7 @@ This approach fixes the most concrete failure with the least new machinery. The 
 - Keep backend/application logic out of React components.
 - Do not expand LLM mutation authority beyond the current MVP bounded fields.
 - Do not log secrets, API keys, full env dumps, or full prompts by default.
+- Do not persist exact provider request messages unless the explicit local raw-request debug flag is enabled.
 - Keep local model support provider-agnostic through the existing OpenAI-compatible adapter.
 - Keep prompt and context fixtures deterministic enough for focused tests.
 - Preserve existing rough reset and scoped-turn behavior.
@@ -236,6 +262,7 @@ This approach fixes the most concrete failure with the least new machinery. The 
 - Unit-test prompt construction for explicit components, bounded recent feed, hidden knowledge inclusion, and absence of turn/command IDs.
 - Unit-test required scene-beat derivation for direct NPC questions and non-dialogue actions.
 - Unit-test provider generation settings parsing and request-body inclusion with safe defaults.
+- Unit-test raw request storage gating so exact provider messages are persisted only when enabled and omitted by default.
 - Unit-test output validation to prove read-only facts are not accepted as mutable `npcUpdates`.
 - Run `npm run test`, `npm run lint`, `npm run build`, and Convex validation/codegen appropriate to changed files.
 - Manually playtest a seeded Mira scene with local Ollama: "I ask Mira what she knows about the storm" should produce a meaningful Mira response, while "I jump" should not create durable fact churn unless something actually changes.
@@ -249,6 +276,7 @@ This approach fixes the most concrete failure with the least new machinery. The 
 - Include all current-scene NPC facts outside `mood`, `status`, and `memory` as read-only hidden knowledge context.
 - Persist compact required scene-beat and generation-setting metadata in `directorCalls.requestSummary` through the existing debug path.
 - Add debug-panel text guidance sections for prompt tuning before adding model-parameter sliders or a polished settings UI.
+- Add opt-in raw provider request persistence for local troubleshooting, likely via `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`.
 
 ## Risks / Trade-Offs
 
@@ -256,3 +284,4 @@ This approach fixes the most concrete failure with the least new machinery. The 
 - Including more hidden facts can reveal information too eagerly unless the prompt distinguishes "use as guidance" from "tell the player everything."
 - Local small models may still underperform even with better guidance; tests should verify request shape and playtests should verify observed behavior.
 - Additional generation knobs can create confusing local behavior if defaults are not documented and logged clearly.
+- Raw request storage improves troubleshooting but can duplicate hidden knowledge and private player text; keep it opt-in, local/debug-oriented, and excluded from canonical game-state semantics.

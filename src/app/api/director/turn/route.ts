@@ -13,6 +13,7 @@ import {
   readLlmConfig,
   requestOpenAICompatibleChat,
 } from "@/lib/director/provider";
+import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
 
 export const runtime = "nodejs";
@@ -137,6 +138,7 @@ export async function POST(request: Request) {
     generationSettings: configResult.config.generationSettings,
     promptGuidance: bodyResult.body.promptGuidance,
   });
+  const rawRequest = rawDirectorRequestForStorage(directorRequest.messages);
   let rawOutput: string;
   const providerStartedAt = performance.now();
   try {
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      ...(rawRequest !== undefined ? { rawRequest } : {}),
       rawResponse: providerError.rawResponse ?? "",
       status: "provider_error",
       acceptedUpdates: [],
@@ -191,6 +194,7 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
+      ...(rawRequest !== undefined ? { rawRequest } : {}),
       rawResponse: rawOutput,
       status: "invalid_output",
       acceptedUpdates: [],
@@ -231,6 +235,7 @@ export async function POST(request: Request) {
     provider,
     model: configResult.config.model,
     requestSummary: directorRequest.requestSummary,
+    ...(rawRequest !== undefined ? { rawRequest } : {}),
     rawResponse: rawOutput,
     parsedResponse: parsed.output,
     status: "success",

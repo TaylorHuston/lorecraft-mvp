@@ -67,7 +67,7 @@ Current synchronous flow:
 6. The backend builds a stateless provider request from explicit prompt components: Director instructions, current scene state, visible facts, hidden read-only NPC knowledge, bounded recent feed, player input, and an engine-derived required scene beat.
 7. The provider returns strict JSON with `narration` and optional `npcUpdates`.
 8. The backend parses and validates the output.
-9. Convex records the Director call for debugging and links it to the turn.
+9. Convex records the Director call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
 10. On success, Convex stores the narration and marks the turn `succeeded`.
 11. Convex applies accepted NPC fact changes.
 12. Convex stores turn-linked events and state diffs for accepted changes.
@@ -75,6 +75,8 @@ Current synchronous flow:
 14. The UI updates from Convex state.
 
 The important bit is that the provider does not own continuity. The next turn starts from Convex again.
+
+Exact raw request storage is diagnostic evidence only. It can include hidden NPC knowledge, prompt guidance, and player text, so it is omitted by default and should not be treated as canonical game state.
 
 Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid world ids, and missing required world state.
 

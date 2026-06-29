@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
 import { buildDirectorRequest, deriveRequiredSceneBeat } from "./prompt";
+import { rawDirectorRequestForStorage, shouldStoreRawDirectorRequest } from "./raw-request";
 import {
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
@@ -439,6 +440,25 @@ describe("OpenAI-compatible provider boundary", () => {
       ok: false,
       error: "LLM_MAX_TOKENS must be an integer number at least 1 and no greater than 8000.",
     });
+  });
+});
+
+describe("Raw Director request storage", () => {
+  it("stores exact provider messages only when explicitly enabled", () => {
+    const messages = [
+      { role: "system" as const, content: "System prompt" },
+      { role: "user" as const, content: '{"promptComponents":{}}' },
+    ];
+
+    expect(shouldStoreRawDirectorRequest({})).toBe(false);
+    expect(shouldStoreRawDirectorRequest({ LORECRAFT_DEBUG_STORE_RAW_REQUEST: "0" })).toBe(false);
+    expect(shouldStoreRawDirectorRequest({ LORECRAFT_DEBUG_STORE_RAW_REQUEST: "1" })).toBe(true);
+    expect(rawDirectorRequestForStorage(messages, {})).toBeUndefined();
+    expect(
+      rawDirectorRequestForStorage(messages, {
+        LORECRAFT_DEBUG_STORE_RAW_REQUEST: "1",
+      }),
+    ).toBe(messages);
   });
 });
 

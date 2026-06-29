@@ -691,19 +691,38 @@ The system SHALL let developer-playtesters adjust text-only Director guidance fr
 - THEN the request summary records which prompt guidance sections were included
 - AND the debug panel can show those section keys with the latest Director summary
 
+### Requirement R8: Debug-Gated Raw Request Persistence
+
+The system SHALL optionally persist the exact Director provider request for local troubleshooting.
+
+#### Scenario R8-S1: Raw request stored only when explicitly enabled
+
+- WHEN local raw request debug storage is enabled
+- AND a Director call is attempted
+- THEN the persisted Director call includes the exact provider messages sent to the OpenAI-compatible adapter
+- AND the raw request can be inspected in the existing debug JSON
+
+#### Scenario R8-S2: Raw request omitted by default
+
+- WHEN local raw request debug storage is not enabled
+- AND a Director call is persisted
+- THEN the Director call stores compact request metadata but omits the full raw request messages
+- AND hidden world facts, prompt guidance, and player text are not duplicated into raw request storage by default
+
 ### Implemented By
 
 - `src/lib/director/prompt.ts` builds explicit Director prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata.
 - `src/lib/director/provider.ts` parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings.
-- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them.
+- `src/app/api/director/turn/route.ts` passes effective generation settings and validated debug prompt guidance into Director request construction so persisted `directorCalls.requestSummary` and local debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled.
 - `src/lib/director/output.ts` continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes.
 - `src/app/world-client.tsx` renders debug prompt guidance text sections and includes them with the next narrative turn.
-- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, and provider generation settings.
+- `src/lib/director/raw-request.ts` gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`.
+- `src/lib/director/director.test.ts` covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, and raw request storage gating.
 - `scripts/director-playtest.mjs` runs the repeatable local Director playtest against a running dev server.
 
 ### Verified By
 
-- `npm run test` passed, including prompt component structure, debug prompt guidance inclusion, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, and generation setting request bodies.
+- `npm run test` passed, including prompt component structure, debug prompt guidance inclusion, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, generation setting request bodies, and raw request storage gating.
 - `npm run ci:required` passed after the initial implementation.
 - `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
 - Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."

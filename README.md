@@ -67,6 +67,14 @@ npm run dev:debug
 
 This writes newline-delimited JSON to `logs/director-debug.jsonl`, which is gitignored. Records include route stage, provider host, model, compact request summary, outcome, errors, accepted/ignored update counts, response length metadata, and timing data. Full raw LLM response text is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is also set.
 
+To persist the exact provider request messages in `directorCalls.rawRequest`, start the app with:
+
+```bash
+LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run dev
+```
+
+This can include hidden NPC knowledge, prompt guidance, and player text, so keep it local/debug-only.
+
 Run the repeatable local Director smoke playtest against a running dev server:
 
 ```bash
