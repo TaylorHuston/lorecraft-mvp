@@ -21,7 +21,7 @@ The format is based on Keep a Changelog 1.1.0.
 - Documented the long-term target as TTRPG-style Game Master play with selective hidden adjudication, not lightweight MUD simulation.
 - Refined seeded NPC profile fields into stable description, background, persona, voice, mood, status, memory, and private knowledge.
 - Rendered read-only NPC profiles as canonical NPC Cards in persistent Game Master prompts, with derived conversation focus for ambiguous follow-up dialogue.
-- Trimmed Game Master provider prompts to compact AI Dungeon-style sections (`AI Instructions`, `World`, `NPC Cards`, `Recent Story`, `Current Input`) instead of sending the full internal debug component graph.
+- Trimmed Game Master provider prompts to compact sectioned prompts (`AI Instructions`, `World`, `NPC Cards`, `Recent Story`, `Current Input`) instead of sending the full internal debug component graph.
 - Split creative story generation from future structured mutation extraction: persistent Game Master turns now request plain prose and the backend wraps narration with empty NPC updates.
 - Improved persistent Game Master prompt priority so current turn directives and read-only NPC profiles outrank stale recent-feed prose, with tighter direct-NPC question targeting.
 - Transcript mode now avoids live room, actor, NPC fact, object, exit, and hidden-knowledge prompt context so transcript continuity cannot conflict with canonical world state.
@@ -30,11 +30,3 @@ The format is based on Keep a Changelog 1.1.0.
 - Changed `npm run dev:debug` to enable full local Game Master diagnostics, including raw provider requests, raw LLM responses, and persisted raw request storage.
 - Changed the Lorecraft play surface from chat-like feed cards to a prose-first story stream with independent story/debug scrolling and bottom anchoring.
 - Replaced the player-facing command parser surface with one narrative input and a split debug layout.
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
