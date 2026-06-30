@@ -21,7 +21,7 @@ if (!convexUrl) {
 
 const convex = new ConvexHttpClient(convexUrl);
 
-console.log(`Director playtest target: ${baseUrl}`);
+console.log(`Game Master playtest target: ${baseUrl}`);
 
 const worldId = await seedFreshWorld();
 const directQuestion = await submitTurn(baseUrl, worldId, DIRECT_QUESTION_INPUT);
@@ -34,7 +34,7 @@ const snapshot = await convex.query(api.world.getSnapshot, { worldId });
 assertSnapshot(snapshot);
 
 console.log("");
-console.log("Director playtest passed.");
+console.log("Game Master playtest passed.");
 console.log(`- Direct question narration: ${directQuestion.narration}`);
 console.log(`- Plain action narration: ${plainAction.narration}`);
 
@@ -58,18 +58,18 @@ async function submitTurn(targetBaseUrl, worldId, input) {
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   } catch (error) {
-    fail(`Could not reach Director route at ${targetBaseUrl}. Is Next running? ${errorMessage(error)}`);
+    fail(`Could not reach Game Master route at ${targetBaseUrl}. Is Next running? ${errorMessage(error)}`);
   }
 
   let body;
   try {
     body = await response.json();
   } catch (error) {
-    fail(`Director route returned non-JSON response with HTTP ${response.status}: ${errorMessage(error)}`);
+    fail(`Game Master route returned non-JSON response with HTTP ${response.status}: ${errorMessage(error)}`);
   }
 
   if (!response.ok || !body.ok) {
-    fail(`Director turn failed for "${input}" with HTTP ${response.status}: ${body.error ?? "unknown error"}`);
+    fail(`Game Master turn failed for "${input}" with HTTP ${response.status}: ${body.error ?? "unknown error"}`);
   }
 
   return body;
@@ -98,7 +98,7 @@ function assertSnapshot(snapshot) {
 
   const calls = snapshot.directorCalls.slice(0, 2);
   if (calls.length < 2) {
-    fail(`Expected at least 2 Director calls in snapshot, found ${calls.length}.`);
+    fail(`Expected at least 2 Game Master calls in snapshot, found ${calls.length}.`);
   }
 
   const plainActionCall = calls[0];
@@ -111,24 +111,31 @@ function assertSnapshot(snapshot) {
   assertSceneBeat(directQuestionCall.requestSummary, {
     kind: "direct_npc_question",
     expectsNpcResponse: true,
-    allowsNpcUpdates: true,
+    allowsNpcUpdates: false,
     targetActorKey: "mira",
   });
 
   for (const call of calls) {
     const summary = call.requestSummary;
-    assertArrayIncludes(summary.promptComponentKeys, "currentTurn", "promptComponentKeys");
-    assertArrayIncludes(summary.promptComponentKeys, "hiddenNpcKnowledge", "promptComponentKeys");
-    assertArrayIncludes(summary.readOnlyKnowledgeKeys, "mira.knows_about_storm", "readOnlyKnowledgeKeys");
-    if (summary.generationSettings?.responseFormat !== "json_object") {
-      fail("Expected generationSettings.responseFormat to be json_object in Director request summary.");
+    if (summary.outputContract !== "plain_prose") {
+      fail(`Expected outputContract to be plain_prose. Got ${JSON.stringify(summary.outputContract)}.`);
+    }
+    if (summary.npcMutationMode !== "read_only") {
+      fail(`Expected npcMutationMode to be read_only. Got ${JSON.stringify(summary.npcMutationMode)}.`);
+    }
+    assertArrayIncludes(summary.promptComponentKeys, "npcCards", "promptComponentKeys");
+    assertArrayIncludes(summary.promptComponentKeys, "currentInput", "promptComponentKeys");
+    assertArrayIncludes(summary.npcProfileKeys, "mira", "npcProfileKeys");
+    assertArrayIncludes(summary.readOnlyKnowledgeKeys, "mira.knowledge", "readOnlyKnowledgeKeys");
+    if (summary.generationSettings?.responseFormat !== "text") {
+      fail("Expected generationSettings.responseFormat to be text in Game Master request summary.");
     }
   }
 }
 
 function assertSceneBeat(summary, expected) {
   if (!summary?.requiredSceneBeat) {
-    fail("Director request summary is missing requiredSceneBeat.");
+    fail("Game Master request summary is missing requiredSceneBeat.");
   }
 
   for (const [key, value] of Object.entries(expected)) {
@@ -194,11 +201,11 @@ function requiredValue(args, index, flag) {
 function printHelp() {
   console.log(`Usage: npm run playtest:director -- [--base-url ${DEFAULT_BASE_URL}] [--timeout-ms 180000]
 
-Runs a local Director smoke playtest against a running Lorecraft app:
+Runs a local Game Master smoke playtest against a running Lorecraft app:
 1. Seeds a fresh demo world through Convex.
 2. Sends a direct Mira question through /api/director/turn.
 3. Sends a plain action through /api/director/turn.
-4. Verifies narration, durable update behavior, and Director debug metadata.
+4. Verifies narration, durable update behavior, and Game Master debug metadata.
 `);
 }
 
@@ -238,6 +245,6 @@ function errorMessage(error) {
 
 function fail(message) {
   console.error("");
-  console.error(`Director playtest failed: ${message}`);
+  console.error(`Game Master playtest failed: ${message}`);
   process.exit(1);
 }

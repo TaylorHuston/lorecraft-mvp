@@ -6,12 +6,13 @@ import { readDirectorMode } from "@/lib/director/mode";
 import { buildDirectorRequest, buildTranscriptDirectorRequest } from "@/lib/director/prompt";
 import {
   applySceneBeatPersistenceBoundary,
-  parseDirectorOutput,
   parsePlainProseDirectorOutput,
   validateNpcUpdates,
 } from "@/lib/director/output";
 import { ProviderError, readLlmConfig, requestOpenAICompatibleChat } from "@/lib/director/provider";
 import { validateNarrativeInput } from "@/lib/director/input";
+import { getNpcDebugOverrides } from "@/lib/director/npc-debug-overrides";
+import { applyNpcDebugOverrides } from "@/lib/director/npc-profiles";
 import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
 import type { DirectorContext, TranscriptDirectorContext } from "@/lib/director/types";
@@ -142,6 +143,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const persistentContext =
+    directorMode === "persistent"
+      ? applyNpcDebugOverrides(context as unknown as DirectorContext, getNpcDebugOverrides(worldId))
+      : null;
+
   const recorded = await convex.mutation(api.world.recordPlayerInput, { worldId, input });
   if (!recorded.ok) {
     await logDirectorTurn({
@@ -157,17 +163,17 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
 
-  const generationSettings =
-    directorMode === "transcript"
-      ? { ...configResult.config.generationSettings, responseFormat: "text" as const }
-      : configResult.config.generationSettings;
+  const generationSettings = {
+    ...configResult.config.generationSettings,
+    responseFormat: "text" as const,
+  };
   const directorRequest =
     directorMode === "transcript"
       ? buildTranscriptDirectorRequest(context as TranscriptDirectorContext, input, {
           generationSettings,
           promptGuidance: bodyResult.body.promptGuidance,
         })
-      : buildDirectorRequest(context as DirectorContext, input, {
+      : buildDirectorRequest(persistentContext ?? (context as unknown as DirectorContext), input, {
           generationSettings,
           promptGuidance: bodyResult.body.promptGuidance,
         });
@@ -221,10 +227,7 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: providerError.message }, 502);
   }
 
-  const parsed =
-    directorMode === "transcript"
-      ? parsePlainProseDirectorOutput(rawOutput)
-      : parseDirectorOutput(rawOutput);
+  const parsed = parsePlainProseDirectorOutput(rawOutput);
   if (!parsed.ok) {
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
@@ -269,7 +272,10 @@ export async function POST(request: Request) {
     directorMode === "transcript"
       ? { acceptedUpdates: [], ignoredUpdates: [] }
       : applySceneBeatPersistenceBoundary(
-          validateNpcUpdates(parsed.output.npcUpdates, (context as DirectorContext).actors),
+          validateNpcUpdates(
+            parsed.output.npcUpdates,
+            (persistentContext ?? (context as unknown as DirectorContext)).actors,
+          ),
           directorRequest.requestSummary.requiredSceneBeat,
         );
   await convex.mutation(api.world.completeDirectorTurn, {
@@ -396,7 +402,7 @@ function createConvexClient() {
   if (!convexUrl) {
     return {
       ok: false as const,
-      error: "NEXT_PUBLIC_CONVEX_URL is not configured, so the Director cannot persist turns.",
+      error: "NEXT_PUBLIC_CONVEX_URL is not configured, so the Game Master cannot persist turns.",
     };
   }
   return { ok: true as const, client: new ConvexHttpClient(convexUrl) };

@@ -27,7 +27,7 @@ if (!convexUrl) {
 
 const convex = new ConvexHttpClient(convexUrl);
 
-console.log(`Transcript Director playtest target: ${baseUrl}`);
+console.log(`Transcript Game Master playtest target: ${baseUrl}`);
 console.log("Expected server mode: LORECRAFT_DIRECTOR_MODE=transcript");
 
 const worldId = await seedFreshWorld();
@@ -46,7 +46,7 @@ const after = await convex.query(api.world.getSnapshot, { worldId });
 assertTranscriptSnapshot(after);
 
 console.log("");
-console.log("Transcript Director playtest passed.");
+console.log("Transcript Game Master playtest passed.");
 console.log(`- Narration: ${result.narration}`);
 
 async function seedFreshWorld() {
@@ -69,18 +69,18 @@ async function submitTurn(targetBaseUrl, worldId, input) {
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   } catch (error) {
-    fail(`Could not reach Director route at ${targetBaseUrl}. Is Next running? ${errorMessage(error)}`);
+    fail(`Could not reach Game Master route at ${targetBaseUrl}. Is Next running? ${errorMessage(error)}`);
   }
 
   let body;
   try {
     body = await response.json();
   } catch (error) {
-    fail(`Director route returned non-JSON response with HTTP ${response.status}: ${errorMessage(error)}`);
+    fail(`Game Master route returned non-JSON response with HTTP ${response.status}: ${errorMessage(error)}`);
   }
 
   if (!response.ok || !body.ok) {
-    fail(`Director turn failed for "${input}" with HTTP ${response.status}: ${body.error ?? "unknown error"}`);
+    fail(`Game Master turn failed for "${input}" with HTTP ${response.status}: ${body.error ?? "unknown error"}`);
   }
 
   return body;
@@ -93,27 +93,27 @@ function assertTranscriptSnapshot(snapshot) {
 
   const latestCall = snapshot.directorCalls[0];
   if (!latestCall) {
-    fail("Expected a persisted Director call.");
+    fail("Expected a persisted Game Master call.");
   }
   if (latestCall.requestSummary?.directorMode !== "transcript") {
     fail(
-      `Expected latest Director call mode to be transcript, got ${JSON.stringify(latestCall.requestSummary?.directorMode)}. Start the app with LORECRAFT_DIRECTOR_MODE=transcript.`,
+      `Expected latest Game Master call mode to be transcript, got ${JSON.stringify(latestCall.requestSummary?.directorMode)}. Start the app with LORECRAFT_DIRECTOR_MODE=transcript.`,
     );
   }
   if (latestCall.requestSummary?.roomKey !== "transcript") {
-    fail(`Expected latest Director call roomKey to be transcript, got ${JSON.stringify(latestCall.requestSummary?.roomKey)}.`);
+    fail(`Expected latest Game Master call roomKey to be transcript, got ${JSON.stringify(latestCall.requestSummary?.roomKey)}.`);
   }
   if (latestCall.requestSummary?.actorKeys?.length !== 0 || latestCall.requestSummary?.npcFactKeys?.length !== 0) {
     fail("Expected transcript request summary to omit live actor and NPC fact context.");
   }
   if (latestCall.requestSummary?.outputContract !== "plain_prose") {
-    fail("Expected latest Director call outputContract to be plain_prose.");
+    fail("Expected latest Game Master call outputContract to be plain_prose.");
   }
   if (latestCall.requestSummary?.generationSettings?.responseFormat !== "text") {
-    fail("Expected latest Director call generationSettings.responseFormat to be text.");
+    fail("Expected latest Game Master call generationSettings.responseFormat to be text.");
   }
   if (latestCall.acceptedUpdates.length > 0 || latestCall.ignoredUpdates.length > 0) {
-    fail("Expected Director call to have empty accepted/ignored updates.");
+    fail("Expected Game Master call to have empty accepted/ignored updates.");
   }
   if (latestCall.parsedResponse?.npcUpdates?.length !== 0) {
     fail("Expected parsed transcript response to have no npcUpdates.");
@@ -196,7 +196,7 @@ function requiredValue(args, index, flag) {
 function printHelp() {
   console.log(`Usage: npm run playtest:director:transcript -- [--base-url ${DEFAULT_BASE_URL}] [--timeout-ms 180000]
 
-Runs a local transcript-only Director smoke playtest against a running Lorecraft app:
+Runs a local transcript-only Game Master smoke playtest against a running Lorecraft app:
 1. Seeds a fresh demo world through Convex.
 2. Sends a direct Mira question through /api/director/turn.
 3. Verifies plain-prose transcript mode metadata, persisted narration/debug records, and no NPC fact/state diff/LLM event mutation.
@@ -241,6 +241,6 @@ function errorMessage(error) {
 
 function fail(message) {
   console.error("");
-  console.error(`Transcript Director playtest failed: ${message}`);
+  console.error(`Transcript Game Master playtest failed: ${message}`);
   process.exit(1);
 }

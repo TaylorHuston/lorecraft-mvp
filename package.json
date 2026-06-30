@@ -16,6 +16,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "benchmark:director-models": "node scripts/director-model-benchmark.mjs",
     "playtest:director:transcript": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/director-transcript-playtest.mjs",
     "playtest:director:persistenceless": "npm run playtest:director:transcript"
   },

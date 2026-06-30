@@ -57,7 +57,7 @@ export async function writeDirectorDebugLog(
     await appendFileImpl(filePath, `${JSON.stringify(record)}\n`, "utf8");
     return true;
   } catch (error) {
-    console.warn("Failed to write Lorecraft Director debug log.", error);
+    console.warn("Failed to write Lorecraft Game Master debug log.", error);
     return false;
   }
 }
