@@ -45,7 +45,7 @@ export function readLlmConfig(env: LlmEnv = process.env): LlmConfigResult {
   if (missing.length > 0) {
     return {
       ok: false,
-      error: `Configure ${missing.join(", ")} before sending Director turns.`,
+      error: `Configure ${missing.join(", ")} before sending Game Master turns.`,
     };
   }
 
@@ -56,7 +56,7 @@ export function readLlmConfig(env: LlmEnv = process.env): LlmConfigResult {
   if (!baseUrl || !apiKey || !model) {
     return {
       ok: false,
-      error: "Configure LLM_BASE_URL, LLM_API_KEY, LLM_MODEL before sending Director turns.",
+      error: "Configure LLM_BASE_URL, LLM_API_KEY, LLM_MODEL before sending Game Master turns.",
     };
   }
 
@@ -82,6 +82,9 @@ export async function requestOpenAICompatibleChat({
         ? { max_tokens: config.generationSettings.maxTokens }
         : {}),
       ...(config.generationSettings.topP !== undefined ? { top_p: config.generationSettings.topP } : {}),
+      ...(config.generationSettings.reasoningEffort !== undefined
+        ? { reasoning_effort: config.generationSettings.reasoningEffort }
+        : {}),
       ...(config.generationSettings.responseFormat === "json_object"
         ? { response_format: { type: "json_object" } }
         : {}),
@@ -161,14 +164,41 @@ function readGenerationSettings(env: LlmEnv):
     return topP;
   }
 
+  const reasoningEffort = readReasoningEffort(env.LLM_REASONING_EFFORT);
+  if (!reasoningEffort.ok) {
+    return reasoningEffort;
+  }
+
   return {
     ok: true,
     value: {
       temperature: temperature.value ?? 0.7,
       ...(maxTokens.value !== undefined ? { maxTokens: maxTokens.value } : {}),
       ...(topP.value !== undefined ? { topP: topP.value } : {}),
+      ...(reasoningEffort.value !== undefined ? { reasoningEffort: reasoningEffort.value } : {}),
       responseFormat: "json_object",
     },
+  };
+}
+
+function readReasoningEffort(rawValue: string | undefined):
+  | { ok: true; value?: NonNullable<DirectorGenerationSettingsSummary["reasoningEffort"]> }
+  | { ok: false; error: string } {
+  const trimmed = rawValue?.trim().toLowerCase();
+  if (!trimmed) {
+    return { ok: true };
+  }
+
+  if (["none", "low", "medium", "high", "max"].includes(trimmed)) {
+    return {
+      ok: true,
+      value: trimmed as NonNullable<DirectorGenerationSettingsSummary["reasoningEffort"]>,
+    };
+  }
+
+  return {
+    ok: false,
+    error: "LLM_REASONING_EFFORT must be one of none, low, medium, high, or max.",
   };
 }
 

@@ -11,7 +11,7 @@ Use the default branch policy from `../../developer-guide.md`.
 
 ## Local Development
 
-- For the foreseeable future, launch Lorecraft with `npm run dev:debug` instead of `npm run dev`. This must enable all current Director debug flags: local JSONL logs, raw provider request logging, raw LLM response logging, and persisted raw request storage.
+- For the foreseeable future, launch Lorecraft with `npm run dev:debug` instead of `npm run dev`. This must enable all current Game Master debug flags: local JSONL logs, raw provider request logging, raw LLM response logging, and persisted raw request storage.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know

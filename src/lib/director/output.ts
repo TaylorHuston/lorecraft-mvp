@@ -20,23 +20,23 @@ export type DirectorParseResult =
 export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
   const trimmed = rawOutput.trim();
   if (!trimmed) {
-    return { ok: false, error: "Director returned an empty response." };
+    return { ok: false, error: "Game Master returned an empty response." };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    return { ok: false, error: "Director response was not valid JSON." };
+    return { ok: false, error: "Game Master response was not valid JSON." };
   }
 
   if (!isRecord(parsed)) {
-    return { ok: false, error: "Director response must be a JSON object." };
+    return { ok: false, error: "Game Master response must be a JSON object." };
   }
 
   const narration = parsed.narration;
   if (typeof narration !== "string" || narration.trim().length === 0) {
-    return { ok: false, error: 'Director response must include non-empty "narration".' };
+    return { ok: false, error: 'Game Master response must include non-empty "narration".' };
   }
 
   const rawUpdates = parsed.npcUpdates ?? [];
@@ -56,7 +56,7 @@ export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
 export function parsePlainProseDirectorOutput(rawOutput: string): DirectorParseResult {
   const narration = rawOutput.trim();
   if (!narration) {
-    return { ok: false, error: "Director returned an empty response." };
+    return { ok: false, error: "Game Master returned an empty response." };
   }
 
   return {

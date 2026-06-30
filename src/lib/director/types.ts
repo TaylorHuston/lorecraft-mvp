@@ -26,6 +26,25 @@ export type DirectorActor = {
   }>;
 };
 
+export type DirectorNpcProfile = {
+  key: string;
+  name: string;
+  description: string;
+  attributes: Array<{
+    key: string;
+    value: string | number | boolean | null;
+    source: string;
+    overridden?: boolean;
+  }>;
+  overriddenFields: string[];
+};
+
+export type NpcDebugOverride = {
+  name?: string;
+  description?: string;
+  facts?: Record<string, string>;
+};
+
 export type DirectorContext = {
   world: {
     id: string;
@@ -48,6 +67,7 @@ export type DirectorContext = {
     toRoomName: string;
   }>;
   actors: DirectorActor[];
+  npcProfiles?: DirectorNpcProfile[];
   objects: Array<{
     key: string;
     name: string;
@@ -84,6 +104,9 @@ export type DirectorRequestSummary = {
   recentFeedCount: number;
   actorKeys: string[];
   npcFactKeys: string[];
+  npcProfileKeys?: string[];
+  npcOverrideKeys?: string[];
+  npcMutationMode?: "read_only" | "bounded_updates";
   readOnlyKnowledgeKeys: string[];
   requiredSceneBeat: {
     kind: SceneBeatKind;
@@ -124,6 +147,7 @@ export type DirectorGenerationSettingsSummary = {
   maxTokens?: number;
   topP?: number;
   responseFormat: "json_object" | "text";
+  reasoningEffort?: "none" | "low" | "medium" | "high" | "max";
 };
 
 export type DirectorPromptGuidance = {
