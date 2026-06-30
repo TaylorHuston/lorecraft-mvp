@@ -6,6 +6,8 @@ The format is based on Keep a Changelog 1.1.0.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-30
+
 ### Added
 
 - Read-only NPC profile context for persistent Game Master turns, plus debug-panel NPC inspection and temporary server-local NPC overrides.
