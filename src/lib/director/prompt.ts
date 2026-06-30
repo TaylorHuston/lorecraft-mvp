@@ -466,11 +466,14 @@ function buildTranscriptUserPrompt(components: {
     "Resolve Current Input before advancing; do not merely restate it.",
     "Use Recent Story as live continuity. The World Seed is only the opening premise.",
     components.sceneDirective,
-    ...promptGuidanceLines(components.promptGuidance),
   ];
+  const promptGuidance = promptGuidanceLines(components.promptGuidance);
 
   return buildSectionedPrompt([
     ["AI Instructions", bulletList(instructions)],
+    ...(promptGuidance.length > 0
+      ? ([["Prompt Guidance", bulletList(promptGuidance)]] as Array<[string, string]>)
+      : []),
     ["World Seed", formatWorldSeed(components.worldSeed)],
     ["Recent Story", formatRecentStory(components.transcript)],
     ["Current Input", `> ${components.lastAction.rawInput}`],

@@ -472,6 +472,30 @@ describe("Director request construction", () => {
     expect(userMessage?.content.length).toBeLessThan(2500);
   });
 
+  it("reports transcript prompt guidance only when it is rendered as its own section", () => {
+    const request = buildTranscriptDirectorRequest(transcriptContext, "What do I see now?", {
+      promptGuidance: {
+        style: "Keep the chapel scene spare and tense.",
+        npcBehavior: "NPCs should answer direct questions with specific intent.",
+      },
+    });
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary.promptComponentKeys).toEqual([
+      "aiInstructions",
+      "promptGuidance",
+      "worldSeed",
+      "recentStory",
+      "currentInput",
+    ]);
+    expect(request.requestSummary.promptGuidanceKeys).toEqual(["style", "npcBehavior"]);
+    expect(userMessage?.content).toContain("Prompt Guidance:");
+    expect(userMessage?.content).toContain("Style guidance: Keep the chapel scene spare and tense.");
+    expect(userMessage?.content).toContain(
+      "NPC behavior guidance: NPCs should answer direct questions with specific intent.",
+    );
+  });
+
   it("highlights immediate transcript context and omits invalid historical turns", () => {
     const request = buildTranscriptDirectorRequest(
       transcriptWithInvalidTurn,
@@ -592,6 +616,37 @@ describe("NPC debug override plumbing", () => {
 
     expect(clearNpcDebugOverride(worldId, "mira")).toEqual({});
     expect(getNpcDebugOverrides(worldId)).toEqual({});
+  });
+
+  it("bounds NPC debug override storage in process memory", () => {
+    for (let index = 0; index <= 20; index += 1) {
+      setNpcDebugOverride(`test-world-bound-${index}`, "mira", {
+        description: `description ${index}`,
+      });
+    }
+
+    expect(getNpcDebugOverrides("test-world-bound-0")).toEqual({});
+    expect(getNpcDebugOverrides("test-world-bound-20")).toEqual({
+      mira: { description: "description 20" },
+    });
+
+    for (let index = 0; index <= 20; index += 1) {
+      clearNpcDebugOverrides(`test-world-bound-${index}`);
+    }
+
+    const worldId = "test-world-actor-bound";
+    clearNpcDebugOverrides(worldId);
+    for (let index = 0; index <= 50; index += 1) {
+      setNpcDebugOverride(worldId, `actor-${index}`, {
+        description: `description ${index}`,
+      });
+    }
+
+    const boundedOverrides = getNpcDebugOverrides(worldId);
+    expect(Object.keys(boundedOverrides)).toHaveLength(50);
+    expect(boundedOverrides["actor-0"]).toBeUndefined();
+    expect(boundedOverrides["actor-50"]).toEqual({ description: "description 50" });
+    clearNpcDebugOverrides(worldId);
   });
 
   it("exposes NPC debug overrides through GET, POST, and DELETE route handlers", async () => {

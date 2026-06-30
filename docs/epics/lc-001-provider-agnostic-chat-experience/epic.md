@@ -878,8 +878,8 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 #### Scenario R5-S3: Fresh demo world per seed
 
 - WHEN the demo world is seeded during the current MVP
-- THEN prior Stormbound Chapel demo worlds and dependent rows are deleted
-- AND the new world uses the current server boot's demo slug
+- THEN the prior deterministic Stormbound Chapel demo world and dependent rows are deleted
+- AND the new world uses the stable demo slug `stormbound-chapel-default`
 - AND playtesting starts from the initial seed instead of resuming older world state
 
 ### Implemented By
@@ -889,7 +889,7 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 - `src/lib/director/provider.ts` omits OpenAI-compatible `response_format` when the effective generation settings request plain text.
 - `src/lib/director/output.ts` parses transcript plain prose as narration with no NPC updates.
 - `src/app/api/director/turn/route.ts` branches backend Game Master orchestration by startup mode, loads transcript context for transcript mode, and sends transcript completions through a no-mutation path.
-- `convex/world.ts` seeds fresh boot-scoped demo worlds, stores successful transcript narrations and Game Master calls, and skips NPC fact writes, LLM events, and state diffs.
+- `convex/world.ts` seeds a fresh deterministic demo world, stores successful transcript narrations and Game Master calls, and skips NPC fact writes, LLM events, and state diffs.
 - `src/app/world-client.tsx` shows the latest Game Master mode and output contract in the debug summary.
 - `scripts/director-transcript-playtest.mjs` verifies the local transcript no-mutation smoke path.
 

@@ -117,7 +117,7 @@ This is intended to compose with the next mutation change rather than be undone 
 
 ## Demo World Lifetime
 
-For this MVP experiment, the Stormbound Chapel demo world is not durable product data. The seed mutation creates a fresh boot-scoped demo world and deletes prior demo worlds plus their rooms, actors, objects, facts, turns, commands, narrations, events, state diffs, and Game Master calls. After a server restart, the app should seed a fresh world instead of resuming an older one.
+For this MVP experiment, the Stormbound Chapel demo world is not durable product data. The seed mutation creates a fresh deterministic demo world and deletes the prior deterministic demo world plus its rooms, actors, objects, facts, turns, commands, narrations, events, state diffs, and Game Master calls. Use the seed/reset workflow when a playtest needs to return to the initial world setup.
 
 This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. Durable world identity, campaign instances, and long-lived save files are deferred until the core story loop is worth preserving.
 

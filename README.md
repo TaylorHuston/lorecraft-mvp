@@ -78,7 +78,7 @@ LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug
 
 Transcript mode still persists turns, player input, Game Master narrations, Game Master debug calls, and local logs. Its prompt is built from the canonical opening seed plus the transcript only; it does not include current room state, present actors, exits, object state, NPC facts, hidden NPC knowledge, or a scene-beat classifier. It does not apply NPC fact changes, LLM-authored world events, or LLM-authored state diffs from the Game Master response.
 
-The demo world is intentionally fresh seed data for now. Seeding Stormbound Chapel deletes prior demo worlds and starts a new boot-scoped world, so after a server restart the expected workflow is to seed again and test the initial world setup.
+The demo world is intentionally resettable seed data for now. Seeding Stormbound Chapel deletes the current deterministic demo world and recreates it, so use the seed/reset workflow when you want to test the initial world setup from scratch.
 
 Run the repeatable local Game Master smoke playtest against a running dev server:
 
@@ -97,7 +97,7 @@ npm run playtest:director:transcript
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
-- `convex/world.ts` seeds a fresh boot-scoped Stormbound Chapel demo world, reconstructs the feed, persists Game Master debug records, exposes actor/fact state, and resets playtest state.
+- `convex/world.ts` seeds a fresh deterministic Stormbound Chapel demo world, reconstructs the feed, persists Game Master debug records, exposes actor/fact state, and resets playtest state.
 - `src/app/api/director/turn/route.ts` coordinates synchronous Game Master turns through a provider-neutral backend boundary.
 - `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
 - `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.

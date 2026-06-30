@@ -2,6 +2,9 @@ import type { NpcDebugOverride } from "./types";
 
 type OverrideStore = Map<string, Map<string, NpcDebugOverride>>;
 
+const MAX_OVERRIDE_WORLDS = 20;
+const MAX_OVERRIDES_PER_WORLD = 50;
+
 const globalForNpcOverrides = globalThis as typeof globalThis & {
   __lorecraftNpcDebugOverrides?: OverrideStore;
 };
@@ -11,47 +14,83 @@ const overridesByWorld =
   (globalForNpcOverrides.__lorecraftNpcDebugOverrides = new Map());
 
 export function getNpcDebugOverrides(worldId: string): Record<string, NpcDebugOverride> {
-  return Object.fromEntries(overridesByWorld.get(worldId)?.entries() ?? []);
+  return Object.fromEntries(overridesByWorld.get(worldId.trim())?.entries() ?? []);
 }
 
 export function setNpcDebugOverride(worldId: string, actorKey: string, override: NpcDebugOverride) {
+  const normalizedWorldId = worldId.trim();
   const normalizedActorKey = actorKey.trim();
-  if (!worldId.trim() || !normalizedActorKey) {
-    return getNpcDebugOverrides(worldId);
+  if (!normalizedWorldId || !normalizedActorKey) {
+    return {};
   }
 
   const normalizedOverride = normalizeOverride(override);
-  let worldOverrides = overridesByWorld.get(worldId);
+  let worldOverrides = overridesByWorld.get(normalizedWorldId);
   if (!worldOverrides) {
+    evictOldestWorldIfNeeded();
     worldOverrides = new Map();
-    overridesByWorld.set(worldId, worldOverrides);
+    overridesByWorld.set(normalizedWorldId, worldOverrides);
+  } else {
+    touchWorld(normalizedWorldId, worldOverrides);
   }
 
   if (isEmptyOverride(normalizedOverride)) {
     worldOverrides.delete(normalizedActorKey);
   } else {
+    evictOldestActorIfNeeded(worldOverrides, normalizedActorKey);
     worldOverrides.set(normalizedActorKey, normalizedOverride);
   }
 
   if (worldOverrides.size === 0) {
-    overridesByWorld.delete(worldId);
+    overridesByWorld.delete(normalizedWorldId);
   }
 
-  return getNpcDebugOverrides(worldId);
+  return getNpcDebugOverrides(normalizedWorldId);
 }
 
 export function clearNpcDebugOverride(worldId: string, actorKey: string) {
-  const worldOverrides = overridesByWorld.get(worldId);
+  const normalizedWorldId = worldId.trim();
+  const worldOverrides = overridesByWorld.get(normalizedWorldId);
   worldOverrides?.delete(actorKey.trim());
   if (worldOverrides?.size === 0) {
-    overridesByWorld.delete(worldId);
+    overridesByWorld.delete(normalizedWorldId);
   }
-  return getNpcDebugOverrides(worldId);
+  return getNpcDebugOverrides(normalizedWorldId);
 }
 
 export function clearNpcDebugOverrides(worldId: string) {
-  overridesByWorld.delete(worldId);
+  overridesByWorld.delete(worldId.trim());
   return {};
+}
+
+function touchWorld(worldId: string, worldOverrides: Map<string, NpcDebugOverride>) {
+  overridesByWorld.delete(worldId);
+  overridesByWorld.set(worldId, worldOverrides);
+}
+
+function evictOldestWorldIfNeeded() {
+  if (overridesByWorld.size < MAX_OVERRIDE_WORLDS) {
+    return;
+  }
+
+  const oldestWorldId = overridesByWorld.keys().next().value;
+  if (oldestWorldId) {
+    overridesByWorld.delete(oldestWorldId);
+  }
+}
+
+function evictOldestActorIfNeeded(
+  worldOverrides: Map<string, NpcDebugOverride>,
+  actorKey: string,
+) {
+  if (worldOverrides.has(actorKey) || worldOverrides.size < MAX_OVERRIDES_PER_WORLD) {
+    return;
+  }
+
+  const oldestActorKey = worldOverrides.keys().next().value;
+  if (oldestActorKey) {
+    worldOverrides.delete(oldestActorKey);
+  }
 }
 
 function normalizeOverride(override: NpcDebugOverride): NpcDebugOverride {

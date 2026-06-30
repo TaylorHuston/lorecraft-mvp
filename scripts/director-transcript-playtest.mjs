@@ -8,8 +8,8 @@ const DEFAULT_BASE_URL = "http://localhost:3000";
 const DIRECT_QUESTION_INPUT = "Mira, what do you know about the storm?";
 const BASELINE_MIRA_FACTS = new Map([
   ["mood", "watchful"],
-  ["status", "waiting near the chapel aisle"],
-  ["memory", "Mira has not yet formed any meaningful memories of Taylor."],
+  ["status", "standing near the chapel aisle, tense from the storm and alert to movement around her"],
+  ["memory", "Mira has not yet formed meaningful memories of Taylor."],
 ]);
 
 loadDotEnv(".env.local");

@@ -5,9 +5,8 @@ import type { Id } from "./_generated/dataModel";
 type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
 
-const WORLD_SLUG_PREFIX = "stormbound-chapel";
-const SERVER_BOOT_ID = Math.random().toString(36).slice(2, 10);
-const WORLD_SLUG = `${WORLD_SLUG_PREFIX}-${SERVER_BOOT_ID}`;
+const WORLD_SLUG = "stormbound-chapel-default";
+const DEMO_RESET_ROW_LIMIT = 500;
 const PLAYER_KEY = "taylor";
 const MIRA_KEY = "mira";
 const MIRA_DESCRIPTION =
@@ -240,7 +239,7 @@ export const seedDemoWorld = mutation({
   args: {},
   returns: v.id("worlds"),
   handler: async (ctx) => {
-    await deleteDemoWorlds(ctx);
+    await deleteDemoWorld(ctx);
 
     const worldId = await ctx.db.insert("worlds", {
       slug: WORLD_SLUG,
@@ -1261,7 +1260,8 @@ async function deleteCommands(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("commands")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("commands", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1272,7 +1272,8 @@ async function deleteNarrations(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("narrations")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("narrations", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1283,7 +1284,8 @@ async function deleteEvents(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("events")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("events", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1294,7 +1296,8 @@ async function deleteStateDiffs(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("stateDiffs")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("stateDiffs", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1305,40 +1308,43 @@ async function deleteDirectorCalls(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("directorCalls")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("directorCalls", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
   return rows.length;
 }
 
-async function deleteDemoWorlds(ctx: MutationCtx) {
-  const worlds = await ctx.db.query("worlds").take(100);
-  for (const world of worlds) {
-    if (!world.slug.startsWith(WORLD_SLUG_PREFIX)) {
-      continue;
-    }
-
-    await deleteNarrations(ctx, world._id);
-    await deleteEvents(ctx, world._id);
-    await deleteStateDiffs(ctx, world._id);
-    await deleteDirectorCalls(ctx, world._id);
-    await deleteCommands(ctx, world._id);
-    await deleteTurns(ctx, world._id);
-    await deleteFacts(ctx, world._id);
-    await deleteWorldObjects(ctx, world._id);
-    await deleteExits(ctx, world._id);
-    await deleteActors(ctx, world._id);
-    await deleteRooms(ctx, world._id);
-    await ctx.db.delete(world._id);
+async function deleteDemoWorld(ctx: MutationCtx) {
+  const world = await ctx.db
+    .query("worlds")
+    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .unique();
+  if (!world) {
+    return;
   }
+
+  await deleteNarrations(ctx, world._id);
+  await deleteEvents(ctx, world._id);
+  await deleteStateDiffs(ctx, world._id);
+  await deleteDirectorCalls(ctx, world._id);
+  await deleteCommands(ctx, world._id);
+  await deleteTurns(ctx, world._id);
+  await deleteFacts(ctx, world._id);
+  await deleteWorldObjects(ctx, world._id);
+  await deleteExits(ctx, world._id);
+  await deleteActors(ctx, world._id);
+  await deleteRooms(ctx, world._id);
+  await ctx.db.delete(world._id);
 }
 
 async function deleteFacts(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("facts")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("facts", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1349,7 +1355,8 @@ async function deleteWorldObjects(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("worldObjects")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("worldObjects", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1360,7 +1367,8 @@ async function deleteExits(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("exits")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("exits", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1371,7 +1379,8 @@ async function deleteActors(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("actors")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("actors", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1382,7 +1391,8 @@ async function deleteRooms(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("rooms")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("rooms", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1393,9 +1403,20 @@ async function deleteTurns(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("turns")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("turns", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
   return rows.length;
+}
+
+function assertDemoResetTableWithinLimit(tableName: string, rowCount: number) {
+  if (rowCount <= DEMO_RESET_ROW_LIMIT) {
+    return;
+  }
+
+  throw new Error(
+    `Demo world reset found more than ${DEMO_RESET_ROW_LIMIT} ${tableName} rows. Reset a smaller demo dataset before reseeding.`,
+  );
 }

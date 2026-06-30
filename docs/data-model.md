@@ -10,18 +10,18 @@ Table: `worlds`
 
 A world is the top-level container for the current playtest state.
 
-For the current MVP, the Stormbound Chapel world is boot-scoped demo data. Reseeding creates a fresh demo world and deletes prior demo worlds plus their dependent rows. Durable world identity and campaign/world-instance persistence are deferred.
+For the current MVP, the Stormbound Chapel world is resettable demo data. Reseeding creates a fresh demo world and deletes the previous deterministic demo world plus its dependent rows. Durable world identity and campaign/world-instance persistence are deferred.
 
 | Field | Meaning |
 |---|---|
-| `slug` | Human-readable identifier for the seeded demo world. The MVP uses a `stormbound-chapel-*` boot-scoped slug. |
+| `slug` | Human-readable identifier for the seeded demo world. The MVP uses the deterministic slug `stormbound-chapel-default`. |
 | `name` | Display name shown to the player/debug UI. |
 | `description` | Stable baseline description of the world. Used as Game Master context. |
 | `currentPlayerActorId` | The actor currently controlled by the player. Optional so seed/repair flows can create the world before wiring the player. |
 
 Strategy:
 
-- The MVP has one active boot-scoped demo world at a time.
+- The MVP has one active deterministic demo world at a time.
 - Later, canonical worlds will likely become templates and active play will happen in copied story instances.
 
 ## Room
