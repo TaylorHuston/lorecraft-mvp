@@ -1,13 +1,24 @@
+# Lorecraft MVP Workspace Guide
+
+This repository is the implementation workspace for the Lorecraft MVP prototype.
+
 ## Branch Policy
 
-- Production branch: `main`.
-- Integration branch: `develop`.
-- Short-lived work branches: branch from `develop` using descriptive prefixes such as `feature/`, `bug/`, or `task/`.
-- Merge completed work back into `develop` after review/verification.
-- Promote `develop` to `main` only for release or explicit closeout work.
-- Documentation-only changes may land directly on `develop`; documentation-only changes to `main` require explicit Taylor approval.
+- `main` is the production branch.
+- `develop` is the integration branch and the GitHub default branch.
+- Routine work branches start from `develop` and use:
+  - `change/<short-slug>` for planned product, UX, architecture, or feature changes.
+  - `fix/<short-slug>` for defects and regressions.
+  - `misc/<short-slug>` for chores, tooling, documentation, process, infrastructure, and low-risk maintenance.
+- Routine integration may merge locally into `develop` after TH review or equivalent local verification.
+- Promotion to `main` should use a remote release PR by default.
 - Do not commit, merge, rebase, push, or rewrite history unless Taylor explicitly asks in the current conversation.
 - Keep this repo independent from the surrounding Obsidian vault git history.
+- See `docs/ci-cd.md` for the required gate, optional checks, and branch protection expectations.
+
+## Local Development
+
+- For the foreseeable future, launch Lorecraft with `npm run dev:debug` instead of `npm run dev`. This must enable all current Game Master debug flags: local JSONL logs, raw provider request logging, raw LLM response logging, and persisted raw request storage.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know

@@ -4,6 +4,7 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { NpcDebugOverride } from "@/lib/director/types";
 
 type DirectorTurnResponse =
   | {
@@ -17,6 +18,38 @@ type DirectorTurnResponse =
       error: string;
     };
 
+type DirectorPromptGuidance = {
+  style: string;
+  npcBehavior: string;
+  persistence: string;
+};
+
+type DebugTab = "prompt" | "npcs" | "state";
+
+type NpcOverrideResponse =
+  | { ok: true; overrides: Record<string, NpcDebugOverride> }
+  | { ok: false; error: string };
+
+type NpcOverrideSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+
+const NPC_PROFILE_FACT_KEYS = [
+  "background",
+  "persona",
+  "voice",
+  "mood",
+  "status",
+  "memory",
+  "knowledge",
+];
+
+const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
+  style: "Grounded, concise prose with concrete sensory detail. Keep the scene moving.",
+  npcBehavior:
+    "Present NPCs should make clear choices when directly engaged: answer, refuse, deflect, warn, ask back, act, or intentionally stay silent.",
+  persistence:
+    "Keep fleeting gestures and reactions in narration. Only update durable NPC facts when the change should matter after recent context falls away.",
+};
+
 export function WorldClient() {
   const defaultWorldId = useQuery(api.world.getDefaultWorld);
   const seedWorld = useMutation(api.world.seedDemoWorld);
@@ -27,7 +60,20 @@ export function WorldClient() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
+  const [npcOverrides, setNpcOverrides] = useState<Record<string, NpcDebugOverride>>({});
+  const [npcOverrideSaveStatus, setNpcOverrideSaveStatus] = useState<
+    Record<string, NpcOverrideSaveStatus>
+  >({});
+  const [collapsedNpcKeys, setCollapsedNpcKeys] = useState<Record<string, boolean>>({});
+  const [savingNpcKey, setSavingNpcKey] = useState<string | null>(null);
+  const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
+    DEFAULT_PROMPT_GUIDANCE,
+  );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
+  const npcOverrideSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const npcOverrideSaveVersions = useRef<Record<string, number>>({});
+  const nextDebugNpcOrdinal = useRef(1);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
@@ -44,11 +90,48 @@ export function WorldClient() {
     storyScroller.scrollTop = storyScroller.scrollHeight;
   }, [feedLength, isSubmitting, error]);
 
+  useEffect(() => {
+    if (!worldId) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(`/api/debug/npc-overrides?worldId=${encodeURIComponent(worldId)}`)
+      .then((response) => response.json() as Promise<NpcOverrideResponse>)
+      .then((result) => {
+        if (!cancelled && result.ok) {
+          setNpcOverrides(result.overrides);
+          setNpcOverrideSaveStatus({});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNpcOverrides({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [worldId]);
+
+  useEffect(() => {
+    const timers = npcOverrideSaveTimers.current;
+    return () => {
+      for (const timer of Object.values(timers)) {
+        clearTimeout(timer);
+      }
+    };
+  }, []);
+
   async function handleSeed() {
     setError(null);
     const seededWorldId = await seedWorld();
     setSelectedWorldId(seededWorldId);
-    setNotice("Stormbound Chapel is ready.");
+    setNpcOverrides({});
+    setNpcOverrideSaveStatus({});
+    setCollapsedNpcKeys({});
+    setNotice("Fresh Stormbound Chapel world seeded.");
   }
 
   async function handleReset() {
@@ -61,7 +144,7 @@ export function WorldClient() {
     try {
       const result = await resetPlaytestWorld({ worldId });
       setNotice(
-        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, and restored ${result.restoredFacts} Mira facts.`,
+        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, and restored ${result.restoredFacts} NPC facts.`,
       );
     } catch (resetError) {
       setError(errorMessage(resetError));
@@ -86,22 +169,152 @@ export function WorldClient() {
       const response = await fetch("/api/director/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worldId, input: submittedInput }),
+        body: JSON.stringify({
+          worldId,
+          input: submittedInput,
+          promptGuidance,
+        }),
       });
       const result = (await response.json()) as DirectorTurnResponse;
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "The Director turn failed." : result.error);
+        setError(result.ok ? "The Game Master turn failed." : result.error);
         setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
         return;
       }
 
-      setNotice("Director response persisted.");
+      setNotice("Game Master response persisted.");
     } catch (submitError) {
       setError(errorMessage(submitError));
       setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function updateNpcOverride(actorKey: string, override: NpcDebugOverride) {
+    setNpcOverrides((current) => ({
+      ...current,
+      [actorKey]: override,
+    }));
+    scheduleNpcOverrideSave(actorKey, override);
+  }
+
+  function addNpcOverride() {
+    const existingActorKeys = new Set([
+      ...(snapshot?.actors.map((actor) => actor.key) ?? []),
+      ...Object.keys(npcOverrides),
+    ]);
+    let actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
+    while (existingActorKeys.has(actorKey)) {
+      nextDebugNpcOrdinal.current += 1;
+      actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
+    }
+    nextDebugNpcOrdinal.current += 1;
+    const override: NpcDebugOverride = {
+      name: "New NPC",
+      description: "A temporary NPC for playtesting.",
+      facts: {
+        background: "New NPC background.",
+        persona: "New NPC personality.",
+        voice: "New NPC voice.",
+        mood: "neutral",
+        status: "present in the current scene",
+        memory: "This NPC has not yet formed meaningful memories of Taylor.",
+        knowledge: "This NPC has no private knowledge yet.",
+      },
+    };
+
+    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
+    updateNpcOverride(actorKey, override);
+  }
+
+  function toggleNpcCollapsed(actorKey: string) {
+    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: !current[actorKey] }));
+  }
+
+  function scheduleNpcOverrideSave(actorKey: string, override: NpcDebugOverride) {
+    if (!worldId) {
+      return;
+    }
+
+    npcOverrideSaveVersions.current[actorKey] = (npcOverrideSaveVersions.current[actorKey] ?? 0) + 1;
+    const saveVersion = npcOverrideSaveVersions.current[actorKey];
+    const saveWorldId = worldId;
+
+    setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "unsaved" }));
+    clearTimeout(npcOverrideSaveTimers.current[actorKey]);
+    npcOverrideSaveTimers.current[actorKey] = setTimeout(() => {
+      void persistNpcOverride(saveWorldId, actorKey, override, saveVersion);
+    }, 700);
+  }
+
+  async function persistNpcOverride(
+    saveWorldId: string,
+    actorKey: string,
+    override: NpcDebugOverride,
+    saveVersion: number,
+  ) {
+    setError(null);
+    setSavingNpcKey(actorKey);
+    setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "saving" }));
+    try {
+      const response = await fetch("/api/debug/npc-overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          worldId: saveWorldId,
+          actorKey,
+          override,
+        }),
+      });
+      const result = (await response.json()) as NpcOverrideResponse;
+      if (!response.ok || !result.ok) {
+        setError(result.ok ? "Failed to save NPC override." : result.error);
+        setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
+        return;
+      }
+
+      if (npcOverrideSaveVersions.current[actorKey] === saveVersion) {
+        setNpcOverrides(result.overrides);
+        setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "saved" }));
+      }
+    } catch (saveError) {
+      setError(errorMessage(saveError));
+      setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
+    } finally {
+      if (npcOverrideSaveVersions.current[actorKey] === saveVersion) {
+        setSavingNpcKey(null);
+      }
+    }
+  }
+
+  async function clearNpcOverride(actorKey: string) {
+    if (!worldId) {
+      return;
+    }
+
+    setError(null);
+    setSavingNpcKey(actorKey);
+    clearTimeout(npcOverrideSaveTimers.current[actorKey]);
+    npcOverrideSaveVersions.current[actorKey] = (npcOverrideSaveVersions.current[actorKey] ?? 0) + 1;
+    try {
+      const response = await fetch(
+        `/api/debug/npc-overrides?worldId=${encodeURIComponent(worldId)}&actorKey=${encodeURIComponent(actorKey)}`,
+        { method: "DELETE" },
+      );
+      const result = (await response.json()) as NpcOverrideResponse;
+      if (!response.ok || !result.ok) {
+        setError(result.ok ? "Failed to clear NPC override." : result.error);
+        return;
+      }
+      setNpcOverrides(result.overrides);
+      setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "idle" }));
+      setNotice("NPC override cleared.");
+    } catch (clearError) {
+      setError(errorMessage(clearError));
+    } finally {
+      setSavingNpcKey(null);
     }
   }
 
@@ -124,7 +337,7 @@ export function WorldClient() {
               Stormbound Chapel
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-300">
-              A narrative Director loop for testing persistent scene memory and Mira&apos;s evolving state.
+              A narrative Game Master loop for testing persistent scene memory and Mira&apos;s evolving state.
             </p>
           </header>
 
@@ -132,7 +345,7 @@ export function WorldClient() {
             {!worldId ? (
               <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4">
                 <p className="max-w-xl text-lg text-zinc-300">
-                  Seed the demo world to begin the persistent scene playtest.
+                  Seed a fresh demo world to begin the transcript playtest.
                 </p>
                 <button
                   type="button"
@@ -201,7 +414,7 @@ export function WorldClient() {
                     rows={3}
                     className="mt-2 min-h-24 w-full resize-y border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-300"
                   />
-                  {isSubmitting ? <p className="mt-3 text-sm text-zinc-400">Director thinking...</p> : null}
+                  {isSubmitting ? <p className="mt-3 text-sm text-zinc-400">Game Master thinking...</p> : null}
                   {notice ? <p className="mt-3 text-sm text-cyan-200">{notice}</p> : null}
                   {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
                 </form>
@@ -215,7 +428,7 @@ export function WorldClient() {
             <div>
               <h2 className="text-lg font-semibold text-zinc-50">Debug panel</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-400">
-                Hidden world state, Director calls, validation decisions, events, and state diffs.
+                Hidden world state, Game Master calls, validation decisions, events, and state diffs.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -224,7 +437,7 @@ export function WorldClient() {
                 onClick={handleSeed}
                 className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
               >
-                Ensure seed
+                Fresh seed
               </button>
               <button
                 type="button"
@@ -239,39 +452,65 @@ export function WorldClient() {
 
           {snapshot ? (
             <div className="mt-6 space-y-6">
-              <DebugList
-                title="Scene"
-                items={[
-                  `${snapshot.world.name} / ${snapshot.room.name}`,
-                  `Player: ${snapshot.player.name} (${snapshot.player.key})`,
-                  `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
-                  `Objects: ${snapshot.objects.map((object) => object.name).join(", ") || "none"}`,
-                ]}
-              />
-              <DebugList
-                title="Hidden facts"
-                items={snapshot.facts.map(
-                  (fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`,
-                )}
-              />
-              <DebugList
-                title="NPC state changes"
-                items={directorUpdateItems(snapshot.directorCalls)}
-              />
-              <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
-              <DebugList
-                title="Events"
-                items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
-              />
-              <DebugList
-                title="Narrations"
-                items={snapshot.narrations.map(
-                  (narration) => `${narration.text} (${narration.source})`,
-                )}
-              />
-              <DebugJson title="Turns" value={snapshot.turns} />
-              <DebugJson title="Director calls" value={snapshot.directorCalls} />
-              <DebugJson title="State diffs" value={snapshot.diffs} />
+              <DebugTabs value={debugTab} onChange={setDebugTab} />
+              {debugTab === "prompt" ? (
+                <DirectorPromptControls
+                  value={promptGuidance}
+                  onChange={setPromptGuidance}
+                  latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
+                />
+              ) : null}
+              {debugTab === "npcs" ? (
+                <NpcDebugPanel
+                  actors={snapshot.actors}
+                  facts={snapshot.facts}
+                  overrides={npcOverrides}
+                  saveStatus={npcOverrideSaveStatus}
+                  collapsedNpcKeys={collapsedNpcKeys}
+                  savingNpcKey={savingNpcKey}
+                  onAdd={addNpcOverride}
+                  onChange={updateNpcOverride}
+                  onToggleCollapsed={toggleNpcCollapsed}
+                  onClear={clearNpcOverride}
+                />
+              ) : null}
+              {debugTab === "state" ? (
+                <>
+                  <DebugList
+                    title="Scene"
+                    items={[
+                      `${snapshot.world.name} / ${snapshot.room.name}`,
+                      `Player: ${snapshot.player.name} (${snapshot.player.key})`,
+                      `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
+                      `Objects: ${snapshot.objects.map((object) => object.name).join(", ") || "none"}`,
+                    ]}
+                  />
+                  <DebugList
+                    title="Hidden facts"
+                    items={snapshot.facts.map(
+                      (fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`,
+                    )}
+                  />
+                  <DebugList
+                    title="NPC state changes"
+                    items={directorUpdateItems(snapshot.directorCalls)}
+                  />
+                  <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
+                  <DebugList
+                    title="Events"
+                    items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
+                  />
+                  <DebugList
+                    title="Narrations"
+                    items={snapshot.narrations.map(
+                      (narration) => `${narration.text} (${narration.source})`,
+                    )}
+                  />
+                  <DebugJson title="Turns" value={snapshot.turns} />
+                  <DebugJson title="Game Master calls" value={snapshot.directorCalls} />
+                  <DebugJson title="State diffs" value={snapshot.diffs} />
+                </>
+              ) : null}
             </div>
           ) : (
             <p className="mt-6 text-sm text-zinc-500">Seed a world to inspect state.</p>
@@ -340,6 +579,256 @@ function StoryEntryShell({
   );
 }
 
+function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: DebugTab) => void }) {
+  const tabs: Array<{ value: DebugTab; label: string }> = [
+    { value: "prompt", label: "Prompt" },
+    { value: "npcs", label: "NPCs" },
+    { value: "state", label: "State" },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 border border-zinc-800 text-xs uppercase">
+      {tabs.map((tab) => (
+        <button
+          key={tab.value}
+          type="button"
+          onClick={() => onChange(tab.value)}
+          className={`px-3 py-2 ${
+            value === tab.value
+              ? "bg-zinc-100 text-zinc-950"
+              : "bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function NpcDebugPanel({
+  actors,
+  facts,
+  overrides,
+  saveStatus,
+  collapsedNpcKeys,
+  savingNpcKey,
+  onAdd,
+  onChange,
+  onToggleCollapsed,
+  onClear,
+}: {
+  actors: Array<{
+    key: string;
+    name: string;
+    description: string;
+    role: "player" | "npc";
+  }>;
+  facts: Array<{
+    subjectId: string;
+    key: string;
+    value: string | number | boolean | null;
+    source: string;
+  }>;
+  overrides: Record<string, NpcDebugOverride>;
+  saveStatus: Record<string, NpcOverrideSaveStatus>;
+  collapsedNpcKeys: Record<string, boolean>;
+  savingNpcKey: string | null;
+  onAdd: () => void;
+  onChange: (actorKey: string, override: NpcDebugOverride) => void;
+  onToggleCollapsed: (actorKey: string) => void;
+  onClear: (actorKey: string) => void;
+}) {
+  const actorKeys = new Set(actors.map((actor) => actor.key));
+  const npcs = [
+    ...actors.filter((actor) => actor.role === "npc").map((actor) => ({ ...actor, debugOnly: false })),
+    ...Object.entries(overrides)
+      .filter(([actorKey]) => !actorKeys.has(actorKey))
+      .map(([actorKey, override]) => ({
+        key: actorKey,
+        name: override.name?.trim() || titleFromKey(actorKey),
+        description: override.description?.trim() || "A temporary debug NPC.",
+        role: "npc" as const,
+        debugOnly: true,
+      })),
+  ];
+
+  return (
+    <section className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-medium uppercase text-zinc-300">NPCs</h3>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            Temporary debug NPC values are server-local and disappear on restart.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="shrink-0 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+        >
+          Add NPC
+        </button>
+      </div>
+      {npcs.length > 0 ? (
+        npcs.map((npc) => {
+          const override = overrides[npc.key] ?? {};
+          const overrideFacts = override.facts ?? {};
+          const actorFacts = npc.debugOnly
+            ? NPC_PROFILE_FACT_KEYS.map((key) => ({
+                subjectId: `actor:${npc.key}`,
+                key,
+                value: overrideFacts[key] ?? "",
+                source: "debug_override",
+              }))
+            : facts.filter((fact) => fact.subjectId === `actor:${npc.key}`);
+          const isSaving = savingNpcKey === npc.key;
+          const status = saveStatus[npc.key] ?? "idle";
+          const statusLabel = npcOverrideStatusLabel(status, Boolean(overrides[npc.key]));
+          const isCollapsed = Boolean(collapsedNpcKeys[npc.key]);
+
+          return (
+            <div key={npc.key} className="border border-zinc-800 bg-zinc-950/50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium uppercase text-zinc-300">
+                    {npc.name} <span className="text-zinc-600">({npc.key})</span>
+                  </h3>
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    {npc.description}
+                    {npc.debugOnly ? " (debug-only)" : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs uppercase text-zinc-500">{statusLabel}</span>
+                  <button
+                    type="button"
+                    onClick={() => onToggleCollapsed(npc.key)}
+                    className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                  >
+                    {isCollapsed ? "Expand" : "Collapse"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onClear(npc.key)}
+                    disabled={isSaving || !overrides[npc.key]}
+                    className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {!isCollapsed ? (
+                <div className="mt-4 space-y-4">
+                  <NpcOverrideTextarea
+                    label="Name"
+                    currentValue={npc.name}
+                    value={override.name ?? ""}
+                    placeholder={npc.name}
+                    onChange={(name) => onChange(npc.key, { ...override, name })}
+                  />
+                  <NpcOverrideTextarea
+                    label="Description"
+                    currentValue={npc.description}
+                    value={override.description ?? ""}
+                    placeholder={npc.description}
+                    onChange={(description) => onChange(npc.key, { ...override, description })}
+                  />
+                  {actorFacts.map((fact) => (
+                    <NpcOverrideTextarea
+                      key={fact.key}
+                      label={`${fact.key} (${fact.source})`}
+                      currentValue={String(fact.value ?? "")}
+                      value={overrideFacts[fact.key] ?? ""}
+                      placeholder={String(fact.value ?? "")}
+                      onChange={(value) =>
+                        onChange(npc.key, {
+                          ...override,
+                          facts: {
+                            ...overrideFacts,
+                            [fact.key]: value,
+                          },
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-sm text-zinc-500">No NPCs in the current scene.</p>
+      )}
+    </section>
+  );
+}
+
+function titleFromKey(actorKey: string) {
+  const words = actorKey
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return words.length > 0
+    ? words.map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ")
+    : "Debug NPC";
+}
+
+function npcOverrideStatusLabel(status: NpcOverrideSaveStatus, hasOverride: boolean) {
+  if (status === "unsaved") {
+    return "Unsaved";
+  }
+  if (status === "saving") {
+    return "Saving";
+  }
+  if (status === "saved") {
+    return "Saved";
+  }
+  if (status === "error") {
+    return "Save failed";
+  }
+  return hasOverride ? "Override active" : "Canonical";
+}
+
+function NpcOverrideTextarea({
+  label,
+  currentValue,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  currentValue: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const id = `npc-override-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-medium text-zinc-400">
+        {label}
+      </label>
+      <p className="mb-2 border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs leading-5 text-zinc-300">
+        {currentValue || "No current value."}
+      </p>
+      <textarea
+        id={id}
+        value={value}
+        placeholder={placeholder}
+        rows={3}
+        maxLength={1200}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-20 w-full resize-y border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-cyan-300"
+      />
+    </div>
+  );
+}
+
 function DebugList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
@@ -355,6 +844,119 @@ function DebugList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function DirectorPromptControls({
+  value,
+  onChange,
+  latestSummary,
+}: {
+  value: DirectorPromptGuidance;
+  onChange: (value: DirectorPromptGuidance) => void;
+  latestSummary: Record<string, unknown> | null;
+}) {
+  return (
+    <section className="border border-zinc-800 bg-zinc-950/50 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-medium uppercase text-zinc-300">Prompt guidance</h3>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            Editable text sections for the next Game Master turn. These guide style and behavior without changing the output schema.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(DEFAULT_PROMPT_GUIDANCE)}
+          className="shrink-0 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <PromptGuidanceTextarea
+          label="Style"
+          value={value.style}
+          onChange={(style) => onChange({ ...value, style })}
+        />
+        <PromptGuidanceTextarea
+          label="NPC behavior"
+          value={value.npcBehavior}
+          onChange={(npcBehavior) => onChange({ ...value, npcBehavior })}
+        />
+        <PromptGuidanceTextarea
+          label="Persistence"
+          value={value.persistence}
+          onChange={(persistence) => onChange({ ...value, persistence })}
+        />
+      </div>
+
+      <div className="mt-5 border-t border-zinc-800 pt-4">
+        <h4 className="text-xs font-medium uppercase text-zinc-500">Last Game Master summary</h4>
+        <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5">
+          {latestSummary ? (
+            <>
+              <dt className="text-zinc-500">Beat</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.requiredSceneBeat)}</dd>
+              <dt className="text-zinc-500">Mode</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.directorMode)}</dd>
+              <dt className="text-zinc-500">Output</dt>
+              <dd className="min-w-0 text-zinc-300">{summaryText(latestSummary.outputContract)}</dd>
+              <dt className="text-zinc-500">Settings</dt>
+              <dd className="min-w-0 text-zinc-300">
+                {summaryText(latestSummary.generationSettings)}
+              </dd>
+              <dt className="text-zinc-500">Guidance</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.promptGuidanceKeys)}
+              </dd>
+              <dt className="text-zinc-500">Knowledge</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.readOnlyKnowledgeKeys)}
+              </dd>
+              <dt className="text-zinc-500">Components</dt>
+              <dd className="min-w-0 break-words text-zinc-300">
+                {summaryList(latestSummary.promptComponentKeys)}
+              </dd>
+            </>
+          ) : (
+            <dd className="col-span-2 text-zinc-500">No Game Master turn yet.</dd>
+          )}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function PromptGuidanceTextarea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = `director-${label.toLowerCase().replaceAll(" ", "-")}`;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+          {label}
+        </label>
+        <span className="text-xs tabular-nums text-zinc-600">{value.length}/1200</span>
+      </div>
+      <textarea
+        id={id}
+        value={value}
+        maxLength={1200}
+        rows={3}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-20 w-full resize-y border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-cyan-300"
+      />
+    </div>
+  );
+}
+
 function DebugJson({ title, value }: { title: string; value: unknown }) {
   return (
     <div>
@@ -364,6 +966,27 @@ function DebugJson({ title, value }: { title: string; value: unknown }) {
       </pre>
     </div>
   );
+}
+
+function latestDirectorRequestSummary(directorCalls: unknown[]) {
+  const latest = directorCalls.find(isRecord);
+  return isRecord(latest?.requestSummary) ? latest.requestSummary : null;
+}
+
+function summaryList(value: unknown) {
+  return Array.isArray(value) && value.length > 0 ? value.join(", ") : "None";
+}
+
+function summaryText(value: unknown) {
+  if (value === undefined || value === null) {
+    return "None";
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
 }
 
 function directorUpdateItems(directorCalls: unknown[]) {
@@ -414,7 +1037,7 @@ function turnSummaryItems(turns: unknown[]) {
       countLabel(turn.stateDiffCount, "diff"),
     ].join(", ");
     const directorStatus =
-      typeof turn.directorCallStatus === "string" ? `; Director: ${turn.directorCallStatus}` : "";
+      typeof turn.directorCallStatus === "string" ? `; Game Master: ${turn.directorCallStatus}` : "";
 
     return [`Turn ${sequenceNumber}: ${status}${input} (${counts}${directorStatus})`];
   });

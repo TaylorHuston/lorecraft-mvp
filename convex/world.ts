@@ -5,13 +5,73 @@ import type { Id } from "./_generated/dataModel";
 type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
 
-const WORLD_SLUG = "stormbound-chapel";
+const WORLD_SLUG = "stormbound-chapel-default";
+const DEMO_RESET_ROW_LIMIT = 500;
 const PLAYER_KEY = "taylor";
 const MIRA_KEY = "mira";
+const MIRA_DESCRIPTION =
+  "A local woman in practical rain-dark clothes, with damp dark hair and watchful eyes.";
 const MIRA_BASELINE_FACTS = [
+  {
+    key: "background",
+    value:
+      "Mira grew up around Stormbound Chapel and learned its routines from older caretakers. She has seen villagers dismiss old warnings as superstition, and she still carries guilt from once ignoring a sign she should have reported.",
+  },
+  {
+    key: "persona",
+    value:
+      "Cautious, observant, and slow to trust. Mira notices exits, strangers, and small changes before she speaks, and she tests whether someone is safe before sharing frightening truths.",
+  },
+  {
+    key: "voice",
+    value:
+      "Plain-spoken and restrained. Mira uses short warnings, practical details, and chapel or weather imagery. She avoids grand claims unless fear breaks through.",
+  },
   { key: "mood", value: "watchful" },
-  { key: "status", value: "waiting near the chapel aisle" },
-  { key: "memory", value: "Mira has not yet formed any meaningful memories of Taylor." },
+  {
+    key: "status",
+    value:
+      "standing near the chapel aisle, tense from the storm and alert to movement around her",
+  },
+  { key: "memory", value: "Mira has not yet formed meaningful memories of Taylor." },
+  {
+    key: "knowledge",
+    value:
+      "Mira knows the storm began after the chapel bell rang at midnight, but she is afraid to say that plainly.",
+  },
+] as const;
+const LEGACY_MIRA_FACT_KEYS = ["knows_about_storm"] as const;
+const PRIEST_KEY = "brother-alden";
+const PRIEST_NAME = "Brother Alden";
+const PRIEST_DESCRIPTION =
+  "A small, middle-aged priest in a patched black cassock, with ink-stained fingers and a careful stoop.";
+const PRIEST_BASELINE_FACTS = [
+  {
+    key: "background",
+    value:
+      "Brother Alden has tended Stormbound Chapel for years, keeping records, repairing small damage, and quietly helping villagers who come in from the rain.",
+  },
+  {
+    key: "persona",
+    value:
+      "Gentle, nervous, and dutiful. Alden tries to calm frightened people before admitting how much he knows, and he dislikes open confrontation.",
+  },
+  {
+    key: "voice",
+    value:
+      "Soft and formal, with small apologies and careful religious phrasing. He often answers indirectly before gathering courage.",
+  },
+  { key: "mood", value: "uneasy" },
+  {
+    key: "status",
+    value: "standing near the altar with a damp ledger tucked under one arm",
+  },
+  { key: "memory", value: "Brother Alden has not yet formed meaningful memories of Taylor." },
+  {
+    key: "knowledge",
+    value:
+      "Alden found a torn bell-rope fiber near the altar after midnight, but he has not told Mira because he fears accusing someone without proof.",
+  },
 ] as const;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
@@ -117,52 +177,69 @@ async function setFact(
   });
 }
 
-async function ensureSeedState(ctx: MutationCtx, worldId: Id<"worlds">) {
-  const chapel = await findRoomByKey(ctx, worldId, "chapel");
-  const player = await findActorByKeyOrName(ctx, worldId, PLAYER_KEY, "Taylor");
-  const mira = await findActorByKeyOrName(ctx, worldId, MIRA_KEY, "Mira");
-  const world = await ctx.db.get(worldId);
+async function deleteActorFactByKey(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  actorKey: string,
+  key: string,
+) {
+  const existing = await ctx.db
+    .query("facts")
+    .withIndex("by_worldId_and_subjectId_and_key", (q) =>
+      q.eq("worldId", worldId).eq("subjectId", actorSubjectId(actorKey)).eq("key", key),
+    )
+    .unique();
 
-  if (player && !player.key) {
-    await ctx.db.patch(player._id, { key: PLAYER_KEY });
+  if (existing) {
+    await ctx.db.delete(existing._id);
   }
-  if (mira && !mira.key) {
-    await ctx.db.patch(mira._id, { key: MIRA_KEY });
+}
+
+async function restoreSeededNpc(
+  ctx: MutationCtx,
+  args: {
+    worldId: Id<"worlds">;
+    key: string;
+    name: string;
+    description: string;
+    facts: readonly { key: string; value: FactValue }[];
+    legacyFactKeys?: readonly string[];
+  },
+) {
+  const actor = await findActorByKeyOrName(ctx, args.worldId, args.key, args.name);
+  if (!actor) {
+    return 0;
   }
-  if (world && !world.currentPlayerActorId && player) {
-    await ctx.db.patch(worldId, { currentPlayerActorId: player._id });
+
+  if (!actor.key) {
+    await ctx.db.patch(actor._id, { key: args.key });
   }
-  if (chapel && player && !player.roomId) {
-    await ctx.db.patch(player._id, { roomId: chapel._id });
+  await ctx.db.patch(actor._id, { description: args.description });
+
+  for (const key of args.legacyFactKeys ?? []) {
+    await deleteActorFactByKey(ctx, args.worldId, args.key, key);
   }
-  if (mira) {
-    for (const fact of MIRA_BASELINE_FACTS) {
-      await setFact(ctx, {
-        worldId,
-        subjectType: "actor",
-        subjectId: actorSubjectId(MIRA_KEY),
-        key: fact.key,
-        value: fact.value,
-        source: "seed",
-        overwrite: false,
-      });
-    }
+
+  for (const fact of args.facts) {
+    await setFact(ctx, {
+      worldId: args.worldId,
+      subjectType: "actor",
+      subjectId: actorSubjectId(args.key),
+      key: fact.key,
+      value: fact.value,
+      source: "seed",
+      overwrite: true,
+    });
   }
+
+  return args.facts.length;
 }
 
 export const seedDemoWorld = mutation({
   args: {},
   returns: v.id("worlds"),
   handler: async (ctx) => {
-    const existing = await ctx.db
-      .query("worlds")
-      .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
-      .unique();
-
-    if (existing) {
-      await ensureSeedState(ctx, existing._id);
-      return existing._id;
-    }
+    await deleteDemoWorld(ctx);
 
     const worldId = await ctx.db.insert("worlds", {
       slug: WORLD_SLUG,
@@ -176,7 +253,7 @@ export const seedDemoWorld = mutation({
       key: "chapel",
       name: "Chapel",
       description:
-        "Rain taps against warped shutters. A cracked lantern hangs beside a stone altar, and Mira waits near the aisle.",
+        "Rain taps against warped shutters. A cracked lantern hangs beside a stone altar, Mira waits near the aisle, and Brother Alden stands close to the altar with a ledger under one arm.",
     });
     const vestryId = await ctx.db.insert("rooms", {
       worldId,
@@ -237,7 +314,15 @@ export const seedDemoWorld = mutation({
       key: MIRA_KEY,
       name: "Mira",
       role: "npc",
-      description: "A careful local who watches the storm and notices when the chapel changes.",
+      description: MIRA_DESCRIPTION,
+    });
+    await ctx.db.insert("actors", {
+      worldId,
+      roomId: chapelId,
+      key: PRIEST_KEY,
+      name: PRIEST_NAME,
+      role: "npc",
+      description: PRIEST_DESCRIPTION,
     });
 
     await ctx.db.patch(worldId, { currentPlayerActorId: playerId });
@@ -295,20 +380,22 @@ export const seedDemoWorld = mutation({
         source: "seed",
         overwrite: false,
       }),
-      setFact(ctx, {
-        worldId,
-        subjectType: "actor",
-        subjectId: actorSubjectId(MIRA_KEY),
-        key: "knows_about_storm",
-        value: true,
-        source: "seed",
-        overwrite: false,
-      }),
       ...MIRA_BASELINE_FACTS.map((fact) =>
         setFact(ctx, {
           worldId,
           subjectType: "actor",
           subjectId: actorSubjectId(MIRA_KEY),
+          key: fact.key,
+          value: fact.value,
+          source: "seed",
+          overwrite: false,
+        }),
+      ),
+      ...PRIEST_BASELINE_FACTS.map((fact) =>
+        setFact(ctx, {
+          worldId,
+          subjectType: "actor",
+          subjectId: actorSubjectId(PRIEST_KEY),
           key: fact.key,
           value: fact.value,
           source: "seed",
@@ -446,6 +533,7 @@ export const getSnapshot = query({
           provider: v.string(),
           model: v.string(),
           requestSummary: v.any(),
+          rawRequest: v.optional(v.any()),
           rawResponse: v.optional(v.string()),
           parsedResponse: v.optional(v.any()),
           status: directorStatus,
@@ -578,6 +666,7 @@ export const getSnapshot = query({
         acceptedUpdates: call.acceptedUpdates,
         ignoredUpdates: call.ignoredUpdates,
         ...(call.commandId ? { commandId: call.commandId } : {}),
+        ...(call.rawRequest !== undefined ? { rawRequest: call.rawRequest } : {}),
         ...(call.rawResponse !== undefined ? { rawResponse: call.rawResponse } : {}),
         ...(call.parsedResponse !== undefined ? { parsedResponse: call.parsedResponse } : {}),
         ...(call.error !== undefined ? { error: call.error } : {}),
@@ -693,6 +782,68 @@ export const getDirectorContext = query({
   },
 });
 
+export const getTranscriptDirectorContext = query({
+  args: { worldId: v.id("worlds") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      world: v.object({ id: v.string(), name: v.string(), description: v.string() }),
+      initialSeed: v.string(),
+      transcript: v.array(feedEntry),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      return null;
+    }
+
+    const [chapel, player, actors, objects, transcript] = await Promise.all([
+      findRoomByKey(ctx, args.worldId, "chapel"),
+      findActorByKeyOrName(ctx, args.worldId, PLAYER_KEY, "Taylor"),
+      ctx.db
+        .query("actors")
+        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .take(100),
+      ctx.db
+        .query("worldObjects")
+        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .take(30),
+      loadTranscript(ctx, args.worldId, 40),
+    ]);
+    const startingNpcs = actors
+      .filter((actor) => actor.role === "npc")
+      .map((actor) => `Starting NPC: ${actor.name}. ${actor.description}`);
+
+    const initialSeed = [
+      `${world.name}: ${world.description}`,
+      chapel
+        ? `Opening scene: ${chapel.description}`
+        : "Opening scene: You begin in the Stormbound Chapel as rain lashes the old building.",
+      player ? `Player: ${player.name}. ${player.description}` : "Player: Taylor, the playtester.",
+      ...startingNpcs,
+      objects.length > 0
+        ? `Opening details: ${objects
+            .filter((object) => object.visible)
+            .map((object) => `${object.name}: ${object.description}`)
+            .join("; ")}`
+        : undefined,
+    ]
+      .filter((line): line is string => Boolean(line))
+      .join("\n");
+
+    return {
+      world: {
+        id: world._id,
+        name: world.name,
+        description: world.description,
+      },
+      initialSeed,
+      transcript,
+    };
+  },
+});
+
 export const recordPlayerInput = mutation({
   args: { worldId: v.id("worlds"), input: v.string() },
   returns: v.union(
@@ -760,6 +911,7 @@ export const completeDirectorTurn = mutation({
     provider: v.string(),
     model: v.string(),
     requestSummary: v.any(),
+    rawRequest: v.optional(v.any()),
     rawResponse: v.optional(v.string()),
     parsedResponse: v.optional(v.any()),
     status: directorStatus,
@@ -767,6 +919,7 @@ export const completeDirectorTurn = mutation({
     ignoredUpdates: v.array(ignoredNpcUpdate),
     error: v.optional(v.string()),
     narration: v.optional(v.string()),
+    applyWorldMutations: v.optional(v.boolean()),
   },
   returns: v.object({
     directorCallId: v.id("directorCalls"),
@@ -789,6 +942,7 @@ export const completeDirectorTurn = mutation({
       status: args.status,
       acceptedUpdates: args.acceptedUpdates,
       ignoredUpdates: args.ignoredUpdates,
+      ...(args.rawRequest !== undefined ? { rawRequest: args.rawRequest } : {}),
       ...(args.rawResponse !== undefined ? { rawResponse: args.rawResponse } : {}),
       ...(args.parsedResponse !== undefined ? { parsedResponse: args.parsedResponse } : {}),
       ...(args.error !== undefined ? { error: args.error } : {}),
@@ -811,6 +965,11 @@ export const completeDirectorTurn = mutation({
       text: args.narration.trim(),
       source: "llm",
     });
+
+    if (args.applyWorldMutations === false) {
+      await ctx.db.patch(args.turnId, { status: "succeeded", completedAt: Date.now() });
+      return { directorCallId, narrationId, changedFacts: 0 };
+    }
 
     let changedFacts = 0;
     const operations: Array<
@@ -892,25 +1051,22 @@ export const resetPlaytestWorld = mutation({
     const deletedCommands = await deleteCommands(ctx, args.worldId);
     const deletedTurns = await deleteTurns(ctx, args.worldId);
 
-    const mira = await findActorByKeyOrName(ctx, args.worldId, MIRA_KEY, "Mira");
     let restoredFacts = 0;
-    if (mira) {
-      if (!mira.key) {
-        await ctx.db.patch(mira._id, { key: MIRA_KEY });
-      }
-      for (const fact of MIRA_BASELINE_FACTS) {
-        await setFact(ctx, {
-          worldId: args.worldId,
-          subjectType: "actor",
-          subjectId: actorSubjectId(MIRA_KEY),
-          key: fact.key,
-          value: fact.value,
-          source: "seed",
-          overwrite: true,
-        });
-        restoredFacts += 1;
-      }
-    }
+    restoredFacts += await restoreSeededNpc(ctx, {
+      worldId: args.worldId,
+      key: MIRA_KEY,
+      name: "Mira",
+      description: MIRA_DESCRIPTION,
+      facts: MIRA_BASELINE_FACTS,
+      legacyFactKeys: LEGACY_MIRA_FACT_KEYS,
+    });
+    restoredFacts += await restoreSeededNpc(ctx, {
+      worldId: args.worldId,
+      key: PRIEST_KEY,
+      name: PRIEST_NAME,
+      description: PRIEST_DESCRIPTION,
+      facts: PRIEST_BASELINE_FACTS,
+    });
 
     return {
       deletedTurns,
@@ -1013,6 +1169,44 @@ async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
+async function loadTranscript(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
+  const [commands, narrations] = await Promise.all([
+    ctx.db
+      .query("commands")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .order("desc")
+      .take(limit),
+    ctx.db
+      .query("narrations")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .order("desc")
+      .take(limit),
+  ]);
+
+  return [
+    ...commands.map((command) => ({
+      id: `command:${command._id}`,
+      kind: "player" as const,
+      text: command.input,
+      source: "player",
+      createdAt: command._creationTime,
+      ...(command.turnId ? { turnId: command.turnId } : {}),
+      commandId: command._id,
+    })),
+    ...narrations
+      .filter((narration) => narration.source !== "seed")
+      .map((narration) => ({
+        id: `narration:${narration._id}`,
+        kind: "director" as const,
+        text: narration.text,
+        source: narration.source,
+        createdAt: narration._creationTime,
+        ...(narration.turnId ? { turnId: narration.turnId } : {}),
+        ...(narration.commandId ? { commandId: narration.commandId } : {}),
+      })),
+  ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+}
+
 async function loadTurnSummaries(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
   const turns = await ctx.db
     .query("turns")
@@ -1066,7 +1260,8 @@ async function deleteCommands(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("commands")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("commands", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1077,7 +1272,8 @@ async function deleteNarrations(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("narrations")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("narrations", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1088,7 +1284,8 @@ async function deleteEvents(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("events")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("events", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1099,7 +1296,8 @@ async function deleteStateDiffs(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("stateDiffs")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("stateDiffs", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1110,7 +1308,91 @@ async function deleteDirectorCalls(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("directorCalls")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("directorCalls", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteDemoWorld(ctx: MutationCtx) {
+  const world = await ctx.db
+    .query("worlds")
+    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .unique();
+  if (!world) {
+    return;
+  }
+
+  await deleteNarrations(ctx, world._id);
+  await deleteEvents(ctx, world._id);
+  await deleteStateDiffs(ctx, world._id);
+  await deleteDirectorCalls(ctx, world._id);
+  await deleteCommands(ctx, world._id);
+  await deleteTurns(ctx, world._id);
+  await deleteFacts(ctx, world._id);
+  await deleteWorldObjects(ctx, world._id);
+  await deleteExits(ctx, world._id);
+  await deleteActors(ctx, world._id);
+  await deleteRooms(ctx, world._id);
+  await ctx.db.delete(world._id);
+}
+
+async function deleteFacts(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("facts")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("facts", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteWorldObjects(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("worldObjects")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("worldObjects", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteExits(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("exits")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("exits", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteActors(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("actors")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("actors", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
+async function deleteRooms(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rows = await ctx.db
+    .query("rooms")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("rooms", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
@@ -1121,9 +1403,20 @@ async function deleteTurns(ctx: MutationCtx, worldId: Id<"worlds">) {
   const rows = await ctx.db
     .query("turns")
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(500);
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("turns", rows.length);
   for (const row of rows) {
     await ctx.db.delete(row._id);
   }
   return rows.length;
+}
+
+function assertDemoResetTableWithinLimit(tableName: string, rowCount: number) {
+  if (rowCount <= DEMO_RESET_ROW_LIMIT) {
+    return;
+  }
+
+  throw new Error(
+    `Demo world reset found more than ${DEMO_RESET_ROW_LIMIT} ${tableName} rows. Reset a smaller demo dataset before reseeding.`,
+  );
 }

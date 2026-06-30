@@ -9,13 +9,19 @@ export type DirectorDebugLogEntry = {
   worldId?: string;
   turnId?: string;
   commandId?: string;
+  playerInput?: string;
   provider?: string;
   model?: string;
   requestSummary?: unknown;
+  rawRequest?: unknown;
   status?: string;
   httpStatus?: number;
   error?: string;
   rawResponse?: string;
+  parsedResponse?: unknown;
+  narration?: string;
+  acceptedUpdates?: unknown[];
+  ignoredUpdates?: unknown[];
   acceptedUpdateCount?: number;
   ignoredUpdateCount?: number;
   timingsMs?: Record<string, number>;
@@ -51,7 +57,7 @@ export async function writeDirectorDebugLog(
     await appendFileImpl(filePath, `${JSON.stringify(record)}\n`, "utf8");
     return true;
   } catch (error) {
-    console.warn("Failed to write Lorecraft Director debug log.", error);
+    console.warn("Failed to write Lorecraft Game Master debug log.", error);
     return false;
   }
 }
@@ -62,6 +68,9 @@ export function buildDirectorDebugLogRecord(
 ) {
   const rawResponseLength =
     typeof entry.rawResponse === "string" ? entry.rawResponse.length : undefined;
+  const rawRequestMessageCount = Array.isArray(entry.rawRequest)
+    ? entry.rawRequest.length
+    : undefined;
 
   return omitUndefined({
     ts: now().toISOString(),
@@ -70,16 +79,23 @@ export function buildDirectorDebugLogRecord(
     worldId: entry.worldId,
     turnId: entry.turnId,
     commandId: entry.commandId,
+    playerInput: entry.playerInput,
     provider: entry.provider,
     model: entry.model,
     requestSummary: entry.requestSummary,
+    rawRequestMessageCount,
+    rawRequest: rawRequestLoggingEnabled(env) ? entry.rawRequest : undefined,
     status: entry.status,
     httpStatus: entry.httpStatus,
     error: entry.error,
     rawResponseLength,
     rawResponse: rawLlmLoggingEnabled(env) ? entry.rawResponse : undefined,
-    acceptedUpdateCount: entry.acceptedUpdateCount,
-    ignoredUpdateCount: entry.ignoredUpdateCount,
+    parsedResponse: entry.parsedResponse,
+    narration: entry.narration,
+    acceptedUpdates: entry.acceptedUpdates,
+    ignoredUpdates: entry.ignoredUpdates,
+    acceptedUpdateCount: entry.acceptedUpdateCount ?? entry.acceptedUpdates?.length,
+    ignoredUpdateCount: entry.ignoredUpdateCount ?? entry.ignoredUpdates?.length,
     timingsMs: entry.timingsMs,
   });
 }
@@ -90,6 +106,10 @@ function debugLogEnabled(env: DebugLogEnv) {
 
 function rawLlmLoggingEnabled(env: DebugLogEnv) {
   return truthyEnv(env.LORECRAFT_DEBUG_LOG_RAW_LLM);
+}
+
+function rawRequestLoggingEnabled(env: DebugLogEnv) {
+  return truthyEnv(env.LORECRAFT_DEBUG_LOG_RAW_REQUEST);
 }
 
 function truthyEnv(value: string | undefined) {

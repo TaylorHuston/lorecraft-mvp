@@ -26,6 +26,25 @@ export type DirectorActor = {
   }>;
 };
 
+export type DirectorNpcProfile = {
+  key: string;
+  name: string;
+  description: string;
+  attributes: Array<{
+    key: string;
+    value: string | number | boolean | null;
+    source: string;
+    overridden?: boolean;
+  }>;
+  overriddenFields: string[];
+};
+
+export type NpcDebugOverride = {
+  name?: string;
+  description?: string;
+  facts?: Record<string, string>;
+};
+
 export type DirectorContext = {
   world: {
     id: string;
@@ -48,6 +67,7 @@ export type DirectorContext = {
     toRoomName: string;
   }>;
   actors: DirectorActor[];
+  npcProfiles?: DirectorNpcProfile[];
   objects: Array<{
     key: string;
     name: string;
@@ -56,23 +76,84 @@ export type DirectorContext = {
   recentFeed: DirectorFeedEntry[];
 };
 
+export type TranscriptDirectorContext = {
+  world: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  initialSeed: string;
+  transcript: DirectorFeedEntry[];
+};
+
 export type DirectorMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
+export type DirectorMode = "persistent" | "transcript";
+export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
+export type SceneBeatSource = "engine" | "llm" | "fallback";
+
 export type DirectorRequestSummary = {
+  directorMode: DirectorMode;
+  outputContract: DirectorOutputContract;
   worldName: string;
   roomKey: string;
   playerInputLength: number;
   recentFeedCount: number;
   actorKeys: string[];
   npcFactKeys: string[];
+  npcProfileKeys?: string[];
+  npcOverrideKeys?: string[];
+  npcMutationMode?: "read_only" | "bounded_updates";
+  readOnlyKnowledgeKeys: string[];
+  requiredSceneBeat: {
+    kind: SceneBeatKind;
+    targetActorKey?: string;
+    expectsNpcResponse: boolean;
+    allowsNpcUpdates: boolean;
+  };
+  sceneBeatSource?: SceneBeatSource;
+  sceneBeatReason?: string;
+  promptComponentKeys: string[];
+  promptGuidanceKeys?: string[];
+  generationSettings?: DirectorGenerationSettingsSummary;
 };
 
 export type DirectorRequest = {
   messages: DirectorMessage[];
   requestSummary: DirectorRequestSummary;
+};
+
+export type SceneBeatKind =
+  | "direct_npc_question"
+  | "direct_npc_address"
+  | "scene_question"
+  | "trivial_player_action"
+  | "player_action";
+
+export type RequiredSceneBeat = {
+  kind: SceneBeatKind;
+  targetActorKey?: string;
+  targetActorName?: string;
+  expectsNpcResponse: boolean;
+  allowsNpcUpdates: boolean;
+  instruction: string;
+};
+
+export type DirectorGenerationSettingsSummary = {
+  temperature: number;
+  maxTokens?: number;
+  topP?: number;
+  responseFormat: "json_object" | "text";
+  reasoningEffort?: "none" | "low" | "medium" | "high" | "max";
+};
+
+export type DirectorPromptGuidance = {
+  style?: string;
+  npcBehavior?: string;
+  persistence?: string;
 };
 
 export type ParsedNpcUpdate = {
