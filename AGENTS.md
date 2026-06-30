@@ -4,10 +4,17 @@ This repository is the implementation workspace for the Lorecraft MVP prototype.
 
 ## Branch Policy
 
-Use the default branch policy from `../../developer-guide.md`.
-
+- `main` is the production branch.
+- `develop` is the integration branch and the GitHub default branch.
+- Routine work branches start from `develop` and use:
+  - `change/<short-slug>` for planned product, UX, architecture, or feature changes.
+  - `fix/<short-slug>` for defects and regressions.
+  - `misc/<short-slug>` for chores, tooling, documentation, process, infrastructure, and low-risk maintenance.
+- Routine integration may merge locally into `develop` after TH review or equivalent local verification.
+- Promotion to `main` should use a remote release PR by default.
 - Do not commit, merge, rebase, push, or rewrite history unless Taylor explicitly asks in the current conversation.
 - Keep this repo independent from the surrounding Obsidian vault git history.
+- See `docs/ci-cd.md` for the required gate, optional checks, and branch protection expectations.
 
 ## Local Development
 

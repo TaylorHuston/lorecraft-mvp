@@ -12,12 +12,12 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "ci:required": "npm run lint && npm run test && npm run typecheck && npm run build",
-    "playtest:director": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/director-playtest.mjs",
+    "playtest:director": "node scripts/director-playtest.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "benchmark:director-models": "node scripts/director-model-benchmark.mjs",
-    "playtest:director:transcript": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/director-transcript-playtest.mjs",
+    "playtest:director:transcript": "node scripts/director-transcript-playtest.mjs",
     "playtest:director:persistenceless": "npm run playtest:director:transcript"
   },
   "dependencies": {

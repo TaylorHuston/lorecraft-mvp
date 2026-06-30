@@ -1,6 +1,6 @@
 # CI/CD
 
-Lorecraft follows the workspace CI/CD guidance in `/Users/taylor/src/my-life/shared/docs/ci-cd-guidance.md`.
+Lorecraft keeps its CI/CD policy in this file so the repository is self-contained.
 
 ## Branch Flow
 
@@ -37,7 +37,7 @@ These checks are useful locally or during release, but they are not part of the 
 - `npm run convex:once`
 - `npx convex codegen`
 - Manual browser playtests against `npm run dev`
-- Provider-backed Director playtests with Ollama or another OpenAI-compatible endpoint
+- Provider-backed Game Master playtests with Ollama or another OpenAI-compatible endpoint
 
 Keep provider-backed and browser checks optional until they are stable, cheap, and have isolated non-production resources.
 
