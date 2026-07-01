@@ -52,7 +52,7 @@
 - [x] Tune story text measure and typography.
 - [x] Balance story stream against turn-number gutter.
 - [x] Run focused verification.
-- [ ] Update Epic truth only if behavior or verification reality changes.
+- [x] Confirm Epic truth remains current for presentation-only UI polish.
 - [x] Prepare for `/sdd-review` if code or user-visible behavior changes.
 
 ## Implementation Ledger
@@ -307,6 +307,6 @@
 - Review record: `review.md`.
 - Manual UI confirmation status: pending Taylor acceptance of the accumulated UI polish pass.
 - Changelog status: not needed; this is internal MVP playtest UI polish without a release-facing behavior change.
-- PR / merge state: branch `change/ui-polish` is open locally.
+- PR / merge state: branch `change/ui-polish` is open locally and reviewed against `develop`; no PR, merge, or closeout has been authorized.
 - Deferred gaps accepted: none.
 - Folder state: active under `docs/changes/2026-06-30-ui-polish/`.
