@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: implementation complete after delegated artifact, coverage, and security review fixes; pending `/sdd-review` and Taylor manual UI confirmation
-- Last completed action: reran final verification after gating debug location writes, tightening NPC movement validation, making Reset Session restore location state, and expanding deterministic E2E coverage.
-- Next action: run `/sdd-review`; then address findings or close/merge if accepted.
+- Current state: `/sdd-apply` remediation is implemented and verified in the working tree; `npm run e2e`, `npm run ci:required`, and `git diff --check` pass after adding NPC debug parity E2E coverage and location-save flushing.
+- Last completed action: reran deterministic browser E2E and the required CI gate after enabling raw request storage for the E2E app server.
+- Next action: commit the intended implementation/remediation state, record the final commit ref, then run a fresh `/sdd-review`.
 - Active branch/ref: `change/lightweight-location-objects`
-- Expected dirty files: `docs/changes/2026-06-30-lightweight-location-objects/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `convex/world.ts`, `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, tests, docs, `CHANGELOG.md`
-- Known blockers: none identified after planning discussion
+- Expected dirty files: `docs/changes/2026-06-30-lightweight-location-objects/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `convex/world.ts`, `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, tests, docs, `package.json`, `CHANGELOG.md`
+- Known blockers: broad uncommitted app/source changes prevent merge readiness until committed; Taylor manual UI confirmation remains pending
 
 ## Task Checklist
 
@@ -48,6 +48,20 @@
       - [x] Scenario R4-S2: Accepted movement is turn-scoped
       - [x] Scenario R4-S3: Rejected movement is inspectable
 - [x] 2.5 Update Story-level Implemented By maps with current code locations.
+- [x] 2.6 Reconcile canonical debug NPC editing parity into artifacts and implementation.
+  - [x] Story: `LC-001-S9` - Read-Only NPC Context
+    - [x] Requirement R3: Debug NPC Inspection And Editing
+      - [x] Scenario R3-S1: Debug panel shows NPC fields
+      - [x] Scenario R3-S2: Debug edit affects Game Master context
+      - [x] Scenario R3-S3: Debug edits are resettable
+      - [x] Scenario R3-S4: Debug create adds a current-location NPC
+- [x] 2.7 Address `/sdd-review` remediation findings.
+  - [x] Local-only guardrails for debug writes and provider-spend route access
+  - [x] NPC fact clearing removes or clears old canonical values
+  - [x] Debug-created NPC/location row growth cannot make reset unrecoverable in ordinary debug use
+  - [x] Pending NPC autosaves cannot reapply stale state after reset/seed
+  - [x] Player submission does not race obvious pending NPC autosaves
+  - [x] Debug state labels and disclosure controls match current behavior
 
 ### 3. Verification
 
@@ -58,6 +72,7 @@
 - [x] 3.5 Run `npm run e2e` if deterministic browser coverage is updated for this flow.
 - [ ] 3.6 Run local `npm run dev:debug` playtests for one accepted move and one unknown-location attempt, then inspect debug logs.
 - [x] 3.7 Update Story-level Verified By maps with concrete evidence.
+- [x] 3.8 Rerun focused and required verification after review remediation.
 
 ### 4. Documentation
 
@@ -65,14 +80,15 @@
 - [x] 4.2 Update `docs/persistence-system.md` with the location persistence strategy and the clear-player-travel movement boundary.
 - [x] 4.3 Update README/debug documentation if setup, debug tabs, reset semantics, or playtest examples change.
 - [x] 4.4 Update root `CHANGELOG.md` under `Unreleased` because changelog impact is required.
+- [x] 4.5 Update README/docs to describe local-only debug write posture and canonical NPC/Location debug parity after remediation.
 
 ### 5. Review And Closeout
 
-- [ ] 5.1 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
-- [ ] 5.2 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
-- [ ] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 5.4 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-- [ ] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
+- [x] 5.1 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
+- [x] 5.2 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
+- [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
+- [x] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [ ] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -86,6 +102,9 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-30 | Discovery | main orchestrator; delegated explorer/test-engineer started; specialist routing: Convex guidelines, Next route/UI surfaces, SDD branch policy | change artifacts, Epic, `convex/world.ts`, `src/lib/director/*`, `src/app/world-client.tsx`, tests | Confirmed no schema rename is needed; implementation should reuse `rooms`, actor `roomId`, existing NPC card/extraction patterns, and `stateDiffs.moveActor`. | uncommitted |
 | 2026-06-30 | `LC-001-S12 R1-R4` implementation | main orchestrator; subagent discovery/test strategy incorporated; Convex guidelines | `convex/world.ts`, `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, fixture, E2E, docs | Implemented Location Cards, Known Locations, bounded actor movement extraction/validation/persistence, debug Locations tab edit/create, actor-location reset, docs, and changelog. | uncommitted |
 | 2026-06-30 | Delegated review remediation | main orchestrator; delegated artifact, test, and security reviewers | `convex/world.ts`, `package.json`, `src/lib/director/output.ts`, `src/lib/director/director.test.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, docs | Addressed stale docs, production-exposed debug location writes, weak NPC movement confirmation, reset-location ambiguity, unknown-destination E2E gap, and fresh-seed/session reset E2E gap. | uncommitted |
+| 2026-07-01 | Formal `/sdd-review` remediation start | main orchestrator; delegated backend and frontend remediation agents | `review.md`, proposal/design/tasks/changelog, backend/frontend remediation pending | Accepted canonical NPC debug parity and tavern seed content into the active change scope; started fixing public debug/write exposure, reset/save races, and stale debug UI evidence. | commit pending |
+| 2026-07-01 | Formal `/sdd-review` remediation | main orchestrator; Pascal backend agent; Hubble frontend agent; Convex and Next route-handler guidance | `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `package.json`, docs, Epic, tests | Removed persistent debug env writes, added local-only debug/Director guardrails plus server-write token path, capped debug-created rows, made blank NPC facts clear canonical facts, fixed NPC autosave reset/submit races, renamed state evidence, added disclosure buttons/live regions, and reconciled artifacts. | commit pending |
+| 2026-07-01 | Post-review deterministic remediation | main orchestrator | `src/app/world-client.tsx`, `playwright.config.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, `convex/world.ts`, tasks/review/Epic docs | Added active location-save flushing before submit/seed/reset, deterministic NPC debug edit/create/reset E2E assertions, raw request storage in the E2E app server so prompt-context assertions are inspectable, and local Convex server-write fallback for the isolated E2E deployment. | commit pending |
 
 ## Verification Ledger
 
@@ -102,6 +121,19 @@ Record proof as it happens.
 | 2026-06-30 | Delegated artifact review | Stale implementation/verification placeholders, read-only NPC wording, and reset ambiguity were identified before closeout. | Changes requested; remediated in docs |
 | 2026-06-30 | Delegated test review | Deterministic E2E gaps for unknown destination rejection and reset restoration were identified before closeout. | Changes requested; remediated in E2E |
 | 2026-06-30 | Delegated security/data-safety review | Public debug location writes, reset state integrity, and NPC movement validation were reviewed. | Changes requested; remediated in code/tests |
+| 2026-07-01 | `/sdd-review` | Formal local integration gate for `change/lightweight-location-objects`. | Changes requested; see `docs/changes/2026-06-30-lightweight-location-objects/review.md` |
+| 2026-07-01 | `npx convex codegen` | Convex generated API and TypeScript are valid after review remediation. | Passed |
+| 2026-07-01 | `npm run test -- src/lib/director/director.test.ts` | Focused director prompt/parser/validation coverage still passes after backend and artifact remediation. | Passed, 40 tests |
+| 2026-07-01 | `npm run lint` | ESLint passes after frontend/debug UI remediation. | Passed |
+| 2026-07-01 | `npm run test` | Full Vitest suite passes after review remediation. | Passed, 40 tests |
+| 2026-07-01 | `npm run typecheck` | TypeScript passes after route, Convex, and UI changes. | Passed |
+| 2026-07-01 | `npm run build` | Next production build passes after route and UI changes. | Passed |
+| 2026-07-01 | `npm run ci:required` | Required gate passes after review remediation. | Passed |
+| 2026-07-01 | `npm run e2e` | Deterministic browser E2E rerun after remediation. | Blocked: `convex-lo` PID `6852` is already listening on `:3210` and Playwright does not reuse that server |
+| 2026-07-01 | `/sdd-review` rerun | Fresh local integration review after remediation. | Changes requested; see `docs/changes/2026-06-30-lightweight-location-objects/review.md` |
+| 2026-07-01 | `git diff --check` | Final whitespace check after post-review remediation. | Passed |
+| 2026-07-01 | `npm run e2e` | Deterministic browser E2E covers seeded playtest, debug drawer accessibility, raw Game Master call evidence, canonical NPC edit/create/reset parity, debug location edit/create/reset, accepted movement, and rejected unknown-location travel. | Passed |
+| 2026-07-01 | `npm run ci:required` | Final required gate after post-review remediation. | Passed: lint, 40 Vitest tests, typecheck, Next build |
 
 ## Manual Feedback
 
@@ -110,6 +142,7 @@ Record the user's manual testing feedback after implementation starts.
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
 | 2026-06-30 | Location should include mutation because NPC mutation proved the pattern; move player and NPCs; use existing locations only; show location state in debug; add editable/createable Locations tab; any existing location may be a target for now. | requirement refinement | Incorporated into proposal/design/tasks. | closed |
+| 2026-07-01 | `/sdd-review` found canonical NPC debug edits, tavern seed NPCs, and removed override files were implemented but not fully owned by the location-change artifacts. | artifact drift / accepted scope expansion | Updated proposal/design/tasks/changelog/Epic to explicitly include canonical NPC debug parity with Locations and seeded tavern NPCs. | closed |
 
 ## Planning Updates
 
@@ -128,14 +161,18 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
   - Open the debug drawer and inspect the `Locations` tab.
   - Edit an existing location's name or description.
   - Create a new location.
+  - Open the `NPCs` tab.
+  - Edit an existing NPC's visible/profile fields and confirm the saved value appears in subsequent Game Master context.
+  - Create a debug NPC and confirm it appears in the current location.
   - Submit a clear travel input to an existing location, such as `I go to the vestry.`
   - Submit a clear travel input to an unknown location, such as `I go to the bell tower.`
   - Use Reset Session and confirm seeded location state is restored.
 - Expected result:
   - Location edits/creates affect Game Master context and valid movement targets.
+  - NPC edits/creates affect Game Master context when the NPC is present.
   - Clear travel to an existing location can update actor locations.
   - Unknown destinations are handled in-story without canonical movement.
-  - Reset restores seeded locations and actor positions.
+  - Reset restores seeded locations, seeded NPCs, actor positions, and removes debug-created rows.
 - Feedback that would change artifacts:
   - Need for path/link enforcement.
   - Need for player-facing location status widget.
@@ -144,7 +181,8 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Blockers / Open Questions
 
-- None identified after planning discussion.
+- Taylor manual UI confirmation remains pending.
+- Remote/shared deployment hardening remains deferred: auth, ownership, rate limiting, and server-owned debug/reset controls are required before this is safe beyond local prototype use.
 
 ## Closeout
 
@@ -153,11 +191,11 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes
-- `sdd-review` verdict: pending
-- Review record: delegated artifact/test/security reviews completed during apply; findings remediated; formal `/sdd-review` pending
-- `review.md` findings resolved: pending
+- `sdd-review` verdict: changes requested; remediation applied and pending fresh review
+- Review record: `docs/changes/2026-06-30-lightweight-location-objects/review.md`
+- `review.md` findings resolved: yes in working tree; fresh review still required after commit
 - Planning updates resolved: no unresolved planning blockers
 - Manual UI confirmation status: pending user
 - PR / merge state: not started
-- Deferred scope accepted: live provider-backed `npm run dev:debug` playtest, Dungeon mode, path/link constraints, dynamic location creation by LLM, player-facing location widget, polished World Builder, object/exit editing
+- Deferred scope accepted: live provider-backed `npm run dev:debug` playtest, Dungeon mode, path/link constraints, dynamic location creation by LLM, player-facing location widget, polished World Builder, object/exit editing, full production auth/ownership/rate limiting
 - Change moved to `docs/changes/closed/`: no

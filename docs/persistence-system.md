@@ -153,7 +153,7 @@ The provider request uses a canonical opening seed plus the actual player/Game M
 
 ## NPC State Strategy
 
-The current MVP keeps NPC state deliberately small. The seeded chapel NPCs, currently Mira and Brother Alden, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior. The Game Master does not mutate them directly in prose; a separate extractor may propose bounded `mood`, `status`, and `memory` updates after narration, and Convex validates those proposals before they become canonical.
+The current MVP keeps NPC state deliberately small. The seeded demo NPCs, currently Mira, Brother Alden, Rowan, and Lena, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior. The Game Master does not mutate them directly in prose; a separate extractor may propose bounded `mood`, `status`, and `memory` updates after narration, and Convex validates those proposals before they become canonical.
 
 ### `description`
 
@@ -260,11 +260,13 @@ knowledge = "Mira knows the storm began after the chapel bell rang at midnight, 
 
 Read-only does not mean player-visible. The Game Master should not mechanically expose hidden fact keys or reveal private knowledge without an in-scene reason. These facts also remain non-mutable through Game Master output: if the model returns `knowledge`, `secret`, `occupation`, or relationship fields inside `npcUpdates`, the backend ignores them.
 
-### Debug NPC overrides
+### Debug NPC edits
 
-The debug panel includes an `NPCs` tab for temporary playtest overrides. These overrides can replace an NPC description or fact value in the next persistent-mode Game Master prompt.
+The debug panel includes an `NPCs` tab for rough playtest editing. These edits can replace an NPC name, description, or profile fact value in the next persistent-mode Game Master prompt.
 
-Debug overrides are process-local server memory. They are not Convex data, are not product state, and disappear when the application server restarts. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without committing seed-data changes or building a World Builder UI.
+Debug NPC edits are canonical Convex demo-world state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Clearing an editable NPC fact removes that manual canonical fact instead of preserving stale prompt context. Reset Session restores seeded NPCs and removes debug-created NPCs; Reset World reseeds the full demo world.
+
+Debug-created NPCs and locations are capped per demo world so ordinary debug use stays resettable within the current bounded deletion limits.
 
 ## Prompt Context Strategy
 
@@ -272,7 +274,7 @@ Persistent Game Master requests are still stateless, but the prompt is no longer
 
 - Game Master instructions and tone guidance, which are editable configuration.
 - Scene state and visible facts, which come from Convex world data.
-- Read-only NPC cards, which are rendered from current-scene actor descriptions, actor facts, and optional debug overrides.
+- Read-only NPC cards, which are rendered from current-scene actor descriptions and actor facts.
 - NPC profiles, which are the typed intermediate shape used to build those cards.
 - Conversation focus, which is a non-durable hint derived from the current target or recent player-addressed NPC for ambiguous follow-up dialogue.
 - Hidden NPC knowledge, which comes from current-scene `knowledge` facts.
@@ -321,7 +323,9 @@ The debug panel also exposes recent turn summaries: sequence number, status, pla
 
 The primary MVP reset path is fresh seeding. The seed mutation deletes prior Stormbound Chapel demo worlds and dependent rows, then recreates the world graph from the current seed.
 
-The debug panel also has a session reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, restores seeded NPC baseline descriptions/facts, restores actor locations, restores seeded location text, and removes debug-created locations. It is a convenience tool for repeating the same demo-world playtest without recreating the whole world row.
+The debug panel also has a session reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, restores seeded NPC baseline descriptions/facts, restores actor locations, restores seeded location text, and removes debug-created NPCs and locations. It is a convenience tool for repeating the same demo-world playtest without recreating the whole world row.
+
+Full hidden-state/debug snapshot sections are local/debug-oriented. In production mode they are omitted unless the app has an explicit debug/auth design; the current local prototype enables them through `LORECRAFT_ENABLE_DEBUG_ROUTES=1` in a non-production process.
 
 Long term, reset is not the product model. The likely product model is independent story/play-session instances created from world templates, but that is intentionally deferred until the single-world persistence loop proves itself.
 

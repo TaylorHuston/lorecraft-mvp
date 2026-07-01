@@ -30,10 +30,26 @@ type DebugLocationWriteResult = {
   error?: string;
   locationId?: Id<"rooms">;
 };
+type DebugNpcWriteResult = {
+  ok: boolean;
+  error?: string;
+  actorId?: Id<"actors">;
+};
 
 const WORLD_SLUG = "stormbound-chapel-default";
 const DEMO_RESET_ROW_LIMIT = 500;
+const DEBUG_CREATED_LOCATION_LIMIT = 25;
+const DEBUG_CREATED_NPC_LIMIT = 25;
 const PLAYER_KEY = "taylor";
+const NPC_PROFILE_FACT_KEYS_FOR_WRITE = [
+  "background",
+  "persona",
+  "voice",
+  "mood",
+  "status",
+  "memory",
+  "knowledge",
+] as const;
 const MIRA_KEY = "mira";
 const MIRA_DESCRIPTION =
   "A local woman in practical rain-dark clothes, with damp dark hair and watchful eyes.";
@@ -99,6 +115,70 @@ const PRIEST_BASELINE_FACTS = [
       "Alden found a torn bell-rope fiber near the altar after midnight, but he has not told Mira because he fears accusing someone without proof.",
   },
 ] as const;
+const TAVERNKEEP_KEY = "rowan";
+const TAVERNKEEP_NAME = "Rowan";
+const TAVERNKEEP_DESCRIPTION =
+  "A broad-shouldered tavernkeeper with rolled sleeves, gray-shot hair, and a towel tucked through his belt.";
+const TAVERNKEEP_BASELINE_FACTS = [
+  {
+    key: "background",
+    value:
+      "Rowan has kept the Lantern & Bell open through bad weather, bad harvests, and worse rumors. He knows which villagers drink quietly and which ones talk when the rain gets loud.",
+  },
+  {
+    key: "persona",
+    value:
+      "Practical, watchful, and protective of his regulars. Rowan is friendly enough to paying guests, but he notices trouble before he names it.",
+  },
+  {
+    key: "voice",
+    value:
+      "Dry and plainspoken, with tavern humor and short warnings. Rowan asks direct questions and rarely wastes words.",
+  },
+  { key: "mood", value: "wary but hospitable" },
+  {
+    key: "status",
+    value: "working behind the tavern bar while keeping one eye on the door",
+  },
+  { key: "memory", value: "Rowan has not yet formed meaningful memories of Taylor." },
+  {
+    key: "knowledge",
+    value:
+      "Rowan heard someone pass the tavern toward the chapel shortly before the midnight bell, but he did not see their face.",
+  },
+] as const;
+const MINSTREL_KEY = "lena";
+const MINSTREL_NAME = "Lena";
+const MINSTREL_DESCRIPTION =
+  "A wiry traveling minstrel in a weather-stained green cloak, with quick hands and sharper eyes than her songs suggest.";
+const MINSTREL_BASELINE_FACTS = [
+  {
+    key: "background",
+    value:
+      "Lena arrived in Stormbound two nights ago with a cracked lute, three half-finished songs, and no clear explanation for why she chose this road.",
+  },
+  {
+    key: "persona",
+    value:
+      "Curious, evasive, and amused by danger until it becomes personal. Lena collects rumors and tests strangers with jokes before offering truth.",
+  },
+  {
+    key: "voice",
+    value:
+      "Lyrical but sly. Lena answers with teasing images, half-rhymes, and sudden blunt admissions when cornered.",
+  },
+  { key: "mood", value: "restless" },
+  {
+    key: "status",
+    value: "sitting near the tavern hearth with her lute case under one boot",
+  },
+  { key: "memory", value: "Lena has not yet formed meaningful memories of Taylor." },
+  {
+    key: "knowledge",
+    value:
+      "Lena noticed the chapel bell's sound had two tones at midnight, as if something cracked after the first strike.",
+  },
+] as const;
 const SEEDED_ROOMS = [
   {
     key: "chapel",
@@ -116,6 +196,44 @@ const SEEDED_ROOMS = [
     key: "graveyard",
     name: "Graveyard",
     description: "Tilted stones vanish into the rain. The chapel door glows behind you.",
+  },
+  {
+    key: "tavern",
+    name: "Lantern & Bell Tavern",
+    description:
+      "Warm lamplight pools across scarred tables. Rain ticks against leaded windows, Rowan works behind the bar, and Lena sits near the hearth with a lute case under one boot.",
+  },
+] as const;
+
+const SEEDED_NPCS = [
+  {
+    key: MIRA_KEY,
+    name: "Mira",
+    description: MIRA_DESCRIPTION,
+    facts: MIRA_BASELINE_FACTS,
+    roomKey: "chapel",
+    legacyFactKeys: LEGACY_MIRA_FACT_KEYS,
+  },
+  {
+    key: PRIEST_KEY,
+    name: PRIEST_NAME,
+    description: PRIEST_DESCRIPTION,
+    facts: PRIEST_BASELINE_FACTS,
+    roomKey: "chapel",
+  },
+  {
+    key: TAVERNKEEP_KEY,
+    name: TAVERNKEEP_NAME,
+    description: TAVERNKEEP_DESCRIPTION,
+    facts: TAVERNKEEP_BASELINE_FACTS,
+    roomKey: "tavern",
+  },
+  {
+    key: MINSTREL_KEY,
+    name: MINSTREL_NAME,
+    description: MINSTREL_DESCRIPTION,
+    facts: MINSTREL_BASELINE_FACTS,
+    roomKey: "tavern",
   },
 ] as const;
 
@@ -159,6 +277,20 @@ const debugLocationWriteResult = v.object({
   ok: v.boolean(),
   error: v.optional(v.string()),
   locationId: v.optional(v.id("rooms")),
+});
+const npcDebugFacts = v.object({
+  background: v.optional(v.string()),
+  persona: v.optional(v.string()),
+  voice: v.optional(v.string()),
+  mood: v.optional(v.string()),
+  status: v.optional(v.string()),
+  memory: v.optional(v.string()),
+  knowledge: v.optional(v.string()),
+});
+const debugNpcWriteResult = v.object({
+  ok: v.boolean(),
+  error: v.optional(v.string()),
+  actorId: v.optional(v.id("actors")),
 });
 
 function normalized(input: string) {
@@ -378,6 +510,20 @@ async function deleteActorFactByKey(
   }
 }
 
+async function deleteActorFacts(ctx: MutationCtx, worldId: Id<"worlds">, actorKey: string) {
+  const rows = await ctx.db
+    .query("facts")
+    .withIndex("by_worldId_and_subjectId", (q) =>
+      q.eq("worldId", worldId).eq("subjectId", actorSubjectId(actorKey)),
+    )
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("facts", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
 async function restoreSeededNpc(
   ctx: MutationCtx,
   args: {
@@ -420,27 +566,53 @@ async function restoreSeededNpc(
 
 async function resetSeededActorLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
   const chapel = await findRoomByKey(ctx, worldId, "chapel");
-  if (!chapel) {
+  const tavern = await findRoomByKey(ctx, worldId, "tavern");
+  if (!chapel || !tavern) {
     return 0;
   }
 
   let moved = 0;
   const seededActors = [
-    { key: PLAYER_KEY, name: "Taylor" },
-    { key: MIRA_KEY, name: "Mira" },
-    { key: PRIEST_KEY, name: PRIEST_NAME },
+    { key: PLAYER_KEY, name: "Taylor", roomId: chapel._id },
+    ...SEEDED_NPCS.map((npc) => ({
+      key: npc.key,
+      name: npc.name,
+      roomId: npc.roomKey === "tavern" ? tavern._id : chapel._id,
+    })),
   ];
 
   for (const seededActor of seededActors) {
     const actor = await findActorByKeyOrName(ctx, worldId, seededActor.key, seededActor.name);
-    if (!actor || actor.roomId === chapel._id) {
+    if (!actor || actor.roomId === seededActor.roomId) {
       continue;
     }
-    await ctx.db.patch(actor._id, { roomId: chapel._id });
+    await ctx.db.patch(actor._id, { roomId: seededActor.roomId });
     moved += 1;
   }
 
   return moved;
+}
+
+async function deleteNonSeededNpcs(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const actors = await ctx.db
+    .query("actors")
+    .withIndex("by_worldId_and_role", (q) => q.eq("worldId", worldId).eq("role", "npc"))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("actors", actors.length);
+
+  const seededNpcKeys = new Set<string>(SEEDED_NPCS.map((npc) => npc.key));
+  let deletedActors = 0;
+  for (const actor of actors) {
+    const actorKey = stableActorKey(actor);
+    if (seededNpcKeys.has(actorKey)) {
+      continue;
+    }
+    await deleteActorFacts(ctx, worldId, actorKey);
+    await ctx.db.delete(actor._id);
+    deletedActors += 1;
+  }
+
+  return deletedActors;
 }
 
 async function restoreSeededLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
@@ -493,7 +665,7 @@ export const seedDemoWorld = mutation({
       slug: WORLD_SLUG,
       name: "Stormbound Chapel",
       description:
-        "A small persistent-world test set around a chapel, a vestry, and a rain-lashed graveyard.",
+        "A small persistent-world test set around a chapel, a tavern, a vestry, and a rain-lashed graveyard.",
     });
 
     const chapelId = await ctx.db.insert("rooms", {
@@ -507,6 +679,10 @@ export const seedDemoWorld = mutation({
     const graveyardId = await ctx.db.insert("rooms", {
       worldId,
       ...SEEDED_ROOMS[2],
+    });
+    const tavernId = await ctx.db.insert("rooms", {
+      worldId,
+      ...SEEDED_ROOMS[3],
     });
 
     await Promise.all([
@@ -538,6 +714,20 @@ export const seedDemoWorld = mutation({
         label: "south",
         visible: true,
       }),
+      ctx.db.insert("exits", {
+        worldId,
+        fromRoomId: chapelId,
+        toRoomId: tavernId,
+        label: "east",
+        visible: true,
+      }),
+      ctx.db.insert("exits", {
+        worldId,
+        fromRoomId: tavernId,
+        toRoomId: chapelId,
+        label: "west",
+        visible: true,
+      }),
     ]);
 
     const playerId = await ctx.db.insert("actors", {
@@ -563,6 +753,22 @@ export const seedDemoWorld = mutation({
       name: PRIEST_NAME,
       role: "npc",
       description: PRIEST_DESCRIPTION,
+    });
+    await ctx.db.insert("actors", {
+      worldId,
+      roomId: tavernId,
+      key: TAVERNKEEP_KEY,
+      name: TAVERNKEEP_NAME,
+      role: "npc",
+      description: TAVERNKEEP_DESCRIPTION,
+    });
+    await ctx.db.insert("actors", {
+      worldId,
+      roomId: tavernId,
+      key: MINSTREL_KEY,
+      name: MINSTREL_NAME,
+      role: "npc",
+      description: MINSTREL_DESCRIPTION,
     });
 
     await ctx.db.patch(worldId, { currentPlayerActorId: playerId });
@@ -642,6 +848,28 @@ export const seedDemoWorld = mutation({
           overwrite: false,
         }),
       ),
+      ...TAVERNKEEP_BASELINE_FACTS.map((fact) =>
+        setFact(ctx, {
+          worldId,
+          subjectType: "actor",
+          subjectId: actorSubjectId(TAVERNKEEP_KEY),
+          key: fact.key,
+          value: fact.value,
+          source: "seed",
+          overwrite: false,
+        }),
+      ),
+      ...MINSTREL_BASELINE_FACTS.map((fact) =>
+        setFact(ctx, {
+          worldId,
+          subjectType: "actor",
+          subjectId: actorSubjectId(MINSTREL_KEY),
+          key: fact.key,
+          value: fact.value,
+          source: "seed",
+          overwrite: false,
+        }),
+      ),
       ctx.db.insert("events", {
         worldId,
         text: "The Stormbound Chapel playtest world was seeded.",
@@ -708,7 +936,15 @@ export const getSnapshot = query({
           key: v.string(),
           name: v.string(),
           description: v.string(),
-          actors: v.array(v.object({ key: v.string(), name: v.string(), role: actorRole })),
+          actors: v.array(
+            v.object({
+              _id: v.id("actors"),
+              key: v.string(),
+              name: v.string(),
+              description: v.string(),
+              role: actorRole,
+            }),
+          ),
           objects: v.array(v.object({ key: v.string(), name: v.string() })),
           exits: v.array(
             v.object({ label: v.string(), toLocationKey: v.string(), toLocationName: v.string() }),
@@ -804,6 +1040,7 @@ export const getSnapshot = query({
     }
 
     const { world, player, room } = loaded;
+    const includeDebugState = debugSnapshotDataEnabled();
     const [
       exits,
       actors,
@@ -900,14 +1137,16 @@ export const getSnapshot = query({
           name: object.name,
           description: object.description,
         })),
-      facts: facts.map((fact) => ({
-        _id: fact._id,
-        subjectType: fact.subjectType,
-        subjectId: fact.subjectId,
-        key: fact.key,
-        value: fact.value,
-        source: fact.source,
-      })),
+      facts: includeDebugState
+        ? facts.map((fact) => ({
+            _id: fact._id,
+            subjectType: fact.subjectType,
+            subjectId: fact.subjectId,
+            key: fact.key,
+            value: fact.value,
+            source: fact.source,
+          }))
+        : [],
       feed,
       events: events.map((event) => ({
         _id: event._id,
@@ -919,35 +1158,39 @@ export const getSnapshot = query({
         text: narration.text,
         source: narration.source,
       })),
-      diffs: diffs.map((diff) => ({
-        _id: diff._id,
-        ...(diff.turnId ? { turnId: diff.turnId } : {}),
-        source: diff.source,
-        operations: diff.operations,
-      })),
+      diffs: includeDebugState
+        ? diffs.map((diff) => ({
+            _id: diff._id,
+            ...(diff.turnId ? { turnId: diff.turnId } : {}),
+            source: diff.source,
+            operations: diff.operations,
+          }))
+        : [],
       turns,
-      directorCalls: directorCalls.map((call) => ({
-        _id: call._id,
-        _creationTime: call._creationTime,
-        ...(call.turnId ? { turnId: call.turnId } : {}),
-        provider: call.provider,
-        model: call.model,
-        requestSummary: call.requestSummary,
-        status: call.status,
-        acceptedUpdates: call.acceptedUpdates,
-        ignoredUpdates: call.ignoredUpdates,
-        ...(call.commandId ? { commandId: call.commandId } : {}),
-        ...(call.rawRequest !== undefined ? { rawRequest: call.rawRequest } : {}),
-        ...(call.rawResponse !== undefined ? { rawResponse: call.rawResponse } : {}),
-        ...(call.parsedResponse !== undefined ? { parsedResponse: call.parsedResponse } : {}),
-        ...(call.error !== undefined ? { error: call.error } : {}),
-      })),
+      directorCalls: includeDebugState
+        ? directorCalls.map((call) => ({
+            _id: call._id,
+            _creationTime: call._creationTime,
+            ...(call.turnId ? { turnId: call.turnId } : {}),
+            provider: call.provider,
+            model: call.model,
+            requestSummary: call.requestSummary,
+            status: call.status,
+            acceptedUpdates: call.acceptedUpdates,
+            ignoredUpdates: call.ignoredUpdates,
+            ...(call.commandId ? { commandId: call.commandId } : {}),
+            ...(call.rawRequest !== undefined ? { rawRequest: call.rawRequest } : {}),
+            ...(call.rawResponse !== undefined ? { rawResponse: call.rawResponse } : {}),
+            ...(call.parsedResponse !== undefined ? { parsedResponse: call.parsedResponse } : {}),
+            ...(call.error !== undefined ? { error: call.error } : {}),
+          }))
+        : [],
     };
   },
 });
 
 export const getDirectorContext = query({
-  args: { worldId: v.id("worlds") },
+  args: { worldId: v.id("worlds"), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -1010,6 +1253,10 @@ export const getDirectorContext = query({
     }),
   ),
   handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return null;
+    }
+
     const loaded = await loadCurrentWorld(ctx, args.worldId);
     if (!loaded) {
       return null;
@@ -1122,7 +1369,7 @@ export const getDirectorContext = query({
 });
 
 export const getTranscriptDirectorContext = query({
-  args: { worldId: v.id("worlds") },
+  args: { worldId: v.id("worlds"), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -1132,6 +1379,10 @@ export const getTranscriptDirectorContext = query({
     }),
   ),
   handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return null;
+    }
+
     const world = await ctx.db.get(args.worldId);
     if (!world) {
       return null;
@@ -1184,7 +1435,7 @@ export const getTranscriptDirectorContext = query({
 });
 
 export const recordPlayerInput = mutation({
-  args: { worldId: v.id("worlds"), input: v.string() },
+  args: { worldId: v.id("worlds"), input: v.string(), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.object({
       ok: v.literal(true),
@@ -1195,6 +1446,10 @@ export const recordPlayerInput = mutation({
     v.object({ ok: v.literal(false), error: v.string() }),
   ),
   handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return { ok: false as const, error: "Server write access is not configured." };
+    }
+
     const input = args.input.trim();
     if (!input) {
       return { ok: false as const, error: "Enter narrative text to continue." };
@@ -1245,6 +1500,7 @@ export const recordPlayerInput = mutation({
 export const completeDirectorTurn = mutation({
   args: {
     worldId: v.id("worlds"),
+    serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
     commandId: v.id("commands"),
     provider: v.string(),
@@ -1266,6 +1522,8 @@ export const completeDirectorTurn = mutation({
     changedFacts: v.number(),
   }),
   handler: async (ctx, args) => {
+    requireServerWrite(args.serverWriteToken);
+
     const turn = await ctx.db.get(args.turnId);
     if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
       throw new Error("Turn, world, and command do not match.");
@@ -1326,6 +1584,7 @@ export const completeDirectorTurn = mutation({
 export const recordNpcStateExtraction = mutation({
   args: {
     worldId: v.id("worlds"),
+    serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
     commandId: v.id("commands"),
     provider: v.string(),
@@ -1347,6 +1606,8 @@ export const recordNpcStateExtraction = mutation({
     movedActors: v.number(),
   }),
   handler: async (ctx, args) => {
+    requireServerWrite(args.serverWriteToken);
+
     const turn = await ctx.db.get(args.turnId);
     if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
       throw new Error("Turn, world, and command do not match.");
@@ -1411,6 +1672,7 @@ export const resetPlaytestWorld = mutation({
     resetActorLocations: v.number(),
     restoredLocations: v.number(),
     deletedLocations: v.number(),
+    deletedActors: v.number(),
   }),
   handler: async (ctx, args) => {
     const deletedNarrations = await deleteNarrations(ctx, args.worldId);
@@ -1421,23 +1683,19 @@ export const resetPlaytestWorld = mutation({
     const deletedTurns = await deleteTurns(ctx, args.worldId);
 
     let restoredFacts = 0;
-    restoredFacts += await restoreSeededNpc(ctx, {
-      worldId: args.worldId,
-      key: MIRA_KEY,
-      name: "Mira",
-      description: MIRA_DESCRIPTION,
-      facts: MIRA_BASELINE_FACTS,
-      legacyFactKeys: LEGACY_MIRA_FACT_KEYS,
-    });
-    restoredFacts += await restoreSeededNpc(ctx, {
-      worldId: args.worldId,
-      key: PRIEST_KEY,
-      name: PRIEST_NAME,
-      description: PRIEST_DESCRIPTION,
-      facts: PRIEST_BASELINE_FACTS,
-    });
+    for (const npc of SEEDED_NPCS) {
+      restoredFacts += await restoreSeededNpc(ctx, {
+        worldId: args.worldId,
+        key: npc.key,
+        name: npc.name,
+        description: npc.description,
+        facts: npc.facts,
+        legacyFactKeys: "legacyFactKeys" in npc ? npc.legacyFactKeys : undefined,
+      });
+    }
     const resetActorLocations = await resetSeededActorLocations(ctx, args.worldId);
     const restoredLocations = await restoreSeededLocations(ctx, args.worldId);
+    const deletedActors = await deleteNonSeededNpcs(ctx, args.worldId);
     const deletedLocations = await deleteNonSeededLocations(ctx, args.worldId);
 
     return {
@@ -1451,6 +1709,7 @@ export const resetPlaytestWorld = mutation({
       resetActorLocations,
       restoredLocations,
       deletedLocations,
+      deletedActors,
     };
   },
 });
@@ -1493,6 +1752,60 @@ export const createLocation = action({
       internal.world.createLocationInternal,
       args,
     );
+    return result;
+  },
+});
+
+export const updateNpc = action({
+  args: {
+    worldId: v.id("worlds"),
+    actorId: v.id("actors"),
+    name: v.string(),
+    description: v.string(),
+    facts: npcDebugFacts,
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args): Promise<DebugNpcWriteResult> => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false, error: "Debug NPC writes are disabled." };
+    }
+
+    const result: DebugNpcWriteResult = await ctx.runMutation(internal.world.updateNpcInternal, args);
+    return result;
+  },
+});
+
+export const createNpc = action({
+  args: {
+    worldId: v.id("worlds"),
+    key: v.string(),
+    name: v.string(),
+    description: v.string(),
+    facts: npcDebugFacts,
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args): Promise<DebugNpcWriteResult> => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false, error: "Debug NPC writes are disabled." };
+    }
+
+    const result: DebugNpcWriteResult = await ctx.runMutation(internal.world.createNpcInternal, args);
+    return result;
+  },
+});
+
+export const resetNpc = action({
+  args: {
+    worldId: v.id("worlds"),
+    actorId: v.id("actors"),
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args): Promise<DebugNpcWriteResult> => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false, error: "Debug NPC writes are disabled." };
+    }
+
+    const result: DebugNpcWriteResult = await ctx.runMutation(internal.world.resetNpcInternal, args);
     return result;
   },
 });
@@ -1553,6 +1866,14 @@ export const createLocationInternal = internalMutation({
       return { ok: false, error: "A location with that key already exists." };
     }
 
+    const debugLocationCount = await countDebugCreatedLocations(ctx, args.worldId);
+    if (debugLocationCount >= DEBUG_CREATED_LOCATION_LIMIT) {
+      return {
+        ok: false,
+        error: `Debug-created locations are capped at ${DEBUG_CREATED_LOCATION_LIMIT}. Reset the demo world before adding more.`,
+      };
+    }
+
     const locationId = await ctx.db.insert("rooms", {
       worldId: args.worldId,
       key,
@@ -1563,8 +1884,210 @@ export const createLocationInternal = internalMutation({
   },
 });
 
+export const updateNpcInternal = internalMutation({
+  args: {
+    worldId: v.id("worlds"),
+    actorId: v.id("actors"),
+    name: v.string(),
+    description: v.string(),
+    facts: npcDebugFacts,
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args) => {
+    const actor = await ctx.db.get(args.actorId);
+    if (!actor || actor.worldId !== args.worldId || actor.role !== "npc") {
+      return { ok: false, error: "NPC could not be found in this world." };
+    }
+
+    const actorKey = stableActorKey(actor);
+    const name = args.name.trim();
+    const description = args.description.trim();
+    if (!name || !description) {
+      return { ok: false, error: "NPC name and description are required." };
+    }
+
+    await ctx.db.patch(actor._id, {
+      name: name.slice(0, 120),
+      description: description.slice(0, 1200),
+    });
+    await writeNpcFacts(ctx, args.worldId, actorKey, args.facts);
+
+    return { ok: true, actorId: actor._id };
+  },
+});
+
+export const createNpcInternal = internalMutation({
+  args: {
+    worldId: v.id("worlds"),
+    key: v.string(),
+    name: v.string(),
+    description: v.string(),
+    facts: npcDebugFacts,
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args) => {
+    const key = args.key.trim().toLowerCase();
+    const name = args.name.trim();
+    const description = args.description.trim();
+    if (!/^[a-z0-9][a-z0-9-]{1,48}$/.test(key)) {
+      return { ok: false, error: "NPC key must use lowercase letters, numbers, and hyphens." };
+    }
+    if (!name || !description) {
+      return { ok: false, error: "NPC name and description are required." };
+    }
+
+    const existing = await findActorByKeyOrName(ctx, args.worldId, key, name);
+    if (existing) {
+      return { ok: false, error: "An actor with that key or name already exists." };
+    }
+
+    const debugNpcCount = await countDebugCreatedNpcs(ctx, args.worldId);
+    if (debugNpcCount >= DEBUG_CREATED_NPC_LIMIT) {
+      return {
+        ok: false,
+        error: `Debug-created NPCs are capped at ${DEBUG_CREATED_NPC_LIMIT}. Reset the demo world before adding more.`,
+      };
+    }
+
+    const world = await ctx.db.get(args.worldId);
+    const player = world?.currentPlayerActorId ? await ctx.db.get(world.currentPlayerActorId) : null;
+    if (!player) {
+      return { ok: false, error: "Player actor could not be found." };
+    }
+
+    const actorId = await ctx.db.insert("actors", {
+      worldId: args.worldId,
+      roomId: player.roomId,
+      key,
+      name: name.slice(0, 120),
+      role: "npc",
+      description: description.slice(0, 1200),
+    });
+    await writeNpcFacts(ctx, args.worldId, key, args.facts);
+
+    return { ok: true, actorId };
+  },
+});
+
+export const resetNpcInternal = internalMutation({
+  args: {
+    worldId: v.id("worlds"),
+    actorId: v.id("actors"),
+  },
+  returns: debugNpcWriteResult,
+  handler: async (ctx, args) => {
+    const actor = await ctx.db.get(args.actorId);
+    if (!actor || actor.worldId !== args.worldId || actor.role !== "npc") {
+      return { ok: false, error: "NPC could not be found in this world." };
+    }
+
+    const actorKey = stableActorKey(actor);
+    const seededNpc = SEEDED_NPCS.find((npc) => npc.key === actorKey);
+    if (!seededNpc) {
+      await deleteActorFacts(ctx, args.worldId, actorKey);
+      await ctx.db.delete(actor._id);
+      return { ok: true };
+    }
+
+    await restoreSeededNpc(ctx, {
+      worldId: args.worldId,
+      key: seededNpc.key,
+      name: seededNpc.name,
+      description: seededNpc.description,
+      facts: seededNpc.facts,
+      legacyFactKeys: "legacyFactKeys" in seededNpc ? seededNpc.legacyFactKeys : undefined,
+    });
+    const room = await findRoomByKey(ctx, args.worldId, seededNpc.roomKey);
+    if (room && actor.roomId !== room._id) {
+      await ctx.db.patch(actor._id, { roomId: room._id });
+    }
+
+    return { ok: true, actorId: actor._id };
+  },
+});
+
+async function writeNpcFacts(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  actorKey: string,
+  facts: Partial<Record<"background" | "persona" | "voice" | "mood" | "status" | "memory" | "knowledge", string>>,
+) {
+  for (const key of NPC_PROFILE_FACT_KEYS_FOR_WRITE) {
+    const value = facts[key]?.trim();
+    if (!value) {
+      await deleteActorFactByKey(ctx, worldId, actorKey, key);
+      continue;
+    }
+    await setFact(ctx, {
+      worldId,
+      subjectType: "actor",
+      subjectId: actorSubjectId(actorKey),
+      key,
+      value: value.slice(0, 1200),
+      source: "manual",
+      overwrite: true,
+    });
+  }
+}
+
 function debugLocationWritesEnabled() {
-  return process.env.NODE_ENV !== "production" || process.env.LORECRAFT_ENABLE_DEBUG_ROUTES === "1";
+  return isLocalConvexDeployment() && process.env.LORECRAFT_ENABLE_DEBUG_ROUTES === "1";
+}
+
+function debugSnapshotDataEnabled() {
+  return isLocalConvexDeployment() && process.env.LORECRAFT_ENABLE_DEBUG_ROUTES === "1";
+}
+
+function serverWriteAuthorized(token: string | undefined) {
+  if (isLocalConvexDeployment()) {
+    return true;
+  }
+
+  const expectedToken = process.env.LORECRAFT_SERVER_WRITE_TOKEN?.trim();
+  return Boolean(expectedToken && token === expectedToken);
+}
+
+function isLocalConvexDeployment() {
+  return isLoopbackUrl(process.env.CONVEX_CLOUD_URL) || isLoopbackUrl(process.env.CONVEX_SITE_URL);
+}
+
+function isLoopbackUrl(value: string | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function requireServerWrite(token: string | undefined) {
+  if (!serverWriteAuthorized(token)) {
+    throw new Error("Server write access is not configured.");
+  }
+}
+
+async function countDebugCreatedLocations(ctx: DatabaseCtx, worldId: Id<"worlds">) {
+  const seededLocationKeys = new Set<string>(SEEDED_ROOMS.map((room) => room.key));
+  const locations = await ctx.db
+    .query("rooms")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("rooms", locations.length);
+  return locations.filter((location) => !seededLocationKeys.has(location.key)).length;
+}
+
+async function countDebugCreatedNpcs(ctx: DatabaseCtx, worldId: Id<"worlds">) {
+  const seededNpcKeys = new Set<string>(SEEDED_NPCS.map((npc) => npc.key));
+  const actors = await ctx.db
+    .query("actors")
+    .withIndex("by_worldId_and_role", (q) => q.eq("worldId", worldId).eq("role", "npc"))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("actors", actors.length);
+  return actors.filter((actor) => !seededNpcKeys.has(stableActorKey(actor))).length;
 }
 
 async function loadCurrentWorld(ctx: QueryCtx, worldId: Id<"worlds">) {
@@ -1636,8 +2159,10 @@ async function loadLocationSummaries(ctx: QueryCtx, worldId: Id<"worlds">) {
     actors: actors
       .filter((actor) => actor.roomId === room._id)
       .map((actor) => ({
+        _id: actor._id,
         key: stableActorKey(actor),
         name: actor.name,
+        description: actor.description,
         role: actor.role,
       })),
     objects: objects

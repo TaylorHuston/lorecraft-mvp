@@ -14,6 +14,10 @@ After narration succeeds, the existing post-narration extraction pattern will be
 
 The debug panel will gain a `Locations` tab similar to the `NPCs` tab. It will show existing locations, current actor locations, and enough context to inspect movement. It will also allow rough canonical editing/creation of locations for the current demo world, with reset behavior that can restore the seeded world.
 
+As part of making NPC and Location debugging consistent, the existing `NPCs` tab will use the same canonical Convex editing model instead of server-local overrides. Debug-created NPCs and locations remain rough local playtest tooling, not a polished World Builder. Reset Session and fresh seeding must restore the seeded demo world and remove debug-created rows.
+
+The seed world will expand beyond the chapel with a tavern location and tavern NPCs so playtesting can validate actor presence, NPC context, and movement across multiple scenes.
+
 ## Epic Actions
 
 ### New Epic Directories
@@ -28,7 +32,7 @@ The debug panel will gain a `Locations` tab similar to the `NPCs` tab. It will s
 
 - Added: `LC-001-S12: Lightweight Location Cards And Movement`
 - Modified: `LC-001-S1` to replace the current "narrative movement does not mutate rooms" MVP boundary with the new bounded rule: clear travel can move actors to existing canonical locations after backend validation.
-- Modified: `LC-001-S2`, `LC-001-S7`, and `LC-001-S10` as needed to describe location context, prompt guidance, request summaries, and the expanded state extraction boundary.
+- Modified: `LC-001-S2`, `LC-001-S7`, `LC-001-S9`, and `LC-001-S10` as needed to describe location context, canonical debug NPC editing, prompt guidance, request summaries, and the expanded state extraction boundary.
 - Removed: none.
 
 ## Change Folder
@@ -38,16 +42,16 @@ The debug panel will gain a `Locations` tab similar to the `NPCs` tab. It will s
 
 ## Impact
 
-- Product: Adds canonical, inspectable locations while preserving the story-first interface.
-- Code: Extends current persistent-mode context, post-narration extraction, Convex movement validation, debug UI, and reset behavior.
-- Tests: Requires focused tests for Location Card prompt context, actor movement validation, unknown-target rejection, debug location editing, reset behavior, and E2E or playtest coverage.
+- Product: Adds canonical, inspectable locations and standardizes rough canonical debug editing for NPCs and Locations while preserving the story-first interface.
+- Code: Extends current persistent-mode context, post-narration extraction, Convex movement validation, canonical debug UI writes, seed data, and reset behavior.
+- Tests: Requires focused tests for Location Card prompt context, actor movement validation, unknown-target rejection, debug location/NPC editing, reset behavior, and E2E or playtest coverage.
 - Docs: Updates Epic truth, `docs/data-model.md`, `docs/persistence-system.md`, README/debug documentation, and `CHANGELOG.md`.
 
 ## Changelog Impact
 
 - Required: yes
 - Category: Added
-- Public summary: Add lightweight Location Cards, debug location editing, and bounded actor movement to existing canonical locations.
+- Public summary: Add lightweight Location Cards, debug location editing, canonical debug NPC editing parity, seeded tavern NPCs, and bounded actor movement to existing canonical locations.
 
 ## Open Questions
 

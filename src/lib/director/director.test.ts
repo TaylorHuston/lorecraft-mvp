@@ -1,19 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  DELETE as deleteNpcOverrides,
-  GET as getNpcOverrides,
-  POST as postNpcOverride,
-} from "../../app/api/debug/npc-overrides/route";
+import { describe, expect, it } from "vitest";
 import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
 import { readDirectorMode } from "./mode";
 import { validateNarrativeInput } from "./input";
-import {
-  clearNpcDebugOverride,
-  clearNpcDebugOverrides,
-  getNpcDebugOverrides,
-  setNpcDebugOverride,
-} from "./npc-debug-overrides";
-import { applyNpcDebugOverrides } from "./npc-profiles";
 import {
   buildDirectorRequest,
   buildNpcStateExtractionRequest,
@@ -261,18 +249,6 @@ const transcriptWithInvalidTurn: TranscriptDirectorContext = {
   ],
 };
 
-function jsonRequest(method: string, url: string, body: unknown) {
-  return new Request(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-async function expectJson(response: Response, expected: unknown) {
-  expect(await response.json()).toEqual(expected);
-}
-
 describe("Director request construction", () => {
   it("builds a bounded plain-prose story request from compact prompt sections", () => {
     const request = buildDirectorRequest(context, "I ask Mira about the storm.", {
@@ -450,22 +426,29 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain("Do not update description, background, persona");
   });
 
-  it("applies debug NPC overrides to persistent prompt context without changing transcript mode", () => {
-    const overriddenContext = applyNpcDebugOverrides(context, {
-      mira: {
-        description: "A drenched archivist with silver spectacles and a storm-dark cloak.",
-        facts: {
-          mood: "deeply suspicious",
-          occupation: "chapel archivist",
-        },
-      },
-    });
-    const request = buildDirectorRequest(overriddenContext, "I look at Mira.");
+  it("uses canonical NPC actor and fact values in persistent prompt context without changing transcript mode", () => {
+    const canonicalContext: DirectorContext = {
+      ...context,
+      actors: context.actors.map((actor) =>
+        actor.key === "mira"
+          ? {
+              ...actor,
+              description: "A drenched archivist with silver spectacles and a storm-dark cloak.",
+              facts: [
+                ...actor.facts.map((fact) =>
+                  fact.key === "mood" ? { ...fact, value: "deeply suspicious" } : fact,
+                ),
+                { key: "occupation", value: "chapel archivist", source: "manual" },
+              ],
+            }
+          : actor,
+      ),
+    };
+    const request = buildDirectorRequest(canonicalContext, "I look at Mira.");
     const userMessage = request.messages.find((message) => message.role === "user");
 
     expect(request.requestSummary).toMatchObject({
       npcProfileKeys: ["mira"],
-      npcOverrideKeys: ["mira.description", "mira.mood", "mira.occupation"],
     });
     expect(userMessage?.content).toContain(
       "Description: A drenched archivist with silver spectacles and a storm-dark cloak.",
@@ -509,19 +492,20 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("hiddenNpcKnowledge");
   });
 
-  it("adds debug-only NPCs to persistent prompt context", () => {
+  it("adds canonical debug-created NPCs to persistent prompt context", () => {
+    const ilyra: DirectorActor = {
+      key: "debug-npc-1",
+      name: "Ilyra",
+      role: "npc",
+      description: "A temporary scholar with ink-stained sleeves.",
+      facts: [
+        { key: "persona", value: "Curious and direct.", source: "manual" },
+        { key: "voice", value: "Precise, clipped, and impatient.", source: "manual" },
+        { key: "status", value: "standing beside the chapel pews", source: "manual" },
+      ],
+    };
     const request = buildDirectorRequest(
-      applyNpcDebugOverrides(context, {
-        "debug-npc-1": {
-          name: "Ilyra",
-          description: "A temporary scholar with ink-stained sleeves.",
-          facts: {
-            persona: "Curious and direct.",
-            voice: "Precise, clipped, and impatient.",
-            status: "standing beside the chapel pews",
-          },
-        },
-      }),
+      { ...context, actors: [...context.actors, ilyra] },
       "I ask Ilyra what she noticed.",
     );
     const userMessage = request.messages.find((message) => message.role === "user");
@@ -529,13 +513,6 @@ describe("Director request construction", () => {
     expect(request.requestSummary).toMatchObject({
       actorKeys: ["taylor", "mira", "debug-npc-1"],
       npcProfileKeys: ["mira", "debug-npc-1"],
-      npcOverrideKeys: expect.arrayContaining([
-        "debug-npc-1.name",
-        "debug-npc-1.description",
-        "debug-npc-1.persona",
-        "debug-npc-1.status",
-        "debug-npc-1.voice",
-      ]),
     });
     expect(userMessage?.content).toContain("NPC CARD: Ilyra (debug-npc-1)");
     expect(userMessage?.content).toContain(
@@ -679,18 +656,22 @@ describe("Director request construction", () => {
   });
 
   it("uses recent addressed NPC focus for ambiguous follow-up dialogue", () => {
-    const garthContext = {
-      ...applyNpcDebugOverrides(context, {
-        "debug-npc-1": {
+    const garthContext: DirectorContext = {
+      ...context,
+      actors: [
+        ...context.actors,
+        {
+          key: "debug-npc-1",
           name: "Garth",
+          role: "npc",
           description: "A burly bartender with a limp and curled mustache.",
-          facts: {
-            persona: "Friendly and boisterous.",
-            voice: "Speaks with dramatic flair.",
-            status: "working behind the bar",
-          },
+          facts: [
+            { key: "persona", value: "Friendly and boisterous.", source: "manual" },
+            { key: "voice", value: "Speaks with dramatic flair.", source: "manual" },
+            { key: "status", value: "working behind the bar", source: "manual" },
+          ],
         },
-      }),
+      ],
       recentFeed: [
         {
           id: "garth-greeting",
@@ -718,193 +699,6 @@ describe("Director request construction", () => {
       targetActorKey: "debug-npc-1",
       expectsNpcResponse: false,
     });
-  });
-});
-
-describe("NPC debug override plumbing", () => {
-  it("stores normalized NPC debug overrides in process memory", () => {
-    const worldId = "test-world-store";
-    clearNpcDebugOverrides(worldId);
-
-    const stored = setNpcDebugOverride(worldId, " mira ", {
-      name: "  Mira Brightfall  ",
-      description: "  She has bright red hair.  ",
-      facts: {
-        " mood ": "  amused  ",
-        empty: "   ",
-      },
-    });
-
-    expect(stored).toEqual({
-      mira: {
-        name: "Mira Brightfall",
-        description: "She has bright red hair.",
-        facts: {
-          mood: "amused",
-        },
-      },
-    });
-    expect(getNpcDebugOverrides(worldId)).toEqual(stored);
-
-    expect(clearNpcDebugOverride(worldId, "mira")).toEqual({});
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("bounds NPC debug override storage in process memory", () => {
-    for (let index = 0; index <= 20; index += 1) {
-      setNpcDebugOverride(`test-world-bound-${index}`, "mira", {
-        description: `description ${index}`,
-      });
-    }
-
-    expect(getNpcDebugOverrides("test-world-bound-0")).toEqual({});
-    expect(getNpcDebugOverrides("test-world-bound-20")).toEqual({
-      mira: { description: "description 20" },
-    });
-
-    for (let index = 0; index <= 20; index += 1) {
-      clearNpcDebugOverrides(`test-world-bound-${index}`);
-    }
-
-    const worldId = "test-world-actor-bound";
-    clearNpcDebugOverrides(worldId);
-    for (let index = 0; index <= 50; index += 1) {
-      setNpcDebugOverride(worldId, `actor-${index}`, {
-        description: `description ${index}`,
-      });
-    }
-
-    const boundedOverrides = getNpcDebugOverrides(worldId);
-    expect(Object.keys(boundedOverrides)).toHaveLength(50);
-    expect(boundedOverrides["actor-0"]).toBeUndefined();
-    expect(boundedOverrides["actor-50"]).toEqual({ description: "description 50" });
-    clearNpcDebugOverrides(worldId);
-  });
-
-  it("exposes NPC debug overrides through GET, POST, and DELETE route handlers", async () => {
-    const worldId = "test-world-route";
-    clearNpcDebugOverrides(worldId);
-
-    const postResponse = await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      }),
-    );
-    expect(postResponse.status).toBe(200);
-    await expectJson(postResponse, {
-      ok: true,
-      overrides: {
-        mira: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      },
-    });
-
-    const getResponse = await getNpcOverrides(
-      new Request(`http://localhost/api/debug/npc-overrides?worldId=${worldId}`),
-    );
-    expect(getResponse.status).toBe(200);
-    await expectJson(getResponse, {
-      ok: true,
-      overrides: {
-        mira: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      },
-    });
-
-    const deleteResponse = await deleteNpcOverrides(
-      new Request(`http://localhost/api/debug/npc-overrides?worldId=${worldId}&actorKey=mira`, {
-        method: "DELETE",
-      }),
-    );
-    expect(deleteResponse.status).toBe(200);
-    await expectJson(deleteResponse, { ok: true, overrides: {} });
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("rejects malformed NPC debug override requests before mutating the store", async () => {
-    const worldId = "test-world-invalid-route";
-    clearNpcDebugOverrides(worldId);
-
-    const response = await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          facts: "mood=curious",
-        },
-      }),
-    );
-
-    expect(response.status).toBe(400);
-    await expectJson(response, { ok: false, error: "override.facts must be an object when provided." });
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("disables NPC debug override routes in production unless explicitly enabled", async () => {
-    const worldId = "test-world-production-route";
-    clearNpcDebugOverrides(worldId);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("LORECRAFT_ENABLE_DEBUG_ROUTES", "");
-
-    try {
-      const response = await postNpcOverride(
-        jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-          worldId,
-          actorKey: "mira",
-          override: {
-            description: "She has bright red hair.",
-          },
-        }),
-      );
-
-      expect(response.status).toBe(404);
-      await expectJson(response, { ok: false, error: "Debug NPC overrides are disabled." });
-      expect(getNpcDebugOverrides(worldId)).toEqual({});
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it("feeds route-saved NPC debug overrides into the next persistent Director request", async () => {
-    const worldId = "test-world-route-to-prompt";
-    clearNpcDebugOverrides(worldId);
-
-    await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          description: "She has bright red hair.",
-        },
-      }),
-    );
-
-    const request = buildDirectorRequest(
-      applyNpcDebugOverrides(context, getNpcDebugOverrides(worldId)),
-      "What color hair do you have, Mira?",
-    );
-    const userMessage = request.messages.find((message) => message.role === "user");
-
-    expect(request.requestSummary.npcOverrideKeys).toEqual(["mira.description"]);
-    expect(userMessage?.content).toContain("Description: She has bright red hair.");
-    expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
-    expect(userMessage?.content).not.toContain("npcProfiles");
-    expect(userMessage?.content).not.toContain("currentSceneActors");
   });
 });
 

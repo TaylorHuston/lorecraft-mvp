@@ -43,19 +43,65 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "npc_state_extraction",
     );
-    await expect(page.locator("#debug-list-npc-state-changes-items")).toContainText(
+    await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
+    );
+
+    await page.locator("#debug-tab-npcs").click();
+    await expect(page.locator("#npc-debug-panel")).toContainText("Mira");
+    await expect(page.locator("#npc-debug-panel")).toContainText("Brother Alden");
+    await page.locator("#npc-card-mira-collapse-toggle").click();
+    await expect(page.locator("#npc-card-mira-collapse-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await page.locator("#npc-debug-mira-description").fill(
+      "She has bright red hair and green eyes.",
+    );
+    await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
+      timeout: 10_000,
+    });
+    await page.locator("#npc-debug-mira-knowledge").fill("");
+    await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
+      timeout: 10_000,
+    });
+    await page.locator("#add-debug-npc-button").click();
+    await expect(page.locator("#npc-card-debug-npc-1")).toContainText("New NPC");
+    await expect(page.locator("#npc-card-debug-npc-1-location")).toContainText("Chapel");
+
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-hidden-facts-items")).not.toContainText(
+      "actor:mira.knowledge",
+    );
+
+    const npcContextInput = page.locator("#director-input");
+    await npcContextInput.fill("I look at Mira.");
+    await npcContextInput.press("Enter");
+    await expect(page.locator("#story-stream")).toContainText("I look at Mira.", {
+      timeout: 60_000,
+    });
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "She has bright red hair and green eyes.",
     );
 
     await page.locator("#debug-tab-locations").click();
     await expect(page.locator("#location-debug-panel")).toContainText("Chapel");
     await expect(page.locator("#location-debug-panel")).toContainText("Vestry");
+    await expect(page.locator("#location-debug-panel")).toContainText("Lantern & Bell Tavern");
     await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
+    await expect(page.locator("#location-card-tavern")).toContainText("Rowan (npc)");
+    await expect(page.locator("#location-card-tavern")).toContainText("Lena (npc)");
+    await page.locator("#location-card-vestry-collapse-toggle").click();
+    await expect(page.locator("#location-card-vestry-collapse-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await page.locator("#location-card-vestry-description").fill(
       "The vestry smells of old paper, damp wool, and fresh sealing wax.",
     );
     await page.locator("#location-card-vestry-description").blur();
-    await expect(page.locator("#turn-notice-message")).toContainText("Location saved.");
+    await expect(page.locator("#location-card-vestry-save-status")).toContainText("Saved");
     await page.locator("#new-location-key").fill("bell-annex");
     await page.locator("#new-location-name").fill("Bell Annex");
     await page.locator("#new-location-description").fill(
@@ -75,7 +121,7 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#debug-list-scene-items")).toContainText(
       "Stormbound Chapel / Vestry",
     );
-    await expect(page.locator("#debug-list-npc-state-changes-items")).toContainText(
+    await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Vestry.",
     );
 
@@ -97,11 +143,19 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
     await page.locator("#debug-tab-locations").click();
+    await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(
       "The vestry smells of old paper and damp wool. A narrow desk sits under shelves of hymnals.",
     );
     await expect(page.locator("#location-card-bell-annex")).toHaveCount(0);
     await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
+    await expect(page.locator("#location-card-chapel")).not.toContainText("New NPC");
+    await page.locator("#debug-tab-npcs").click();
+    await expect(page.locator("#npc-card-debug-npc-1")).toHaveCount(0);
+    await page.locator("#npc-card-mira-collapse-toggle").click();
+    await expect(page.locator("#npc-debug-mira-description")).toHaveValue(
+      "A local woman in practical rain-dark clothes, with damp dark hair and watchful eyes.",
+    );
 
     const followupInput = page.locator("#director-input");
     await followupInput.fill("I listen to the rain.");

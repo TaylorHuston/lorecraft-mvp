@@ -153,7 +153,9 @@ Strategy:
 - `knowledge` can shape narration and dialogue, but it is not automatically player-visible.
 - Game Master-authored NPC mutation is allowed only through the post-narration extractor for `mood`, `status`, and `memory`.
 - Game Master-authored actor movement is allowed only through the post-narration extractor for current-scene actors moving to existing locations.
-- Debug NPC overrides are process-local server state, not Convex rows. They can temporarily override profile values in prompt context, but they disappear when the application server restarts.
+- Debug NPC edits are canonical Convex demo-world actor rows and actor facts. They can change profile values in prompt context, and Reset Session restores seeded NPCs while removing debug-created NPCs.
+- Clearing an editable NPC fact in the debug UI removes that manual canonical fact instead of leaving the previous value in prompt context.
+- Debug-created NPCs and locations are capped per demo world so ordinary debug use cannot exceed the bounded reset deletion limits.
 
 Useful future fact keys:
 
@@ -312,6 +314,7 @@ Strategy:
 - Story-generation calls use `outputContract: "plain_prose"` and do not carry accepted NPC updates.
 - NPC-state extraction calls use `outputContract: "json_npc_updates"` and may carry accepted or ignored updates for `mood`, `status`, and `memory`, plus accepted or ignored actor moves to existing locations.
 - `rawRequest` is omitted by default and only stored when local raw request debug storage is explicitly enabled. It can contain hidden NPC knowledge, prompt guidance, and player text, so it is diagnostic evidence rather than canonical game state.
+- Full debug snapshot sections such as hidden facts, state diffs, and Game Master calls are local/debug-oriented and are omitted from the client snapshot unless debug routes are enabled in a non-production process.
 
 ## Game Master Prompt Context
 
@@ -324,7 +327,7 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 | `world` | Derived from world, room, exit, object, and player rows | Current world, room, baseline scene description, visible exits, visible objects, and player identity. |
 | `locationCard` | Derived from the current room/location, room facts, visible objects, exits, and present actors | Canonical current-location card for persistent Game Master context. |
 | `knownLocations` | Derived from existing room rows | Compact list of valid movement destinations for the current world. |
-| `npcCards` | Rendered from current-scene NPC profiles and temporary debug overrides | Card-like story memory the Game Master should treat as canonical NPC context. |
+| `npcCards` | Rendered from current-scene NPC profiles | Card-like story memory the Game Master should treat as canonical NPC context. |
 | `recentStory` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
 | `currentInput` | Current request body | The player's narrative intent for this turn. |
 | `gameMasterNarration` | Completed story-generation call | Extractor-only input containing the player-facing narration to inspect for durable NPC changes. |

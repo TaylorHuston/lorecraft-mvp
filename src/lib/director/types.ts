@@ -36,15 +36,7 @@ export type DirectorNpcProfile = {
     key: string;
     value: string | number | boolean | null;
     source: string;
-    overridden?: boolean;
   }>;
-  overriddenFields: string[];
-};
-
-export type NpcDebugOverride = {
-  name?: string;
-  description?: string;
-  facts?: Record<string, string>;
 };
 
 export type DirectorLocationCard = {
@@ -145,7 +137,6 @@ export type DirectorRequestSummary = {
   actorKeys: string[];
   npcFactKeys: string[];
   npcProfileKeys?: string[];
-  npcOverrideKeys?: string[];
   npcMutationMode?: "read_only" | "bounded_updates";
   locationKeys?: string[];
   movementMode?: "read_only" | "bounded_existing_locations";

@@ -66,9 +66,11 @@ This starts Convex and Next.js together. The app runs at:
 http://localhost:3000
 ```
 
-`npm run dev:debug` currently enables all local Game Master diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, and persisted provider request messages in `directorCalls.rawRequest`.
+`npm run dev:debug` currently enables all local Game Master diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, persisted provider request messages in `directorCalls.rawRequest`, and debug-only Convex write/snapshot surfaces. The debug flag is process-local; the npm scripts do not persist it into Convex deployment environment variables.
 
 Each recorded Game Master story attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, response length metadata, raw request, raw response, and timing data. Persistent mode can also write a `director.turn.extraction` record for the post-narration NPC-state extractor, including accepted/ignored updates and extraction timing. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include prompt guidance, player text, model output, and in persistent mode hidden NPC knowledge, so keep it local/debug-only.
+
+By default `/api/director/turn` accepts local browser requests only. Remote deployments must opt in with `LORECRAFT_ALLOW_REMOTE_DIRECTOR=1` and configure `LORECRAFT_SERVER_WRITE_TOKEN` for server-owned Convex writes before provider calls and state mutation can work outside local development. This is a prototype guardrail, not a replacement for real user auth and world ownership.
 
 Persistent Game Master mode is the default. To compare story-only prose generation without canonical world mutation, start the app with transcript mode:
 
@@ -134,11 +136,9 @@ I ask Mira what she knows about the storm.
 
 Direct questions to present NPCs derive a required scene beat so the Game Master is prompted to let that NPC make a meaningful response or choice. Current-scene NPC profiles are rendered into card-like prompt context, including Mira's description, background, persona, voice, mood, status, memory, and private knowledge. Persistent mode now applies only validated post-narration extractor updates for current-scene NPC `mood`, `status`, and `memory`.
 
-The seeded chapel currently includes Mira and Brother Alden so local playtesting can compare how the Game Master handles multiple NPCs in the same scene.
+The seeded demo world currently includes Mira and Brother Alden in the chapel, plus Rowan and Lena in the Lantern & Bell Tavern, so local playtesting can compare how the Game Master handles multiple NPCs across different scenes.
 
-The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. It also includes an `NPCs` tab for temporary server-local NPC description/fact overrides and a `Locations` tab for rough canonical location inspection, editing, and creation. Prompt guidance, NPC overrides, and Location Cards are summarized in Game Master debug metadata. NPC debug overrides are not stored in Convex and disappear when the application server restarts; location edits are canonical demo-world rows and can be reset by seeding a fresh world or using Reset Session.
-
-The NPC override API is local-debug tooling. It is available outside production by default and returns 404 in production unless `LORECRAFT_ENABLE_DEBUG_ROUTES=1` is explicitly set.
+The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. It also includes `NPCs` and `Locations` tabs for rough canonical demo-world inspection, editing, and creation. Prompt guidance, NPC Cards, and Location Cards are summarized in Game Master debug metadata. NPC and location debug edits are stored in Convex demo-world rows/facts and can be reset by seeding a fresh world or using Reset Session. Clearing an NPC profile fact in the debug UI removes that manual canonical fact, so stale values are not kept in future prompts.
 
 The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, linked path enforcement, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 

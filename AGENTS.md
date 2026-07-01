@@ -103,5 +103,5 @@ For the foreseeable future, use `npm run dev:debug` instead of `npm run dev` for
 - Do not let the Game Master directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations may change only through bounded extractor output plus backend validation.
 - The Stormbound Chapel demo world is resettable seed data. Seeding deletes the current deterministic demo world and dependent rows; use reset only when destructive local playtest behavior is intended.
 - Local debug logs and raw request storage can include prompt guidance, player text, model output, hidden NPC knowledge, and other sensitive playtest context. Keep them local/debug-only and out of commits, durable vault docs, and public artifacts.
-- The NPC override API is local-debug tooling. It is unavailable in production unless `LORECRAFT_ENABLE_DEBUG_ROUTES=1` is explicitly set.
+- Debug NPC and Location editing writes canonical demo-world Convex state. Keep it resettable and local/dev-oriented; do not treat it as a polished public World Builder contract yet.
 - Keep provider secrets in ignored `.env*` files, process environment, or platform secret stores. Never print API keys, generated tokens, database URLs, full environment dumps, or provider credentials.

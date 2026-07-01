@@ -4,7 +4,6 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { NpcDebugOverride } from "@/lib/director/types";
 
 type DirectorTurnResponse =
   | {
@@ -26,11 +25,33 @@ type DirectorPromptGuidance = {
 
 type DebugTab = "prompt" | "npcs" | "locations" | "state";
 
-type NpcOverrideResponse =
-  | { ok: true; overrides: Record<string, NpcDebugOverride> }
-  | { ok: false; error: string };
-
-type NpcOverrideSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+type NpcSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+type NpcDebugDraft = {
+  name?: string;
+  description?: string;
+  facts?: Record<string, string>;
+};
+type NpcDebugSavePayload = {
+  name: string;
+  description: string;
+  facts: Record<string, string>;
+};
+type NpcDebugActor = {
+  _id: Id<"actors">;
+  key: string;
+  name: string;
+  description: string;
+  role: "npc";
+  locationKey: string;
+  locationName: string;
+};
+type NpcPendingSave = {
+  worldId: Id<"worlds">;
+  actor: NpcDebugActor;
+  payload: NpcDebugSavePayload;
+  saveVersion: number;
+};
+type LocationSaveStatus = "idle" | "saving" | "saved" | "error";
 
 const NPC_PROFILE_FACT_KEYS = [
   "background",
@@ -56,20 +77,25 @@ export function WorldClient() {
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const updateLocation = useAction(api.world.updateLocation);
   const createLocation = useAction(api.world.createLocation);
+  const updateNpc = useAction(api.world.updateNpc);
+  const createNpc = useAction(api.world.createNpc);
+  const resetNpc = useAction(api.world.resetNpc);
   const [selectedWorldId, setSelectedWorldId] = useState<Id<"worlds"> | null>(null);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(false);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
-  const [npcOverrides, setNpcOverrides] = useState<Record<string, NpcDebugOverride>>({});
-  const [npcOverrideSaveStatus, setNpcOverrideSaveStatus] = useState<
-    Record<string, NpcOverrideSaveStatus>
+  const [npcDrafts, setNpcDrafts] = useState<Record<string, NpcDebugDraft>>({});
+  const [npcSaveStatus, setNpcSaveStatus] = useState<
+    Record<string, NpcSaveStatus>
   >({});
   const [collapsedNpcKeys, setCollapsedNpcKeys] = useState<Record<string, boolean>>({});
   const [savingNpcKey, setSavingNpcKey] = useState<string | null>(null);
+  const [locationSaveStatus, setLocationSaveStatus] = useState<Record<string, LocationSaveStatus>>({});
   const [newLocation, setNewLocation] = useState({
     key: "",
     name: "",
@@ -79,8 +105,11 @@ export function WorldClient() {
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
-  const npcOverrideSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const npcOverrideSaveVersions = useRef<Record<string, number>>({});
+  const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const npcSaveVersions = useRef<Record<string, number>>({});
+  const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
+  const npcActiveSaves = useRef<Record<string, Promise<boolean>>>({});
+  const locationActiveSaves = useRef<Record<string, Promise<boolean>>>({});
   const nextDebugNpcOrdinal = useRef(1);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
@@ -101,47 +130,35 @@ export function WorldClient() {
   }, [feedLength, isSubmitting, error]);
 
   useEffect(() => {
-    if (!worldId) {
-      return;
-    }
-
-    let cancelled = false;
-    void fetch(`/api/debug/npc-overrides?worldId=${encodeURIComponent(worldId)}`)
-      .then((response) => response.json() as Promise<NpcOverrideResponse>)
-      .then((result) => {
-        if (!cancelled && result.ok) {
-          setNpcOverrides(result.overrides);
-          setNpcOverrideSaveStatus({});
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNpcOverrides({});
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [worldId]);
-
-  useEffect(() => {
-    const timers = npcOverrideSaveTimers.current;
+    const timers = npcSaveTimers.current;
     return () => {
       for (const timer of Object.values(timers)) {
         clearTimeout(timer);
       }
+      npcPendingSaves.current = {};
     };
   }, []);
 
   async function handleSeed() {
     setError(null);
-    const seededWorldId = await seedWorld();
-    setSelectedWorldId(seededWorldId);
-    setNpcOverrides({});
-    setNpcOverrideSaveStatus({});
-    setCollapsedNpcKeys({});
-    setNotice("Fresh Stormbound Chapel world seeded.");
+    setNotice(null);
+    setIsSeeding(true);
+    try {
+      await cancelQueuedNpcSavesAndWaitForActive();
+      await flushActiveLocationSaves();
+      setError(null);
+      const seededWorldId = await seedWorld();
+      setSelectedWorldId(seededWorldId);
+      setNpcDrafts({});
+      setNpcSaveStatus({});
+      setCollapsedNpcKeys({});
+      setLocationSaveStatus({});
+      setNotice("Fresh Stormbound Chapel world seeded.");
+    } catch (seedError) {
+      setError(errorMessage(seedError));
+    } finally {
+      setIsSeeding(false);
+    }
   }
 
   async function handleReset() {
@@ -150,11 +167,19 @@ export function WorldClient() {
     }
 
     setError(null);
+    setNotice(null);
     setIsResetting(true);
     try {
+      await cancelQueuedNpcSavesAndWaitForActive();
+      await flushActiveLocationSaves();
+      setError(null);
       const result = await resetPlaytestWorld({ worldId });
+      setNpcDrafts({});
+      setNpcSaveStatus({});
+      setCollapsedNpcKeys({});
+      setLocationSaveStatus({});
       setNotice(
-        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, restored ${result.restoredFacts} NPC facts, and reset ${result.resetActorLocations} actor locations.`,
+        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, restored ${result.restoredFacts} NPC facts, removed ${result.deletedActors} debug NPCs, and reset ${result.resetActorLocations} actor locations.`,
       );
     } catch (resetError) {
       setError(errorMessage(resetError));
@@ -176,6 +201,13 @@ export function WorldClient() {
     setIsSubmitting(true);
     setInput("");
     try {
+      const npcSavesFlushed = await flushQueuedNpcSaves();
+      const locationSavesFlushed = await flushActiveLocationSaves();
+      if (!npcSavesFlushed || !locationSavesFlushed) {
+        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+        return;
+      }
+
       const response = await fetch("/api/director/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,127 +233,204 @@ export function WorldClient() {
     }
   }
 
-  function updateNpcOverride(actorKey: string, override: NpcDebugOverride) {
-    setNpcOverrides((current) => ({
+  function updateNpcDraft(
+    actor: NpcDebugActor,
+    draft: NpcDebugDraft,
+    payload: NpcDebugSavePayload,
+  ) {
+    setNpcDrafts((current) => ({
       ...current,
-      [actorKey]: override,
+      [actor.key]: draft,
     }));
-    scheduleNpcOverrideSave(actorKey, override);
+    scheduleNpcSave(actor, payload);
   }
 
-  function addNpcOverride() {
-    const existingActorKeys = new Set([
-      ...(snapshot?.actors.map((actor) => actor.key) ?? []),
-      ...Object.keys(npcOverrides),
-    ]);
+  async function addNpc() {
+    if (!worldId) {
+      return;
+    }
+
+    const existingActorKeys = new Set(
+      snapshot?.locations.flatMap((location) => location.actors.map((actor) => actor.key)) ?? [],
+    );
     let actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
     while (existingActorKeys.has(actorKey)) {
       nextDebugNpcOrdinal.current += 1;
       actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
     }
     nextDebugNpcOrdinal.current += 1;
-    const override: NpcDebugOverride = {
+    const payload = {
       name: "New NPC",
       description: "A temporary NPC for playtesting.",
-      facts: {
-        background: "New NPC background.",
-        persona: "New NPC personality.",
-        voice: "New NPC voice.",
-        mood: "neutral",
-        status: "present in the current scene",
-        memory: "This NPC has not yet formed meaningful memories of Taylor.",
-        knowledge: "This NPC has no private knowledge yet.",
-      },
+      facts: defaultNpcFacts(),
     };
 
+    setError(null);
+    setNotice(null);
+    setSavingNpcKey(actorKey);
+    setNpcSaveStatus((current) => ({ ...current, [actorKey]: "saving" }));
     setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
-    updateNpcOverride(actorKey, override);
+    try {
+      const result = await createNpc({
+        worldId,
+        key: actorKey,
+        ...payload,
+      });
+      if (!result.ok) {
+        setError(result.error ?? "Failed to create NPC.");
+        setNpcSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
+        return;
+      }
+      setNpcSaveStatus((current) => ({ ...current, [actorKey]: "saved" }));
+      setNotice("NPC created.");
+    } catch (createError) {
+      setError(errorMessage(createError));
+      setNpcSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
+    } finally {
+      setSavingNpcKey(null);
+    }
   }
 
   function toggleNpcCollapsed(actorKey: string) {
-    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: !current[actorKey] }));
+    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: !(current[actorKey] ?? true) }));
   }
 
-  function scheduleNpcOverrideSave(actorKey: string, override: NpcDebugOverride) {
+  function scheduleNpcSave(actor: NpcDebugActor, payload: NpcDebugSavePayload) {
     if (!worldId) {
       return;
     }
 
-    npcOverrideSaveVersions.current[actorKey] = (npcOverrideSaveVersions.current[actorKey] ?? 0) + 1;
-    const saveVersion = npcOverrideSaveVersions.current[actorKey];
+    npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
+    const saveVersion = npcSaveVersions.current[actor.key];
     const saveWorldId = worldId;
 
-    setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "unsaved" }));
-    clearTimeout(npcOverrideSaveTimers.current[actorKey]);
-    npcOverrideSaveTimers.current[actorKey] = setTimeout(() => {
-      void persistNpcOverride(saveWorldId, actorKey, override, saveVersion);
+    setNpcSaveStatus((current) => ({ ...current, [actor.key]: "unsaved" }));
+    clearTimeout(npcSaveTimers.current[actor.key]);
+    npcPendingSaves.current[actor.key] = {
+      worldId: saveWorldId,
+      actor,
+      payload,
+      saveVersion,
+    };
+    npcSaveTimers.current[actor.key] = setTimeout(() => {
+      delete npcSaveTimers.current[actor.key];
+      delete npcPendingSaves.current[actor.key];
+      void startPersistNpc({ worldId: saveWorldId, actor, payload, saveVersion });
     }, 700);
   }
 
-  async function persistNpcOverride(
-    saveWorldId: string,
-    actorKey: string,
-    override: NpcDebugOverride,
+  function startPersistNpc(pendingSave: NpcPendingSave) {
+    const savePromise = persistNpc(
+      pendingSave.worldId,
+      pendingSave.actor,
+      pendingSave.payload,
+      pendingSave.saveVersion,
+    );
+    npcActiveSaves.current[pendingSave.actor.key] = savePromise;
+    void savePromise.finally(() => {
+      if (npcActiveSaves.current[pendingSave.actor.key] === savePromise) {
+        delete npcActiveSaves.current[pendingSave.actor.key];
+      }
+    });
+    return savePromise;
+  }
+
+  async function flushQueuedNpcSaves() {
+    const pendingSaves = Object.values(npcPendingSaves.current);
+    const flushedSaves = pendingSaves.map((pendingSave) => {
+      clearTimeout(npcSaveTimers.current[pendingSave.actor.key]);
+      delete npcSaveTimers.current[pendingSave.actor.key];
+      delete npcPendingSaves.current[pendingSave.actor.key];
+      return startPersistNpc(pendingSave);
+    });
+    const activeSaves = Object.values(npcActiveSaves.current);
+    const results = await Promise.all([...flushedSaves, ...activeSaves]);
+    return results.every(Boolean);
+  }
+
+  async function cancelQueuedNpcSavesAndWaitForActive() {
+    const actorKeys = new Set([
+      ...Object.keys(npcSaveTimers.current),
+      ...Object.keys(npcPendingSaves.current),
+      ...Object.keys(npcActiveSaves.current),
+      ...Object.keys(npcSaveVersions.current),
+    ]);
+
+    for (const actorKey of actorKeys) {
+      clearTimeout(npcSaveTimers.current[actorKey]);
+      delete npcSaveTimers.current[actorKey];
+      delete npcPendingSaves.current[actorKey];
+      npcSaveVersions.current[actorKey] = (npcSaveVersions.current[actorKey] ?? 0) + 1;
+    }
+
+    await Promise.allSettled(Object.values(npcActiveSaves.current));
+  }
+
+  async function persistNpc(
+    saveWorldId: Id<"worlds">,
+    actor: NpcDebugActor,
+    payload: NpcDebugSavePayload,
     saveVersion: number,
-  ) {
+  ): Promise<boolean> {
     setError(null);
-    setSavingNpcKey(actorKey);
-    setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "saving" }));
+    setSavingNpcKey(actor.key);
+    setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saving" }));
     try {
-      const response = await fetch("/api/debug/npc-overrides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          worldId: saveWorldId,
-          actorKey,
-          override,
-        }),
+      const result = await updateNpc({
+        worldId: saveWorldId,
+        actorId: actor._id,
+        name: payload.name,
+        description: payload.description,
+        facts: payload.facts,
       });
-      const result = (await response.json()) as NpcOverrideResponse;
-      if (!response.ok || !result.ok) {
-        setError(result.ok ? "Failed to save NPC override." : result.error);
-        setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
-        return;
+      if (!result.ok) {
+        setError(result.error ?? "Failed to save NPC.");
+        setNpcSaveStatus((current) => ({ ...current, [actor.key]: "error" }));
+        return false;
       }
 
-      if (npcOverrideSaveVersions.current[actorKey] === saveVersion) {
-        setNpcOverrides(result.overrides);
-        setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "saved" }));
+      if (npcSaveVersions.current[actor.key] === saveVersion) {
+        setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saved" }));
       }
+      return true;
     } catch (saveError) {
       setError(errorMessage(saveError));
-      setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
+      setNpcSaveStatus((current) => ({ ...current, [actor.key]: "error" }));
+      return false;
     } finally {
-      if (npcOverrideSaveVersions.current[actorKey] === saveVersion) {
+      if (npcSaveVersions.current[actor.key] === saveVersion) {
         setSavingNpcKey(null);
       }
     }
   }
 
-  async function clearNpcOverride(actorKey: string) {
+  async function resetNpcDebugActor(actor: NpcDebugActor) {
     if (!worldId) {
       return;
     }
 
     setError(null);
-    setSavingNpcKey(actorKey);
-    clearTimeout(npcOverrideSaveTimers.current[actorKey]);
-    npcOverrideSaveVersions.current[actorKey] = (npcOverrideSaveVersions.current[actorKey] ?? 0) + 1;
+    setNotice(null);
+    setSavingNpcKey(actor.key);
+    clearTimeout(npcSaveTimers.current[actor.key]);
+    delete npcSaveTimers.current[actor.key];
+    delete npcPendingSaves.current[actor.key];
+    npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
     try {
-      const response = await fetch(
-        `/api/debug/npc-overrides?worldId=${encodeURIComponent(worldId)}&actorKey=${encodeURIComponent(actorKey)}`,
-        { method: "DELETE" },
-      );
-      const result = (await response.json()) as NpcOverrideResponse;
-      if (!response.ok || !result.ok) {
-        setError(result.ok ? "Failed to clear NPC override." : result.error);
+      const result = await resetNpc({ worldId, actorId: actor._id });
+      if (!result.ok) {
+        setError(result.error ?? "Failed to reset NPC.");
         return;
       }
-      setNpcOverrides(result.overrides);
-      setNpcOverrideSaveStatus((current) => ({ ...current, [actorKey]: "idle" }));
-      setNotice("NPC override cleared.");
-    } catch (clearError) {
-      setError(errorMessage(clearError));
+      setNpcDrafts((current) => {
+        const next = { ...current };
+        delete next[actor.key];
+        return next;
+      });
+      setNpcSaveStatus((current) => ({ ...current, [actor.key]: "idle" }));
+      setNotice(result.actorId ? "NPC reset." : "Debug NPC removed.");
+    } catch (resetError) {
+      setError(errorMessage(resetError));
     } finally {
       setSavingNpcKey(null);
     }
@@ -329,26 +438,64 @@ export function WorldClient() {
 
   async function saveLocation(
     locationId: Id<"rooms">,
+    locationKey: string,
     name: string,
     description: string,
-  ) {
+  ): Promise<boolean> {
     if (!worldId) {
-      return;
+      return false;
     }
 
+    setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saving" }));
+    const savePromise = persistLocation(worldId, locationId, locationKey, name, description);
+    locationActiveSaves.current[locationKey] = savePromise;
+    void savePromise.finally(() => {
+      if (locationActiveSaves.current[locationKey] === savePromise) {
+        delete locationActiveSaves.current[locationKey];
+      }
+    });
+    return savePromise;
+  }
+
+  async function persistLocation(
+    saveWorldId: Id<"worlds">,
+    locationId: Id<"rooms">,
+    locationKey: string,
+    name: string,
+    description: string,
+  ): Promise<boolean> {
     setError(null);
     setNotice(null);
-    const result = await updateLocation({
-      worldId,
-      locationId,
-      name,
-      description,
-    });
-    if (!result.ok) {
-      setError(result.error ?? "Failed to save location.");
-      return;
+    try {
+      const result = await updateLocation({
+        worldId: saveWorldId,
+        locationId,
+        name,
+        description,
+      });
+      if (!result.ok) {
+        setError(result.error ?? "Failed to save location.");
+        setLocationSaveStatus((current) => ({ ...current, [locationKey]: "error" }));
+        return false;
+      }
+      setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saved" }));
+      setNotice("Location saved.");
+      return true;
+    } catch (saveError) {
+      setError(errorMessage(saveError));
+      setLocationSaveStatus((current) => ({ ...current, [locationKey]: "error" }));
+      return false;
     }
-    setNotice("Location saved.");
+  }
+
+  async function flushActiveLocationSaves() {
+    const activeSaves = Object.values(locationActiveSaves.current);
+    if (activeSaves.length === 0) {
+      return true;
+    }
+
+    const results = await Promise.all(activeSaves);
+    return results.every(Boolean);
   }
 
   async function handleCreateLocation() {
@@ -518,13 +665,23 @@ export function WorldClient() {
                       />
                     </>
                   )}
-                  {notice ? (
-                    <p id="turn-notice-message" className="mt-3 text-xs text-emerald-300/80">
-                      {notice}
-                    </p>
-                  ) : null}
+                  <div
+                    id="async-status-region"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {notice ? (
+                      <p id="turn-notice-message" className="mt-3 text-xs text-emerald-300/80">
+                        {notice}
+                      </p>
+                    ) : null}
+                  </div>
                   {error ? (
-                    <p id="turn-error-message" className="mt-3 text-sm text-rose-300">
+                    <p
+                      id="turn-error-message"
+                      role="alert"
+                      className="mt-3 text-sm text-rose-300"
+                    >
                       {error}
                     </p>
                   ) : null}
@@ -536,7 +693,7 @@ export function WorldClient() {
 
         <aside
           id="debug-panel"
-          className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[380px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[380px] ${
+          className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
             isDebugPanelCollapsed
               ? "pointer-events-none translate-x-full"
               : "translate-x-0"
@@ -557,23 +714,21 @@ export function WorldClient() {
               </p>
             </div>
             <div id="debug-panel-actions" className="flex flex-wrap gap-2">
-              <button
+              <DebugActionButton
                 id="fresh-seed-button"
-                type="button"
                 onClick={handleSeed}
-                className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+                disabled={isSeeding || isResetting}
               >
-                Reset World
-              </button>
-              <button
+                {isSeeding ? "Resetting" : "Reset World"}
+              </DebugActionButton>
+              <DebugActionButton
                 id="rough-reset-button"
-                type="button"
                 onClick={handleReset}
-                disabled={!worldId || isResetting}
-                className="rounded border border-rose-500/70 px-3 py-1.5 text-xs text-rose-200 hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!worldId || isResetting || isSeeding}
+                tone="danger"
               >
                 {isResetting ? "Resetting" : "Reset Session"}
-              </button>
+              </DebugActionButton>
             </div>
           </div>
 
@@ -589,21 +744,22 @@ export function WorldClient() {
               ) : null}
               {debugTab === "npcs" ? (
                 <NpcDebugPanel
-                  actors={snapshot.actors}
+                  actors={buildNpcDebugActors(snapshot.locations)}
                   facts={snapshot.facts}
-                  overrides={npcOverrides}
-                  saveStatus={npcOverrideSaveStatus}
+                  drafts={npcDrafts}
+                  saveStatus={npcSaveStatus}
                   collapsedNpcKeys={collapsedNpcKeys}
                   savingNpcKey={savingNpcKey}
-                  onAdd={addNpcOverride}
-                  onChange={updateNpcOverride}
+                  onAdd={addNpc}
+                  onChange={updateNpcDraft}
                   onToggleCollapsed={toggleNpcCollapsed}
-                  onClear={clearNpcOverride}
+                  onReset={resetNpcDebugActor}
                 />
               ) : null}
               {debugTab === "locations" ? (
                 <LocationDebugPanel
                   locations={snapshot.locations}
+                  saveStatus={locationSaveStatus}
                   newLocation={newLocation}
                   onNewLocationChange={setNewLocation}
                   onSave={saveLocation}
@@ -628,7 +784,7 @@ export function WorldClient() {
                     )}
                   />
                   <DebugList
-                    title="NPC state changes"
+                    title="State changes"
                     items={directorUpdateItems(snapshot.directorCalls)}
                   />
                   <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
@@ -799,155 +955,247 @@ function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: Deb
   );
 }
 
+function DebugSectionHeader({
+  id,
+  title,
+  description,
+  action,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div id={id} className="flex items-start justify-between gap-4">
+      <div id={`${id}-title-block`} className="min-w-0">
+        <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">
+          {title}
+        </h3>
+        {description ? (
+          <p className="mt-2 text-xs leading-5 text-zinc-500">{description}</p>
+        ) : null}
+      </div>
+      {action ? <div id={`${id}-action`} className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+function DebugCard({
+  id,
+  children,
+}: {
+  id: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div id={id} className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
+      {children}
+    </div>
+  );
+}
+
+function DebugActionButton({
+  id,
+  children,
+  onClick,
+  disabled,
+  tone = "neutral",
+}: {
+  id: string;
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "neutral" | "danger";
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-60 ${
+        tone === "danger"
+          ? "border-rose-500/70 text-rose-200 hover:bg-rose-950/40"
+          : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DebugDisclosureButton({
+  id,
+  controlsId,
+  isExpanded,
+  onClick,
+  label,
+}: {
+  id: string;
+  controlsId: string;
+  isExpanded: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      aria-expanded={isExpanded}
+      aria-controls={controlsId}
+      onClick={onClick}
+      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+    >
+      {isExpanded ? "Collapse" : "Expand"}
+      <span className="sr-only"> {label}</span>
+    </button>
+  );
+}
+
 function NpcDebugPanel({
   actors,
   facts,
-  overrides,
+  drafts,
   saveStatus,
   collapsedNpcKeys,
   savingNpcKey,
   onAdd,
   onChange,
   onToggleCollapsed,
-  onClear,
+  onReset,
 }: {
-  actors: Array<{
-    key: string;
-    name: string;
-    description: string;
-    role: "player" | "npc";
-  }>;
+  actors: NpcDebugActor[];
   facts: Array<{
     subjectId: string;
     key: string;
     value: string | number | boolean | null;
     source: string;
   }>;
-  overrides: Record<string, NpcDebugOverride>;
-  saveStatus: Record<string, NpcOverrideSaveStatus>;
+  drafts: Record<string, NpcDebugDraft>;
+  saveStatus: Record<string, NpcSaveStatus>;
   collapsedNpcKeys: Record<string, boolean>;
   savingNpcKey: string | null;
   onAdd: () => void;
-  onChange: (actorKey: string, override: NpcDebugOverride) => void;
+  onChange: (actor: NpcDebugActor, draft: NpcDebugDraft, payload: NpcDebugSavePayload) => void;
   onToggleCollapsed: (actorKey: string) => void;
-  onClear: (actorKey: string) => void;
+  onReset: (actor: NpcDebugActor) => void;
 }) {
-  const actorKeys = new Set(actors.map((actor) => actor.key));
-  const npcs = [
-    ...actors.filter((actor) => actor.role === "npc").map((actor) => ({ ...actor, debugOnly: false })),
-    ...Object.entries(overrides)
-      .filter(([actorKey]) => !actorKeys.has(actorKey))
-      .map(([actorKey, override]) => ({
-        key: actorKey,
-        name: override.name?.trim() || titleFromKey(actorKey),
-        description: override.description?.trim() || "A temporary debug NPC.",
-        role: "npc" as const,
-        debugOnly: true,
-      })),
-  ];
-
   return (
     <section id="npc-debug-panel" className="space-y-4">
-      <div id="npc-debug-panel-header" className="flex items-start justify-between gap-4">
-        <div id="npc-debug-panel-title-block">
-          <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">NPCs</h3>
-          <p className="mt-2 text-xs leading-5 text-zinc-500">
-            Temporary debug NPC values are server-local and disappear on restart.
-          </p>
-        </div>
-        <button
-          id="add-debug-npc-button"
-          type="button"
-          onClick={onAdd}
-          className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-        >
-          Add NPC
-        </button>
-      </div>
-      {npcs.length > 0 ? (
-        npcs.map((npc) => {
+      <DebugSectionHeader
+        id="npc-debug-panel-header"
+        title="NPCs"
+        description="Canonical demo-world NPCs. Edits autosave to Convex and can be reset with Reset Session or Reset World."
+        action={
+          <DebugActionButton id="add-debug-npc-button" onClick={onAdd}>
+            Add NPC
+          </DebugActionButton>
+        }
+      />
+      {actors.length > 0 ? (
+        actors.map((npc) => {
           const npcDomId = `npc-card-${domId(npc.key)}`;
-          const override = overrides[npc.key] ?? {};
-          const overrideFacts = override.facts ?? {};
-          const actorFacts = npc.debugOnly
-            ? NPC_PROFILE_FACT_KEYS.map((key) => ({
-                subjectId: `actor:${npc.key}`,
-                key,
-                value: overrideFacts[key] ?? "",
-                source: "debug_override",
-              }))
-            : facts.filter((fact) => fact.subjectId === `actor:${npc.key}`);
+          const draft = drafts[npc.key] ?? {};
+          const draftFacts = draft.facts ?? {};
+          const canonicalFacts = facts.filter((fact) => fact.subjectId === `actor:${npc.key}`);
+          const editableFacts = NPC_PROFILE_FACT_KEYS.map((key) => {
+            const fact = canonicalFacts.find((candidate) => candidate.key === key);
+            return {
+              key,
+              value: draftFacts[key] ?? String(fact?.value ?? ""),
+              source: draftFacts[key] !== undefined ? "draft" : (fact?.source ?? "empty"),
+            };
+          });
+          const payload: NpcDebugSavePayload = {
+            name: draft.name ?? npc.name,
+            description: draft.description ?? npc.description,
+            facts: Object.fromEntries(editableFacts.map((fact) => [fact.key, fact.value])),
+          };
           const isSaving = savingNpcKey === npc.key;
           const status = saveStatus[npc.key] ?? "idle";
-          const statusLabel = npcOverrideStatusLabel(status, Boolean(overrides[npc.key]));
-          const isCollapsed = Boolean(collapsedNpcKeys[npc.key]);
+          const hasDraft = Boolean(drafts[npc.key]);
+          const statusLabel = npcSaveStatusLabel(status, hasDraft);
+          const isCollapsed = collapsedNpcKeys[npc.key] ?? true;
+          const fieldsId = `${npcDomId}-fields`;
 
           return (
-            <div
-              id={npcDomId}
-              key={npc.key}
-              className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3"
-            >
+            <DebugCard id={npcDomId} key={npc.key}>
               <div id={`${npcDomId}-header`} className="flex items-start justify-between gap-3">
                 <div id={`${npcDomId}-identity`}>
                   <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
-                    {npc.name} <span className="text-zinc-600">({npc.key})</span>
+                    {payload.name || titleFromKey(npc.key)} <span className="text-zinc-600">({npc.key})</span>
                   </h3>
                   <p className="mt-2 text-xs leading-5 text-zinc-500">
-                    {npc.description}
-                    {npc.debugOnly ? " (debug-only)" : ""}
+                    {payload.description || "No description yet."}
+                  </p>
+                  <p id={`${npcDomId}-location`} className="mt-2 text-xs leading-5 text-zinc-400">
+                    Location: {npc.locationName} ({npc.locationKey})
                   </p>
                 </div>
                 <div id={`${npcDomId}-actions`} className="flex shrink-0 items-center gap-2">
-                  <span id={`${npcDomId}-save-status`} className="text-xs uppercase text-emerald-300/60">{statusLabel}</span>
-                  <button
-                    id={`${npcDomId}-collapse-toggle`}
-                    type="button"
-                    onClick={() => onToggleCollapsed(npc.key)}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                  <span
+                    id={`${npcDomId}-save-status`}
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="text-xs uppercase text-emerald-300/60"
                   >
-                    {isCollapsed ? "Expand" : "Collapse"}
-                  </button>
-                  <button
+                    {statusLabel}
+                  </span>
+                  <DebugDisclosureButton
+                    id={`${npcDomId}-collapse-toggle`}
+                    controlsId={fieldsId}
+                    isExpanded={!isCollapsed}
+                    onClick={() => onToggleCollapsed(npc.key)}
+                    label={`${npc.name} details`}
+                  />
+                  <DebugActionButton
                     id={`${npcDomId}-reset-button`}
-                    type="button"
-                    onClick={() => onClear(npc.key)}
-                    disabled={isSaving || !overrides[npc.key]}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => onReset(npc)}
+                    disabled={isSaving}
                   >
                     Reset
-                  </button>
+                  </DebugActionButton>
                 </div>
               </div>
 
               {!isCollapsed ? (
-                <div id={`${npcDomId}-fields`} className="mt-4 space-y-4">
-                  <NpcOverrideTextarea
+                <div id={fieldsId} className="mt-4 space-y-4">
+                  <NpcDebugTextarea
                     actorKey={npc.key}
                     label="Name"
-                    meta={override.name !== undefined ? "override" : "canonical"}
-                    value={override.name ?? npc.name}
-                    onChange={(name) => onChange(npc.key, { ...override, name })}
+                    meta={draft.name !== undefined ? "draft" : "canonical"}
+                    value={payload.name}
+                    onChange={(name) => onChange(npc, { ...draft, name }, { ...payload, name })}
                   />
-                  <NpcOverrideTextarea
+                  <NpcDebugTextarea
                     actorKey={npc.key}
                     label="Description"
-                    meta={override.description !== undefined ? "override" : "canonical"}
-                    value={override.description ?? npc.description}
-                    onChange={(description) => onChange(npc.key, { ...override, description })}
+                    meta={draft.description !== undefined ? "draft" : "canonical"}
+                    value={payload.description}
+                    onChange={(description) =>
+                      onChange(npc, { ...draft, description }, { ...payload, description })
+                    }
                   />
-                  {actorFacts.map((fact) => (
-                    <NpcOverrideTextarea
+                  {editableFacts.map((fact) => (
+                    <NpcDebugTextarea
                       key={fact.key}
                       actorKey={npc.key}
                       label={fact.key}
-                      meta={overrideFacts[fact.key] !== undefined ? "override" : fact.source}
-                      value={overrideFacts[fact.key] ?? String(fact.value ?? "")}
+                      meta={fact.source}
+                      value={fact.value}
                       onChange={(value) =>
-                        onChange(npc.key, {
-                          ...override,
+                        onChange(npc, {
+                          ...draft,
                           facts: {
-                            ...overrideFacts,
+                            ...draftFacts,
+                            [fact.key]: value,
+                          },
+                        }, {
+                          ...payload,
+                          facts: {
+                            ...payload.facts,
                             [fact.key]: value,
                           },
                         })
@@ -956,11 +1204,11 @@ function NpcDebugPanel({
                   ))}
                 </div>
               ) : null}
-            </div>
+            </DebugCard>
           );
         })
       ) : (
-        <p id="npc-debug-panel-empty-state" className="text-sm text-zinc-500">No NPCs in the current scene.</p>
+        <p id="npc-debug-panel-empty-state" className="text-sm text-zinc-500">No NPCs exist in this world yet.</p>
       )}
     </section>
   );
@@ -968,6 +1216,7 @@ function NpcDebugPanel({
 
 function LocationDebugPanel({
   locations,
+  saveStatus,
   newLocation,
   onNewLocationChange,
   onSave,
@@ -982,23 +1231,26 @@ function LocationDebugPanel({
     objects: Array<{ key: string; name: string }>;
     exits: Array<{ label: string; toLocationKey: string; toLocationName: string }>;
   }>;
+  saveStatus: Record<string, LocationSaveStatus>;
   newLocation: { key: string; name: string; description: string };
   onNewLocationChange: (location: { key: string; name: string; description: string }) => void;
-  onSave: (locationId: Id<"rooms">, name: string, description: string) => void;
+  onSave: (
+    locationId: Id<"rooms">,
+    locationKey: string,
+    name: string,
+    description: string,
+  ) => Promise<boolean>;
   onCreate: () => void;
 }) {
   return (
     <section id="location-debug-panel" className="space-y-4">
-      <div id="location-debug-panel-header">
-        <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">
-          Locations
-        </h3>
-        <p className="mt-2 text-xs leading-5 text-zinc-500">
-          Canonical demo-world locations. Keys are stable; names and descriptions can be edited.
-        </p>
-      </div>
+      <DebugSectionHeader
+        id="location-debug-panel-header"
+        title="Locations"
+        description="Canonical demo-world locations. Keys are stable; names and descriptions can be edited."
+      />
 
-      <div id="location-create-card" className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
+      <DebugCard id="location-create-card">
         <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
           Add location
         </h4>
@@ -1022,20 +1274,21 @@ function LocationDebugPanel({
             onChange={(description) => onNewLocationChange({ ...newLocation, description })}
           />
         </div>
-        <button
-          id="create-location-button"
-          type="button"
-          onClick={onCreate}
-          className="mt-3 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-        >
-          Add Location
-        </button>
-      </div>
+        <div className="mt-3">
+          <DebugActionButton
+            id="create-location-button"
+            onClick={onCreate}
+          >
+            Add Location
+          </DebugActionButton>
+        </div>
+      </DebugCard>
 
       {locations.map((location) => (
         <LocationCardEditor
           key={`${location.key}-${location.name}-${location.description}`}
           location={location}
+          saveStatus={saveStatus[location.key] ?? "idle"}
           onSave={onSave}
         />
       ))}
@@ -1045,6 +1298,7 @@ function LocationDebugPanel({
 
 function LocationCardEditor({
   location,
+  saveStatus,
   onSave,
 }: {
   location: {
@@ -1056,51 +1310,81 @@ function LocationCardEditor({
     objects: Array<{ key: string; name: string }>;
     exits: Array<{ label: string; toLocationKey: string; toLocationName: string }>;
   };
-  onSave: (locationId: Id<"rooms">, name: string, description: string) => void;
+  saveStatus: LocationSaveStatus;
+  onSave: (
+    locationId: Id<"rooms">,
+    locationKey: string,
+    name: string,
+    description: string,
+  ) => Promise<boolean>;
 }) {
   const [name, setName] = useState(location.name);
   const [description, setDescription] = useState(location.description);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const locationDomId = `location-card-${domId(location.key)}`;
+  const fieldsId = `${locationDomId}-fields`;
 
   function saveIfChanged() {
     if (name !== location.name || description !== location.description) {
-      onSave(location._id, name, description);
+      void onSave(location._id, location.key, name, description);
     }
   }
 
   return (
-    <div id={locationDomId} className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
-      <div id={`${locationDomId}-header`}>
-        <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
-          {location.name} <span className="text-zinc-600">({location.key})</span>
-        </h4>
-        <p className="mt-2 text-xs leading-5 text-zinc-500">
-          Actors: {location.actors.map((actor) => `${actor.name} (${actor.role})`).join(", ") || "none"}
-        </p>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">
-          Objects: {location.objects.map((object) => object.name).join(", ") || "none"}
-        </p>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">
-          Exits: {location.exits.map((exit) => `${exit.label} to ${exit.toLocationName}`).join(", ") || "none"}
-        </p>
+    <DebugCard id={locationDomId}>
+      <div id={`${locationDomId}-header`} className="flex items-start justify-between gap-3">
+        <div id={`${locationDomId}-summary`} className="min-w-0">
+          <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
+            {location.name} <span className="text-zinc-600">({location.key})</span>
+          </h4>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            Actors: {location.actors.map((actor) => `${actor.name} (${actor.role})`).join(", ") || "none"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">
+            Objects: {location.objects.map((object) => object.name).join(", ") || "none"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">
+            Exits: {location.exits.map((exit) => `${exit.label} to ${exit.toLocationName}`).join(", ") || "none"}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            id={`${locationDomId}-save-status`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="text-xs uppercase text-emerald-300/60"
+          >
+            {locationSaveStatusLabel(saveStatus)}
+          </span>
+          <DebugDisclosureButton
+            id={`${locationDomId}-collapse-toggle`}
+            controlsId={fieldsId}
+            isExpanded={!isCollapsed}
+            onClick={() => setIsCollapsed((current) => !current)}
+            label={`${location.name} details`}
+          />
+        </div>
       </div>
-      <div id={`${locationDomId}-fields`} className="mt-4 space-y-4">
-        <LocationInput
-          id={`${locationDomId}-name`}
-          label="Name"
-          value={name}
-          onChange={setName}
-          onBlur={saveIfChanged}
-        />
-        <LocationTextarea
-          id={`${locationDomId}-description`}
-          label="Description"
-          value={description}
-          onChange={setDescription}
-          onBlur={saveIfChanged}
-        />
-      </div>
-    </div>
+      {!isCollapsed ? (
+        <div id={fieldsId} className="mt-4 space-y-4">
+          <LocationInput
+            id={`${locationDomId}-name`}
+            label="Name"
+            value={name}
+            onChange={setName}
+            onBlur={saveIfChanged}
+          />
+          <LocationTextarea
+            id={`${locationDomId}-description`}
+            label="Description"
+            value={description}
+            onChange={setDescription}
+            onBlur={saveIfChanged}
+          />
+        </div>
+      ) : null}
+    </DebugCard>
   );
 }
 
@@ -1162,7 +1446,7 @@ function LocationTextarea({
         rows={3}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
-        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
+        className="h-20 w-full resize-none overflow-y-auto rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
       />
     </div>
   );
@@ -1180,7 +1464,47 @@ function titleFromKey(actorKey: string) {
     : "Debug NPC";
 }
 
-function npcOverrideStatusLabel(status: NpcOverrideSaveStatus, hasOverride: boolean) {
+function defaultNpcFacts() {
+  return {
+    background: "New NPC background.",
+    persona: "New NPC personality.",
+    voice: "New NPC voice.",
+    mood: "neutral",
+    status: "present in the current scene",
+    memory: "This NPC has not yet formed meaningful memories of Taylor.",
+    knowledge: "This NPC has no private knowledge yet.",
+  };
+}
+
+function buildNpcDebugActors(
+  locations: Array<{
+    key: string;
+    name: string;
+    actors: Array<{
+      _id: Id<"actors">;
+      key: string;
+      name: string;
+      description: string;
+      role: "player" | "npc";
+    }>;
+  }>,
+): NpcDebugActor[] {
+  return locations.flatMap((location) =>
+    location.actors
+      .filter((actor): actor is typeof actor & { role: "npc" } => actor.role === "npc")
+      .map((actor) => ({
+        _id: actor._id,
+        key: actor.key,
+        name: actor.name,
+        description: actor.description,
+        role: "npc",
+        locationKey: location.key,
+        locationName: location.name,
+      })),
+  );
+}
+
+function npcSaveStatusLabel(status: NpcSaveStatus, hasDraft: boolean) {
   if (status === "unsaved") {
     return "Unsaved";
   }
@@ -1193,10 +1517,23 @@ function npcOverrideStatusLabel(status: NpcOverrideSaveStatus, hasOverride: bool
   if (status === "error") {
     return "Save failed";
   }
-  return hasOverride ? "Override active" : "Canonical";
+  return hasDraft ? "Edited" : "Canonical";
 }
 
-function NpcOverrideTextarea({
+function locationSaveStatusLabel(status: LocationSaveStatus) {
+  if (status === "saving") {
+    return "Saving";
+  }
+  if (status === "saved") {
+    return "Saved";
+  }
+  if (status === "error") {
+    return "Save failed";
+  }
+  return "Canonical";
+}
+
+function NpcDebugTextarea({
   actorKey,
   label,
   meta,
@@ -1209,7 +1546,7 @@ function NpcOverrideTextarea({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const id = `npc-override-${domId(actorKey)}-${domId(label)}`;
+  const id = `npc-debug-${domId(actorKey)}-${domId(label)}`;
 
   return (
     <div id={`${id}-field`}>
@@ -1226,7 +1563,7 @@ function NpcOverrideTextarea({
         rows={3}
         maxLength={1200}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-amber-300"
+        className="h-20 w-full resize-none overflow-y-auto rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-amber-300"
       />
     </div>
   );
@@ -1236,8 +1573,8 @@ function DebugList({ title, items }: { title: string; items: string[] }) {
   const listDomId = `debug-list-${domId(title)}`;
 
   return (
-    <div id={listDomId}>
-      <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">{title}</h3>
+    <DebugCard id={listDomId}>
+      <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">{title}</h3>
       <ul id={`${listDomId}-items`} className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
         {items.length > 0 ? (
           items.map((item, index) => <li id={`${listDomId}-item-${index + 1}`} key={`${title}-${index}`}>{item}</li>)
@@ -1245,7 +1582,7 @@ function DebugList({ title, items }: { title: string; items: string[] }) {
           <li id={`${listDomId}-empty-state`} className="text-zinc-500">None yet.</li>
         )}
       </ul>
-    </div>
+    </DebugCard>
   );
 }
 
@@ -1259,45 +1596,42 @@ function DirectorPromptControls({
   latestSummary: Record<string, unknown> | null;
 }) {
   return (
-    <section id="prompt-guidance-panel" className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
-      <div id="prompt-guidance-header" className="flex items-start justify-between gap-4">
-        <div id="prompt-guidance-title-block">
-          <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">
-            Prompt guidance
-          </h3>
-          <p className="mt-2 text-xs leading-5 text-zinc-500">
-            Editable text sections for the next Game Master turn. These guide style and behavior without changing the output schema.
-          </p>
+    <section id="prompt-guidance-panel" className="space-y-4">
+      <DebugCard id="prompt-guidance-card">
+        <DebugSectionHeader
+          id="prompt-guidance-header"
+          title="Prompt guidance"
+          description="Editable text sections for the next Game Master turn. These guide style and behavior without changing the output schema."
+          action={
+            <DebugActionButton
+              id="prompt-guidance-reset-button"
+              onClick={() => onChange(DEFAULT_PROMPT_GUIDANCE)}
+            >
+              Reset
+            </DebugActionButton>
+          }
+        />
+
+        <div id="prompt-guidance-fields" className="mt-4 space-y-4">
+          <PromptGuidanceTextarea
+            label="Style"
+            value={value.style}
+            onChange={(style) => onChange({ ...value, style })}
+          />
+          <PromptGuidanceTextarea
+            label="NPC behavior"
+            value={value.npcBehavior}
+            onChange={(npcBehavior) => onChange({ ...value, npcBehavior })}
+          />
+          <PromptGuidanceTextarea
+            label="Persistence"
+            value={value.persistence}
+            onChange={(persistence) => onChange({ ...value, persistence })}
+          />
         </div>
-        <button
-          id="prompt-guidance-reset-button"
-          type="button"
-          onClick={() => onChange(DEFAULT_PROMPT_GUIDANCE)}
-          className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-        >
-          Reset
-        </button>
-      </div>
+      </DebugCard>
 
-      <div id="prompt-guidance-fields" className="mt-4 space-y-4">
-        <PromptGuidanceTextarea
-          label="Style"
-          value={value.style}
-          onChange={(style) => onChange({ ...value, style })}
-        />
-        <PromptGuidanceTextarea
-          label="NPC behavior"
-          value={value.npcBehavior}
-          onChange={(npcBehavior) => onChange({ ...value, npcBehavior })}
-        />
-        <PromptGuidanceTextarea
-          label="Persistence"
-          value={value.persistence}
-          onChange={(persistence) => onChange({ ...value, persistence })}
-        />
-      </div>
-
-      <div id="last-game-master-summary" className="mt-5 border-t border-zinc-800 pt-4">
+      <DebugCard id="last-game-master-summary">
         <h4 className="text-xs font-medium uppercase text-zinc-500">Last Game Master summary</h4>
         <dl id="last-game-master-summary-fields" className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5">
           {latestSummary ? (
@@ -1329,7 +1663,7 @@ function DirectorPromptControls({
             <dd id="last-game-master-summary-empty-state" className="col-span-2 text-zinc-500">No Game Master turn yet.</dd>
           )}
         </dl>
-      </div>
+      </DebugCard>
     </section>
   );
 }
@@ -1359,7 +1693,7 @@ function PromptGuidanceTextarea({
         maxLength={1200}
         rows={3}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
+        className="h-20 w-full resize-none overflow-y-auto rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
       />
     </div>
   );
@@ -1369,12 +1703,12 @@ function DebugJson({ title, value }: { title: string; value: unknown }) {
   const jsonDomId = `debug-json-${domId(title)}`;
 
   return (
-    <div id={jsonDomId}>
-      <h3 className="text-sm font-medium uppercase text-zinc-400">{title}</h3>
+    <DebugCard id={jsonDomId}>
+      <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">{title}</h3>
       <pre id={`${jsonDomId}-content`} className="mt-3 max-h-80 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-3 text-xs leading-5 text-zinc-300">
         {JSON.stringify(value, null, 2)}
       </pre>
-    </div>
+    </DebugCard>
   );
 }
 

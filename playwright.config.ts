@@ -46,7 +46,7 @@ export default defineConfig({
     },
     {
       name: "lorecraft-app",
-      command: `PORT=${appPort} NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 LLM_BASE_URL=${fixtureURL}/v1 LLM_API_KEY=fixture LLM_MODEL=lorecraft-fixture-model npm run e2e:next`,
+      command: `PORT=${appPort} NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 LLM_BASE_URL=${fixtureURL}/v1 LLM_API_KEY=fixture LLM_MODEL=lorecraft-fixture-model LORECRAFT_SERVER_WRITE_TOKEN=lorecraft-e2e-local LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 npm run e2e:next`,
       url: baseURL,
       reuseExistingServer: false,
       timeout: 240_000,

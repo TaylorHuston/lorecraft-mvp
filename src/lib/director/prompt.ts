@@ -78,7 +78,6 @@ export function buildDirectorRequest(
         context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
       ),
       npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
-      ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
       npcMutationMode: "bounded_updates",
       locationKeys: prompt.knownLocations.map((location) => location.key),
       movementMode: "bounded_existing_locations",
@@ -154,7 +153,6 @@ export function buildNpcStateExtractionRequest(
         context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
       ),
       npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
-      ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
       npcMutationMode: "bounded_updates",
       locationKeys: prompt.knownLocations.map((location) => location.key),
       movementMode: "bounded_existing_locations",
@@ -416,9 +414,6 @@ function buildPromptComponents(
     promptGuidanceKeys: Object.keys(promptGuidance),
     npcProfiles,
     knownLocations,
-    npcOverrideKeys: npcProfiles.flatMap((profile) =>
-      profile.overriddenFields.map((field) => `${profile.key}.${field.replace(/^facts\./, "")}`),
-    ),
     readOnlyKnowledgeKeys,
   };
 }

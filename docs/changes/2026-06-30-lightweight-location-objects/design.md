@@ -16,6 +16,8 @@ The product vocabulary should call these places `locations`, even if the backing
 - Let the Game Master know the current location and existing movement destinations without requiring MUD-style navigation.
 - Allow validated movement of the player and present NPCs to existing locations when the player clearly attempts travel.
 - Add a debug `Locations` tab for inspecting, editing, and creating canonical demo-world locations.
+- Standardize rough debug editing so NPC and Location tabs both edit canonical Convex demo-world state and both reset cleanly.
+- Expand the seed world with a tavern and tavern NPCs to test multi-location NPC presence.
 - Keep location edits fully resettable through the demo world reset/fresh seed path.
 - Preserve transcript mode as a seed-plus-transcript comparison mode without live location state.
 
@@ -28,6 +30,7 @@ The product vocabulary should call these places `locations`, even if the backing
 - Dynamic object creation.
 - Location schedules, encounter tables, hazards, locks, combat, stats, inventory, or dungeon rules.
 - A polished World Builder or authenticated admin UI.
+- Public multi-user editing, ownership, or role-based admin permissions.
 - Moving offscreen actors or applying far-reaching consequences.
 
 ## Epic Changes
@@ -43,6 +46,7 @@ The product vocabulary should call these places `locations`, even if the backing
 - Modified: `LC-001-S1` to supersede the old no-room-mutation scenario with bounded existing-location movement.
 - Modified: `LC-001-S2` to include location context and movement validation in the provider-neutral backend boundary.
 - Modified: `LC-001-S7` to include Location Cards in active Game Master context.
+- Modified: `LC-001-S9` to make the debug `NPCs` tab use canonical Convex edits instead of temporary server-local overrides, matching the new `Locations` tab semantics.
 - Modified: `LC-001-S10` to broaden post-narration extraction from NPC-only mutation to state extraction that can also propose actor movement.
 - Removed: none.
 
@@ -178,6 +182,37 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 
 - Taylor manual browser confirmation remains pending.
 
+#### Story LC-001-S9 Refinement: Canonical NPC Debug Parity
+
+This change also refines the already-existing `LC-001-S9` debug NPC workflow so that NPC editing follows the same canonical, resettable model as Location editing.
+
+##### Updated Requirement R3: Debug NPC Inspection And Editing
+
+The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creating, and resetting canonical demo-world NPC values.
+
+###### Scenario R3-S1: Debug panel shows NPC fields
+
+- WHEN a world is seeded and the debug panel is open
+- THEN the `NPCs` tab lists current NPCs with their key, name, description, location, and readable attributes.
+
+###### Scenario R3-S2: Debug edit affects Game Master context
+
+- WHEN Taylor edits an NPC value in the debug `NPCs` tab
+- THEN the saved canonical Convex actor row or actor fact is used by the next persistent Game Master request
+- AND the debug UI makes save/reset status visible.
+
+###### Scenario R3-S3: Debug edits are resettable
+
+- WHEN Taylor uses Reset Session or Reset World
+- THEN seeded NPC values and seeded actor locations are restored
+- AND debug-created NPCs are removed from the demo world.
+
+###### Scenario R3-S4: Debug create adds a current-location NPC
+
+- WHEN Taylor creates an NPC from the debug `NPCs` tab
+- THEN the system creates a canonical NPC actor in the player's current location with a stable key, name, description, and editable profile facts
+- AND that NPC can appear in the next persistent Game Master request when present in the current scene.
+
 ## Epic File Rules
 
 - Stories live inside the Epic `epic.md` file.
@@ -212,7 +247,11 @@ The backend should validate every proposed actor move. Accepted moves must requi
 
 Clear travel eligibility should be derived before extraction from the player input and current known locations. Unknown destination attempts should influence story guidance: the Game Master may say the destination is not clear, not reachable from current context, or needs more information, but the backend must not create a new location or accept a move. The system should not require exits or links for this change; any existing location is an eligible target once the player clearly attempts travel.
 
-Add a debug `Locations` tab to the existing debug drawer. Unlike NPC overrides, location edits should persist to Convex because actor movement needs real location IDs. This is still local/dev tooling, not a polished World Builder. Existing location keys should remain stable after creation; name and description are editable. New debug-created locations should require a stable key, name, and description, and should be fully removable by resetting the demo world to its seed.
+Add a debug `Locations` tab to the existing debug drawer. Location edits should persist to Convex because actor movement needs real location IDs, matching the debug `NPCs` tab's canonical demo-world editing model. This is still local/dev tooling, not a polished World Builder. Existing location keys should remain stable after creation; name and description are editable. New debug-created locations should require a stable key, name, and description, and should be fully removable by resetting the demo world to its seed.
+
+Convert the existing NPC debug override path into canonical Convex debug writes. Debug NPC edits should save actor name/description and actor facts directly. Debug NPC creation should place a new NPC in the player's current location so it can be tested immediately. Reset Session and fresh seed should restore seeded NPCs and remove debug-created NPCs. Clearing a debug-edited NPC fact should remove or clear that canonical value rather than silently preserving the old one.
+
+Seed an additional tavern location with tavern NPCs so the test world has more than one populated scene. This remains authored seed content, not dynamic model-created content.
 
 Keep transcript mode unchanged. It should continue to omit live location state and should not run location movement extraction.
 
@@ -228,6 +267,8 @@ Keep transcript mode unchanged. It should continue to omit live location state a
   - Why not: dynamic creation of locations and NPCs is deferred. Current movement should fail closed against canonical existing locations.
 - Store debug location edits as server-local overrides:
   - Why not: movement needs durable target IDs. Canonical Convex rows keep the debug editing loop aligned with movement validation.
+- Keep NPC debug edits as server-local overrides:
+  - Why not: NPC and Location debug editing should use one consistent model. Canonical debug NPC edits are easier to inspect in prompt context, reset behavior, and deterministic tests than a parallel override store.
 
 ## Why This Approach
 
@@ -238,11 +279,13 @@ This approach follows the lesson from NPC mutation: keep prose and state mutatio
 - Do not add dungeon schema, dungeon UI, or path enforcement.
 - Do not require typed movement commands or slash commands.
 - Do not dynamically create locations or NPCs from Game Master output.
+- Do not expose debug editing as a production-ready public admin API.
 - Do not move offscreen actors.
 - Do not accept actor movement unless the player input clearly attempts travel and the narration confirms the move.
 - Do not allow movement to unknown/nonexistent locations.
 - Do not run location movement extraction in transcript mode.
 - Keep debug location editing resettable through the demo world reset/fresh seed path.
+- Keep debug NPC editing resettable through the same demo world reset/fresh seed path.
 - Keep player-facing UI prose-first; location state is debug-visible for now.
 
 ## Verification Strategy
@@ -252,7 +295,8 @@ This approach follows the lesson from NPC mutation: keep prose and state mutatio
 - Add parser/validation tests for accepted player movement, accepted present-NPC movement, rejected unknown destination, rejected unknown actor, rejected offscreen NPC, and no movement when player input is not a clear travel action.
 - Add Convex/domain tests or integration-style tests proving accepted moves patch actor `roomId` and write turn-scoped `moveActor` diffs.
 - Add tests or browser coverage for the debug `Locations` tab editing and creating canonical locations.
-- Verify reset/fresh seed restores seeded locations, removes debug-created locations, and resets actor locations.
+- Add tests or browser coverage for canonical debug NPC edit/create/reset behavior when practical.
+- Verify reset/fresh seed restores seeded locations and NPCs, removes debug-created locations/NPCs, and resets actor locations.
 - Run `npm run ci:required`.
 - Run `npm run e2e` if the deterministic flow is updated to cover location debug or movement.
 - Run a local `npm run dev:debug` playtest and inspect raw turn logs for one accepted move and one unknown-location attempt.
@@ -267,6 +311,7 @@ This approach follows the lesson from NPC mutation: keep prose and state mutatio
 - Movement requires clear player travel action; the Game Master cannot relocate actors autonomously.
 - Current movement does not require exits or linked paths.
 - The debug `Locations` tab edits canonical Convex state, not server-local overrides.
+- The debug `NPCs` tab edits canonical Convex state, not server-local overrides.
 - Existing location keys are stable after creation.
 - Location state is debug-visible only for now; a player-facing status widget is deferred.
 - Dungeon mode is deferred future scope.
@@ -276,5 +321,6 @@ This approach follows the lesson from NPC mutation: keep prose and state mutatio
 - Expanding the extractor from NPC updates to actor movement increases validation complexity. The mitigation is a narrow allowlist and focused tests.
 - Any-existing-location movement may feel too permissive once the world grows. That is intentional for this phase and can later be replaced by link/path constraints.
 - Canonical debug editing is rough and local-first; without auth or a polished builder it should remain debug tooling.
+- Canonical debug NPC and Location writes are intentionally local/dev-oriented. Before a remote shared deployment, they need auth, ownership, or a hardened local-only gate.
 - Reset semantics must be clear so playtest edits do not become mistaken for durable authored world content.
 - Prompt context may grow as locations increase. For the MVP, all existing locations are acceptable; retrieval/filtering can come later.
