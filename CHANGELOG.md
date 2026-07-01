@@ -8,6 +8,7 @@ The format is based on Keep a Changelog 1.1.0.
 
 ### Added
 
+- Deterministic Playwright E2E coverage for the Lorecraft playtest loop using a local OpenAI-compatible fixture provider.
 - Post-narration NPC state extraction for persistent mode, with bounded validated updates for NPC `mood`, `status`, and `memory`.
 - Game Master call roles in debug metadata so story generation and NPC-state extraction can be inspected separately for the same turn.
 

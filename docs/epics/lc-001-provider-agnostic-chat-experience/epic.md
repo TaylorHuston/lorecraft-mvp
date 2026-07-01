@@ -76,11 +76,12 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 - Runtime `curl http://localhost:3000` under `npm run dev` returned the narrative UI HTML.
 - Runtime POST to `/api/director/turn` with local Ollama `llama3.1:8b` returned a persisted Game Master narration.
 - `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed player input, Game Master narration, and event feed entries ordered from persisted rows.
+- `npm run e2e` passed with browser assertions for seeded world readiness, narrative input submission, pending state, persisted reload, debug turn evidence, and reset reuse.
 
 ### Verification Gaps
 
 - No unresolved implementation gap for this Story.
-- Full browser click automation is not yet installed; verification used route-level HTTP checks, Convex snapshot reads, and build/lint/type checks.
+- No unresolved browser automation gap for the current MVP play-feed path.
 
 ## Story LC-001-S2: Provider-Agnostic Backend Game Master Boundary
 
@@ -1126,6 +1127,123 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 - `npm run dev:debug` plus `npm run playtest:director` passed in persistent mode, producing `story_generation` and `npc_state_extraction` records for both a direct Mira question and a trivial jump.
 - Latest local log inspection showed the direct Mira question accepted one bounded `memory` update and the trivial jump returned `{"npcUpdates":[]}`.
 - Convex snapshot inspection of the latest playtest world showed Mira's actor-scoped `memory` fact updated with `source: "llm"` and one turn-scoped state diff/event for the accepted extraction.
+
+### Verification Gaps
+
+- Taylor manual browser confirmation remains pending.
+
+## Story LC-001-S11: End To End Playtest Verification
+
+As a developer-playtester, I want deterministic browser E2E coverage of the Lorecraft playtest loop, so that UI, backend route, Convex state, and provider-shaped Game Master behavior can be verified together.
+
+### Requirement R1: Browser Playtest Flow
+
+The system SHALL provide a Playwright E2E suite that verifies the core seeded-world playtest loop in a browser.
+
+#### Scenario R1-S1: Seeded world can start the playtest
+
+- WHEN the E2E suite opens the app with no usable playtest state
+- THEN it can seed or reset the Stormbound Chapel demo world through the visible app workflow
+- AND the story surface becomes ready for narrative input
+
+#### Scenario R1-S2: Player submits a narrative turn
+
+- WHEN the E2E suite enters player text into `What do you do next?`
+- AND submits with Enter
+- THEN the input clears promptly
+- AND duplicate submission is prevented while the turn is pending
+- AND a Game Master response appears in the story stream
+
+#### Scenario R1-S3: Reload preserves the turn
+
+- WHEN a successful E2E turn has been persisted
+- AND the page reloads
+- THEN the player input, Game Master narration, and turn number remain visible or inspectable from persisted state
+
+### Requirement R2: Debug And Reset Verification
+
+The system SHALL verify the debug/test controls that make local playtesting diagnosable.
+
+#### Scenario R2-S1: Debug drawer toggles without breaking play
+
+- WHEN the E2E suite toggles the top-bar debug gear
+- THEN the debug drawer opens and closes without trapping focus in hidden controls
+- AND the story stream remains usable for narrative input
+
+#### Scenario R2-S2: Debug turn evidence is visible
+
+- WHEN a successful E2E turn completes
+- THEN the debug surface exposes current turn/Game Master evidence for that turn
+- AND the evidence identifies the deterministic fixture model or provider without exposing secrets
+
+#### Scenario R2-S3: Reset returns to a clean playtest state
+
+- WHEN the E2E suite invokes the appropriate reset control
+- THEN persisted playtest history is cleared or reseeded according to the control's documented meaning
+- AND the app returns to a state where another deterministic turn can be submitted
+
+### Requirement R3: Deterministic Provider Fixture
+
+The system SHALL allow E2E tests to drive the real backend provider adapter without depending on a real model.
+
+#### Scenario R3-S1: Fixture provider returns story prose
+
+- WHEN Playwright runs deterministic E2E
+- THEN the app uses an OpenAI-compatible local fixture endpoint via `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`
+- AND the story-generation call returns stable non-empty prose
+
+#### Scenario R3-S2: Fixture provider returns extraction output
+
+- WHEN persistent mode runs the post-narration NPC-state extractor during E2E
+- THEN the fixture can return stable JSON for the extractor call
+- AND E2E can verify either no durable update or one expected bounded update without relying on model judgment
+
+#### Scenario R3-S3: Fixture requests remain inspectable
+
+- WHEN local debug logging is enabled for E2E
+- THEN logged or persisted Game Master call metadata identifies fixture-backed story/extraction calls
+- AND secrets, API keys, and full environment dumps remain excluded
+
+### Requirement R4: CI And Script Boundaries
+
+The system SHALL expose clear scripts for cheap required checks, deterministic E2E, and optional live-provider playtests.
+
+#### Scenario R4-S1: Required CI remains cheap
+
+- WHEN `npm run ci:required` runs
+- THEN it continues to execute lint, unit tests, typecheck, and build
+- AND it does not require a browser, Convex dev server, or LLM provider unless a later accepted CI policy change says otherwise
+
+#### Scenario R4-S2: Deterministic E2E has a dedicated script
+
+- WHEN a developer runs the new E2E script
+- THEN it starts or targets the required app/test-provider services
+- AND runs the Playwright smoke suite with deterministic provider behavior
+
+#### Scenario R4-S3: Live-provider playtests remain optional
+
+- WHEN a developer wants to evaluate local model behavior
+- THEN existing or updated playtest scripts can still call the configured live model
+- AND failures are treated as model/runtime diagnostics rather than deterministic E2E failures
+
+### Implemented By
+
+- `playwright.config.ts` configures a single Chromium E2E project, app base URL, fixture LLM service, and local Convex/Next dev server startup.
+- `scripts/llm-fixture-server.mjs` provides the deterministic OpenAI-compatible chat completions fixture for story-generation and NPC-state extraction calls.
+- `scripts/e2e-next-server.mjs` builds and runs the Next app on the E2E test port with signal handling for clean Playwright shutdown.
+- `tests/e2e/lorecraft-playtest.spec.ts` drives the browser through seeding/reset, narrative input, pending state, persisted reload state, debug drawer toggling, turn evidence, and reset reuse.
+- `src/app/world-client.tsx` distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E.
+- `vitest.config.ts` keeps Playwright specs out of the Vitest unit-test suite.
+- `package.json` exposes `npm run e2e`, `npm run e2e:install`, fixture, Convex, and Next startup scripts while leaving `npm run ci:required` unchanged.
+
+### Verified By
+
+- `npm run typecheck` passed after adding Playwright config and E2E tests.
+- `npm run lint` passed after adding Playwright config and E2E tests.
+- `npm run e2e:install` installed the local Chromium browser for Playwright.
+- `npm run e2e` passed after adding deterministic fixture provider, split Convex/Next server startup, and browser assertions for seed/reset, Enter submission, pending state, persisted reload state, debug drawer toggling, Game Master call evidence, accepted NPC memory extraction evidence, and reset reuse.
+- `npm run ci:required` passed after excluding Playwright specs from Vitest unit-test discovery.
+- During `/sdd-review`, `npm run e2e` initially reproduced a seed-button race against persisted local Convex state; after adding the default-world loading state, `npm run ci:required` and `npm run e2e` passed.
 
 ### Verification Gaps
 

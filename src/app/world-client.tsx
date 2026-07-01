@@ -77,6 +77,7 @@ export function WorldClient() {
   const nextDebugNpcOrdinal = useRef(1);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
+  const isLoadingDefaultWorld = selectedWorldId === null && defaultWorldId === undefined;
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
@@ -369,7 +370,11 @@ export function WorldClient() {
           className="flex h-[calc(100vh-3rem)] min-h-0 flex-col"
         >
           <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
-            {!worldId ? (
+            {isLoadingDefaultWorld ? (
+              <p id="default-world-loading-state" className="text-zinc-400">
+                Loading world state...
+              </p>
+            ) : !worldId ? (
               <div
                 id="seed-world-empty-state"
                 className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4"

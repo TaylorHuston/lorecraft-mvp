@@ -94,6 +94,24 @@ When the app is running in transcript mode, run the no-mutation smoke check:
 npm run playtest:director:transcript
 ```
 
+Install the local Chromium browser used by Playwright E2E once:
+
+```bash
+npm run e2e:install
+```
+
+Run the deterministic browser E2E smoke check:
+
+```bash
+npm run e2e
+```
+
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It builds and runs Next on a separate port so it can run without stopping an already-running `next dev` server for normal playtesting. It verifies the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the persisted story, inspect debug turn evidence, and reset for another turn. This path is deterministic and does not call Ollama, OpenRouter, Vercel AI Gateway, or any hosted model.
+
+The E2E script is intentionally local-only and destructive against its local test state. `LORECRAFT_E2E_BASE_URL` must point to the configured local E2E app origin, which defaults to `http://127.0.0.1:3101`, and the local Convex port `3210` must be free so Playwright starts the intended anonymous E2E Convex service instead of reusing an existing playtest backend.
+
+Live-provider playtest scripts remain separate because they evaluate local model/runtime behavior rather than deterministic browser integration.
+
 ## What Is Scaffolded
 
 - `convex/schema.ts` defines the persistent-world tables.
@@ -102,6 +120,7 @@ npm run playtest:director:transcript
 - `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
 - `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
 - `src/app/providers.tsx` wires the Convex React provider into the App Router root.
+- `playwright.config.ts`, `scripts/llm-fixture-server.mjs`, and `tests/e2e/` provide deterministic browser E2E coverage of the current playtest loop.
 
 Persistent story generation remains plain prose. NPC `mood`, `status`, and `memory` can be updated only by the separate post-narration extractor after Convex validates the actor, field, value, and scene boundary.
 

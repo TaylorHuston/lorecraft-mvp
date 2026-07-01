@@ -12,6 +12,11 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "ci:required": "npm run lint && npm run test && npm run typecheck && npm run build",
+    "e2e": "playwright test",
+    "e2e:convex": "CONVEX_AGENT_MODE=anonymous convex dev",
+    "e2e:fixture": "node scripts/llm-fixture-server.mjs",
+    "e2e:install": "playwright install chromium",
+    "e2e:next": "node scripts/e2e-next-server.mjs",
     "playtest:director": "node scripts/director-playtest.mjs",
     "start": "next start",
     "lint": "eslint",
@@ -27,6 +32,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
