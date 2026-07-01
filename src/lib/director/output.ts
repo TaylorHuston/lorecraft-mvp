@@ -1,12 +1,17 @@
 import {
   NPC_FACT_KEYS,
+  type AcceptedActorMove,
   type AcceptedNpcFactChange,
   type AcceptedNpcUpdate,
   type DirectorActor,
+  type DirectorKnownLocation,
+  type IgnoredActorMove,
   type IgnoredNpcUpdate,
+  type ParsedActorMove,
   type ParsedDirectorOutput,
   type ParsedNpcUpdate,
   type RequiredSceneBeat,
+  type ValidatedActorMoves,
   type ValidatedNpcUpdates,
 } from "./types";
 
@@ -19,6 +24,10 @@ export type DirectorParseResult =
 
 export type NpcStateExtractionParseResult =
   | { ok: true; npcUpdates: ParsedNpcUpdate[] }
+  | { ok: false; error: string };
+
+export type StateExtractionParseResult =
+  | { ok: true; npcUpdates: ParsedNpcUpdate[]; actorMoves: ParsedActorMove[] }
   | { ok: false; error: string };
 
 export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
@@ -109,6 +118,14 @@ function findLastSentenceEnd(text: string) {
 }
 
 export function parseNpcStateExtractionOutput(rawOutput: string): NpcStateExtractionParseResult {
+  const result = parseStateExtractionOutput(rawOutput);
+  if (!result.ok) {
+    return result;
+  }
+  return { ok: true, npcUpdates: result.npcUpdates };
+}
+
+export function parseStateExtractionOutput(rawOutput: string): StateExtractionParseResult {
   const trimmed = rawOutput.trim();
   if (!trimmed) {
     return { ok: false, error: "NPC state extractor returned an empty response." };
@@ -129,10 +146,15 @@ export function parseNpcStateExtractionOutput(rawOutput: string): NpcStateExtrac
   if (!Array.isArray(rawUpdates)) {
     return { ok: false, error: '"npcUpdates" must be an array when provided.' };
   }
+  const rawMoves = parsed.actorMoves ?? [];
+  if (!Array.isArray(rawMoves)) {
+    return { ok: false, error: '"actorMoves" must be an array when provided.' };
+  }
 
   return {
     ok: true,
     npcUpdates: rawUpdates.map(normalizeNpcUpdate),
+    actorMoves: rawMoves.map(normalizeActorMove),
   };
 }
 
@@ -251,6 +273,104 @@ export function applySceneBeatPersistenceBoundary(
   };
 }
 
+export function validateActorMoves(
+  parsedMoves: ParsedActorMove[],
+  currentSceneActors: DirectorActor[],
+  knownLocations: DirectorKnownLocation[],
+  playerInput: string,
+  narration: string,
+): ValidatedActorMoves {
+  const actorsByKey = new Map(currentSceneActors.map((actor) => [actor.key, actor]));
+  const locationsByKey = new Map(knownLocations.map((location) => [location.key, location]));
+  const acceptedMoves: AcceptedActorMove[] = [];
+  const ignoredMoves: IgnoredActorMove[] = [];
+
+  for (const move of parsedMoves) {
+    const actorKey = move.actorKey.trim();
+    const toLocationKey = move.toLocationKey.trim();
+
+    if (!actorKey) {
+      ignoredMoves.push({ reason: "Actor move did not include a valid actorKey." });
+      continue;
+    }
+
+    const actor = actorsByKey.get(actorKey);
+    if (!actor) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey: toLocationKey || undefined,
+        reason: "Actor move actor is unknown or not in the current scene.",
+      });
+      continue;
+    }
+
+    if (actor.role !== "player" && actor.role !== "npc") {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey: toLocationKey || undefined,
+        reason: "Actor move actor role is not allowed.",
+      });
+      continue;
+    }
+
+    const location = locationsByKey.get(toLocationKey);
+    if (!location) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey: toLocationKey || undefined,
+        reason: "Actor move destination is unknown.",
+      });
+      continue;
+    }
+
+    if (typeof move.reason !== "string" || move.reason.trim().length === 0) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey,
+        reason: "Actor move did not include a human-readable reason.",
+      });
+      continue;
+    }
+
+    if (!inputClearlyAttemptsTravel(playerInput, location)) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey,
+        reason: "Player input did not clearly attempt travel to this location.",
+      });
+      continue;
+    }
+
+    if (!narrationConfirmsArrival(narration, location)) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey,
+        reason: "Game Master narration did not confirm arrival at this location.",
+      });
+      continue;
+    }
+
+    if (actor.role === "npc" && !narrationConfirmsNpcMovement(narration, actor)) {
+      ignoredMoves.push({
+        actorKey,
+        toLocationKey,
+        reason: "Game Master narration did not explicitly confirm this NPC moved.",
+      });
+      continue;
+    }
+
+    acceptedMoves.push({
+      actorKey,
+      actorName: actor.name,
+      toLocationKey,
+      toLocationName: location.name,
+      reason: move.reason.trim(),
+    });
+  }
+
+  return { acceptedMoves, ignoredMoves };
+}
+
 function normalizeNpcUpdate(update: unknown): ParsedNpcUpdate {
   if (!isRecord(update)) {
     return { actorKey: "", reason: "", changes: {} };
@@ -261,6 +381,72 @@ function normalizeNpcUpdate(update: unknown): ParsedNpcUpdate {
     reason: typeof update.reason === "string" ? update.reason : "",
     changes: isRecord(update.changes) ? update.changes : {},
   };
+}
+
+function normalizeActorMove(move: unknown): ParsedActorMove {
+  if (!isRecord(move)) {
+    return { actorKey: "", toLocationKey: "", reason: "" };
+  }
+
+  return {
+    actorKey: typeof move.actorKey === "string" ? move.actorKey : "",
+    toLocationKey: typeof move.toLocationKey === "string" ? move.toLocationKey : "",
+    reason: typeof move.reason === "string" ? move.reason : "",
+  };
+}
+
+function inputClearlyAttemptsTravel(playerInput: string, location: DirectorKnownLocation) {
+  const input = normalizeForMatching(playerInput);
+  const travelVerb = /\b(go|walk|run|travel|head|enter|leave|return|move|step|cross|follow)\b/.test(input);
+  if (!travelVerb) {
+    return false;
+  }
+
+  return locationMentioned(input, location);
+}
+
+function narrationConfirmsArrival(narration: string, location: DirectorKnownLocation) {
+  const normalizedNarration = normalizeForMatching(narration);
+  if (!locationMentioned(normalizedNarration, location)) {
+    return false;
+  }
+
+  return /\b(reach|reaches|reached|arrive|arrives|arrived|enter|enters|entered|inside|in|into|step|steps|stepped|cross|crosses|crossed)\b/.test(
+    normalizedNarration,
+  );
+}
+
+function narrationConfirmsNpcMovement(narration: string, actor: DirectorActor) {
+  const normalizedNarration = normalizeForMatching(narration);
+  const actorMentioned = [actor.key, actor.name].some((label) =>
+    wordAppears(normalizedNarration, normalizeForMatching(label)),
+  );
+  if (!actorMentioned) {
+    return false;
+  }
+
+  return /\b(follow|follows|followed|accompany|accompanies|accompanied|come with|comes with|came with|joins|joined|leave|leaves|left|goes|went|walks|walked|steps|stepped|enters|entered|moves|moved|travels|traveled)\b/.test(
+    normalizedNarration,
+  );
+}
+
+function locationMentioned(text: string, location: DirectorKnownLocation) {
+  return [location.key, location.name].some((label) => wordAppears(text, normalizeForMatching(label)));
+}
+
+function normalizeForMatching(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function wordAppears(text: string, word: string) {
+  if (!word) {
+    return false;
+  }
+  return new RegExp(`(^|\\s)${escapeRegExp(word)}($|\\s)`).test(text);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

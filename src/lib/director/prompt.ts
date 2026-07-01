@@ -78,8 +78,9 @@ export function buildDirectorRequest(
         context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
       ),
       npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
-      ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
       npcMutationMode: "bounded_updates",
+      locationKeys: prompt.knownLocations.map((location) => location.key),
+      movementMode: "bounded_existing_locations",
       readOnlyKnowledgeKeys: prompt.readOnlyKnowledgeKeys,
       requiredSceneBeat: {
         kind: prompt.requiredSceneBeat.kind,
@@ -118,6 +119,8 @@ export function buildNpcStateExtractionRequest(
     ? { ...options.generationSettings, responseFormat: "json_object" as const }
     : undefined;
   const userPrompt = buildNpcStateExtractionUserPrompt({
+    locationCard: prompt.components.locationCard,
+    knownLocations: prompt.components.knownLocations,
     npcCards: prompt.components.npcCards,
     recentFeed: prompt.components.recentFeed,
     playerInput,
@@ -150,8 +153,9 @@ export function buildNpcStateExtractionRequest(
         context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
       ),
       npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
-      ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
       npcMutationMode: "bounded_updates",
+      locationKeys: prompt.knownLocations.map((location) => location.key),
+      movementMode: "bounded_existing_locations",
       readOnlyKnowledgeKeys: prompt.readOnlyKnowledgeKeys,
       requiredSceneBeat: {
         kind: prompt.requiredSceneBeat.kind,
@@ -165,6 +169,8 @@ export function buildNpcStateExtractionRequest(
       ...(options.sceneBeatReason ? { sceneBeatReason: options.sceneBeatReason } : {}),
       promptComponentKeys: [
         "extractionInstructions",
+        "locationCard",
+        "knownLocations",
         "npcCards",
         "recentStory",
         "currentInput",
@@ -338,6 +344,17 @@ function buildPromptComponents(
   };
   const npcProfiles = context.npcProfiles ?? buildNpcProfiles(context.actors);
   const npcCards = npcProfiles.map(toNpcCard);
+  const locationCard = context.locationCard ?? fallbackLocationCard(context);
+  const knownLocations =
+    context.knownLocations ??
+    [
+      {
+        id: context.room.id,
+        key: context.room.key,
+        name: context.room.name,
+        description: context.room.description,
+      },
+    ];
   const conversationFocus = buildConversationFocus(context.actors, recentFeed, requiredSceneBeat);
   const readOnlyKnowledgeKeys = npcProfiles.flatMap((profile) =>
     profile.attributes
@@ -373,6 +390,8 @@ function buildPromptComponents(
         key: context.player.key,
       },
     },
+    locationCard,
+    knownLocations,
     npcCards,
     conversationFocus,
     recentFeed: recentFeed.map((entry) => ({
@@ -394,9 +413,7 @@ function buildPromptComponents(
     requiredSceneBeat,
     promptGuidanceKeys: Object.keys(promptGuidance),
     npcProfiles,
-    npcOverrideKeys: npcProfiles.flatMap((profile) =>
-      profile.overriddenFields.map((field) => `${profile.key}.${field.replace(/^facts\./, "")}`),
-    ),
+    knownLocations,
     readOnlyKnowledgeKeys,
   };
 }
@@ -478,6 +495,7 @@ function buildPersistentAiInstructions({
     "Prefer complete sentences and a clean stopping point over extra detail.",
     "Resolve Current Input before advancing; do not merely restate it.",
     "Stop after resolving the current input; do not continue into the player's next action.",
+    "Treat Location Cards as canonical scene truth. Known Locations are the only valid movement destinations; do not invent new locations.",
     "Treat NPC Cards as canonical story memory, including descriptions, personality, voice, current status, memory, and private knowledge.",
     "Keep fleeting gestures and reactions in narration. Durable NPC state is evaluated separately after this prose.",
   ];
@@ -511,6 +529,8 @@ function buildPersistentAiInstructions({
 function buildPersistentUserPrompt(components: {
   aiInstructions: string[];
   scene: PersistentPromptScene;
+  locationCard: NonNullable<DirectorContext["locationCard"]>;
+  knownLocations: NonNullable<DirectorContext["knownLocations"]>;
   npcCards: PromptNpcCard[];
   recentFeed: PromptFeedEntry[];
   lastAction: { rawInput: string };
@@ -518,6 +538,8 @@ function buildPersistentUserPrompt(components: {
   return buildSectionedPrompt([
     ["AI Instructions", bulletList(components.aiInstructions)],
     ["World", formatPersistentScene(components.scene)],
+    ["Location Card", formatLocationCard(components.locationCard)],
+    ["Known Locations", formatKnownLocations(components.knownLocations)],
     ["NPC Cards", formatNpcCards(components.npcCards)],
     ["Recent Story", formatRecentStory(components.recentFeed)],
     ["Current Input", `> ${components.lastAction.rawInput}`],
@@ -526,6 +548,8 @@ function buildPersistentUserPrompt(components: {
 }
 
 function buildNpcStateExtractionUserPrompt(components: {
+  locationCard: NonNullable<DirectorContext["locationCard"]>;
+  knownLocations: NonNullable<DirectorContext["knownLocations"]>;
   npcCards: PromptNpcCard[];
   recentFeed: PromptFeedEntry[];
   playerInput: string;
@@ -540,6 +564,9 @@ function buildNpcStateExtractionUserPrompt(components: {
     "Do not update description, background, persona, voice, knowledge, location, inventory, health, or rules-like stats.",
     "Do not update for momentary gestures, incidental movement, eye contact, posture, tone, or obvious reactions that the recent story already covers.",
     "Do not invent hidden consequences. If no durable NPC state changed, return an empty npcUpdates array.",
+    "Actor movement is separate from NPC facts. Propose actorMoves only when Current Input clearly attempts travel and the completed narration confirms the actor reached or entered an existing Known Location.",
+    "Allowed actorMoves actors: the player and NPCs present in the Location Card.",
+    "Allowed actorMoves destinations: Known Locations only. Never create a location.",
   ];
 
   if (!components.requiredSceneBeat.allowsNpcUpdates) {
@@ -550,19 +577,30 @@ function buildNpcStateExtractionUserPrompt(components: {
 
   return buildSectionedPrompt([
     ["Extraction Instructions", bulletList(instructions)],
+    ["Location Card", formatLocationCard(components.locationCard)],
+    ["Known Locations", formatKnownLocations(components.knownLocations)],
     ["NPC Cards", formatNpcCards(components.npcCards)],
     ["Recent Story", formatRecentStory(components.recentFeed)],
     ["Current Input", `> ${components.playerInput}`],
     ["Game Master Narration", components.narration],
     [
       "Output",
-      'Return exactly one JSON object shaped like {"npcUpdates":[{"actorKey":"mira","reason":"brief human-readable reason","changes":{"mood":"new mood","status":"new status","memory":"updated compact memory"}}]}. Use {"npcUpdates":[]} when nothing durable changed.',
+      'Return exactly one JSON object shaped like {"npcUpdates":[{"actorKey":"mira","reason":"brief human-readable reason","changes":{"mood":"new mood","status":"new status","memory":"updated compact memory"}}],"actorMoves":[{"actorKey":"taylor","toLocationKey":"vestry","reason":"brief human-readable reason"}]}. Use {"npcUpdates":[],"actorMoves":[]} when nothing durable changed.',
     ],
   ]);
 }
 
 function persistentPromptSectionKeys() {
-  return ["aiInstructions", "world", "npcCards", "recentStory", "currentInput", "output"];
+  return [
+    "aiInstructions",
+    "world",
+    "locationCard",
+    "knownLocations",
+    "npcCards",
+    "recentStory",
+    "currentInput",
+    "output",
+  ];
 }
 
 function buildTranscriptUserPrompt(components: {
@@ -654,6 +692,78 @@ function formatNpcCards(npcCards: PromptNpcCard[]) {
   }
 
   return npcCards.map((npcCard) => npcCard.card).join("\n\n");
+}
+
+function formatLocationCard(location: NonNullable<DirectorContext["locationCard"]>) {
+  const lines = [
+    `LOCATION CARD: ${location.name} (${location.key})`,
+    `Description: ${location.description}`,
+  ];
+
+  if (location.facts.length > 0) {
+    lines.push(
+      `Facts: ${location.facts
+        .map((fact) => `${fact.key}=${String(fact.value)} (${fact.source})`)
+        .join("; ")}`,
+    );
+  }
+
+  if (location.presentActors.length > 0) {
+    lines.push(
+      `Present actors: ${location.presentActors
+        .map((actor) => `${actor.name} (${actor.key}, ${actor.role})`)
+        .join("; ")}`,
+    );
+  }
+
+  if (location.visibleObjects.length > 0) {
+    lines.push(
+      `Visible objects: ${location.visibleObjects
+        .map((object) => `${object.name} (${object.key}) - ${object.description}`)
+        .join("; ")}`,
+    );
+  }
+
+  if (location.visibleExits.length > 0) {
+    lines.push(
+      `Visible exits: ${location.visibleExits
+        .map((exit) => `${exit.label} to ${exit.toLocationName} (${exit.toLocationKey})`)
+        .join("; ")}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function formatKnownLocations(locations: NonNullable<DirectorContext["knownLocations"]>) {
+  if (locations.length === 0) {
+    return "No known movement destinations.";
+  }
+
+  return locations
+    .map((location) => `- ${location.name} (${location.key}): ${location.description}`)
+    .join("\n");
+}
+
+function fallbackLocationCard(context: DirectorContext): NonNullable<DirectorContext["locationCard"]> {
+  return {
+    id: context.room.id,
+    key: context.room.key,
+    name: context.room.name,
+    description: context.room.description,
+    facts: [],
+    visibleObjects: context.objects,
+    visibleExits: context.exits.map((exit) => ({
+      label: exit.label,
+      toLocationKey: normalizeForMatching(exit.toRoomName).replace(/\s+/g, "-"),
+      toLocationName: exit.toRoomName,
+    })),
+    presentActors: context.actors.map((actor) => ({
+      key: actor.key,
+      name: actor.name,
+      role: actor.role,
+    })),
+  };
 }
 
 function formatRecentStory(feed: PromptFeedEntry[]) {

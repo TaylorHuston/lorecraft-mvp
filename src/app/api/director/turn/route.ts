@@ -10,14 +10,13 @@ import {
 } from "@/lib/director/prompt";
 import {
   applySceneBeatPersistenceBoundary,
-  parseNpcStateExtractionOutput,
+  parseStateExtractionOutput,
   parsePlainProseDirectorOutput,
+  validateActorMoves,
   validateNpcUpdates,
 } from "@/lib/director/output";
 import { ProviderError, readLlmConfig, requestOpenAICompatibleChat } from "@/lib/director/provider";
 import { validateNarrativeInput } from "@/lib/director/input";
-import { getNpcDebugOverrides } from "@/lib/director/npc-debug-overrides";
-import { applyNpcDebugOverrides } from "@/lib/director/npc-profiles";
 import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
 import type { DirectorContext, TranscriptDirectorContext } from "@/lib/director/types";
@@ -38,6 +37,23 @@ type TurnResponse =
 
 export async function POST(request: Request) {
   const startedAt = performance.now();
+  if (!isLocalDirectorRequest(request)) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "director_route_guard",
+      error: "Director turns are only enabled for local development requests by default.",
+      httpStatus: 403,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
+    return json<TurnResponse>(
+      {
+        ok: false,
+        error: "Director turns are only enabled for local development requests by default.",
+      },
+      403,
+    );
+  }
+
   const bodyResult = await readBody(request);
   if (!bodyResult.ok) {
     await logDirectorTurn({
@@ -98,6 +114,8 @@ export async function POST(request: Request) {
   const { worldId, input } = bodyResult.body;
   const convex = convexResult.client;
   const directorMode = modeResult.mode;
+  const serverWriteToken = process.env.LORECRAFT_SERVER_WRITE_TOKEN?.trim() || undefined;
+  const serverWriteArgs = serverWriteToken ? { serverWriteToken } : {};
 
   let context:
     | Awaited<ReturnType<typeof convex.query<typeof api.world.getDirectorContext>>>
@@ -105,8 +123,8 @@ export async function POST(request: Request) {
   try {
     context =
       directorMode === "transcript"
-        ? await convex.query(api.world.getTranscriptDirectorContext, { worldId })
-        : await convex.query(api.world.getDirectorContext, { worldId });
+        ? await convex.query(api.world.getTranscriptDirectorContext, { worldId, ...serverWriteArgs })
+        : await convex.query(api.world.getDirectorContext, { worldId, ...serverWriteArgs });
   } catch (error) {
     const worldLoadError = normalizeWorldLoadError(error);
     await logDirectorTurn({
@@ -148,12 +166,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const persistentContext =
-    directorMode === "persistent"
-      ? applyNpcDebugOverrides(context as unknown as DirectorContext, getNpcDebugOverrides(worldId))
-      : null;
+  const persistentContext = directorMode === "persistent" ? (context as DirectorContext) : null;
 
-  const recorded = await convex.mutation(api.world.recordPlayerInput, { worldId, input });
+  const recorded = await convex.mutation(api.world.recordPlayerInput, {
+    worldId,
+    input,
+    ...serverWriteArgs,
+  });
   if (!recorded.ok) {
     await logDirectorTurn({
       event: "director.turn.rejected",
@@ -195,6 +214,7 @@ export async function POST(request: Request) {
     const providerError = normalizeProviderError(error);
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
+      ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
@@ -236,6 +256,7 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     await convex.mutation(api.world.completeDirectorTurn, {
       worldId,
+      ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
@@ -275,6 +296,7 @@ export async function POST(request: Request) {
 
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
+    ...serverWriteArgs,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
     provider,
@@ -354,6 +376,7 @@ export async function POST(request: Request) {
     const providerError = normalizeProviderError(error);
     await convex.mutation(api.world.recordNpcStateExtraction, {
       worldId,
+      ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
@@ -396,10 +419,11 @@ export async function POST(request: Request) {
     });
   }
 
-  const extractionParsed = parseNpcStateExtractionOutput(extractionRawOutput);
+  const extractionParsed = parseStateExtractionOutput(extractionRawOutput);
   if (!extractionParsed.ok) {
     await convex.mutation(api.world.recordNpcStateExtraction, {
       worldId,
+      ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       provider,
@@ -446,8 +470,16 @@ export async function POST(request: Request) {
     validateNpcUpdates(extractionParsed.npcUpdates, persistentContext.actors),
     extractionRequest.requestSummary.requiredSceneBeat,
   );
+  const movementValidated = validateActorMoves(
+    extractionParsed.actorMoves,
+    persistentContext.actors,
+    persistentContext.knownLocations ?? [],
+    input,
+    parsed.output.narration,
+  );
   await convex.mutation(api.world.recordNpcStateExtraction, {
     worldId,
+    ...serverWriteArgs,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
     provider,
@@ -455,10 +487,15 @@ export async function POST(request: Request) {
     requestSummary: extractionRequest.requestSummary,
     ...(extractionRawRequest !== undefined ? { rawRequest: extractionRawRequest } : {}),
     rawResponse: extractionRawOutput,
-    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
+    parsedResponse: {
+      npcUpdates: extractionParsed.npcUpdates,
+      actorMoves: extractionParsed.actorMoves,
+    },
     status: "success",
     acceptedUpdates: extractionValidated.acceptedUpdates,
     ignoredUpdates: extractionValidated.ignoredUpdates,
+    acceptedMoves: movementValidated.acceptedMoves,
+    ignoredMoves: movementValidated.ignoredMoves,
   });
   await logDirectorTurn({
     event: "director.turn.extraction",
@@ -474,9 +511,12 @@ export async function POST(request: Request) {
     status: "success",
     httpStatus: 200,
     rawResponse: extractionRawOutput,
-    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
-    acceptedUpdates: extractionValidated.acceptedUpdates,
-    ignoredUpdates: extractionValidated.ignoredUpdates,
+    parsedResponse: {
+      npcUpdates: extractionParsed.npcUpdates,
+      actorMoves: extractionParsed.actorMoves,
+    },
+    acceptedUpdates: [...extractionValidated.acceptedUpdates, ...movementValidated.acceptedMoves],
+    ignoredUpdates: [...extractionValidated.ignoredUpdates, ...movementValidated.ignoredMoves],
     timingsMs: {
       provider: elapsedSince(extractionStartedAt),
       total: elapsedSince(startedAt),
@@ -486,13 +526,57 @@ export async function POST(request: Request) {
   return json<TurnResponse>({
     ok: true,
     narration: parsed.output.narration,
-    acceptedUpdates: extractionValidated.acceptedUpdates,
-    ignoredUpdates: extractionValidated.ignoredUpdates,
+    acceptedUpdates: [...extractionValidated.acceptedUpdates, ...movementValidated.acceptedMoves],
+    ignoredUpdates: [...extractionValidated.ignoredUpdates, ...movementValidated.ignoredMoves],
   });
 }
 
 function json<T>(body: T, status = 200) {
   return Response.json(body, { status });
+}
+
+function isLocalDirectorRequest(request: Request) {
+  if (process.env.LORECRAFT_ALLOW_REMOTE_DIRECTOR === "1") {
+    return true;
+  }
+
+  const requestHost = request.headers.get("host") ?? hostFromUrl(request.url);
+  if (!isLocalHost(requestHost)) {
+    return false;
+  }
+
+  const origin = request.headers.get("origin");
+  if (origin && !isLocalUrl(origin)) {
+    return false;
+  }
+
+  const referer = request.headers.get("referer");
+  if (!origin && referer && !isLocalUrl(referer)) {
+    return false;
+  }
+
+  return true;
+}
+
+function hostFromUrl(value: string) {
+  try {
+    return new URL(value).host;
+  } catch {
+    return "";
+  }
+}
+
+function isLocalUrl(value: string) {
+  try {
+    return isLocalHost(new URL(value).host);
+  } catch {
+    return false;
+  }
+}
+
+function isLocalHost(value: string) {
+  const hostname = value.trim().replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1").toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
 async function readBody(request: Request) {

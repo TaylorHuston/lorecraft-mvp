@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "CONVEX_AGENT_MODE=anonymous convex dev --start \"next dev --webpack\"",
-    "dev:debug": "CONVEX_AGENT_MODE=anonymous LORECRAFT_DEBUG_LOG=1 LORECRAFT_DEBUG_LOG_RAW_REQUEST=1 LORECRAFT_DEBUG_LOG_RAW_LLM=1 LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 convex dev --start \"next dev --webpack\"",
+    "dev:debug": "CONVEX_AGENT_MODE=anonymous LORECRAFT_ENABLE_DEBUG_ROUTES=1 LORECRAFT_DEBUG_LOG=1 LORECRAFT_DEBUG_LOG_RAW_REQUEST=1 LORECRAFT_DEBUG_LOG_RAW_LLM=1 LORECRAFT_DEBUG_STORE_RAW_REQUEST=1 convex dev --start \"next dev --webpack\"",
     "dev:next": "next dev --webpack",
     "dev:next:turbopack": "next dev",
     "dev:convex": "convex dev",
@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "ci:required": "npm run lint && npm run test && npm run typecheck && npm run build",
     "e2e": "playwright test",
-    "e2e:convex": "CONVEX_AGENT_MODE=anonymous convex dev",
+    "e2e:convex": "CONVEX_AGENT_MODE=anonymous LORECRAFT_ENABLE_DEBUG_ROUTES=1 LORECRAFT_SERVER_WRITE_TOKEN=lorecraft-e2e-local convex dev",
     "e2e:fixture": "node scripts/llm-fixture-server.mjs",
     "e2e:install": "playwright install chromium",
     "e2e:next": "node scripts/e2e-next-server.mjs",
