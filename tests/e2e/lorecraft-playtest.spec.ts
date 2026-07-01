@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("LC-001-S11 End To End Playtest Verification", () => {
+test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () => {
   test("runs a deterministic seeded-world browser playtest", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#lorecraft-app")).toBeVisible();
@@ -47,9 +47,61 @@ test.describe("LC-001-S11 End To End Playtest Verification", () => {
       "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
     );
 
+    await page.locator("#debug-tab-locations").click();
+    await expect(page.locator("#location-debug-panel")).toContainText("Chapel");
+    await expect(page.locator("#location-debug-panel")).toContainText("Vestry");
+    await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
+    await page.locator("#location-card-vestry-description").fill(
+      "The vestry smells of old paper, damp wool, and fresh sealing wax.",
+    );
+    await page.locator("#location-card-vestry-description").blur();
+    await expect(page.locator("#turn-notice-message")).toContainText("Location saved.");
+    await page.locator("#new-location-key").fill("bell-annex");
+    await page.locator("#new-location-name").fill("Bell Annex");
+    await page.locator("#new-location-description").fill(
+      "A cramped annex below the bell rope, dry enough for old tools.",
+    );
+    await page.locator("#create-location-button").click();
+    await expect(page.locator("#location-card-bell-annex")).toContainText("Bell Annex");
+
+    const travelInput = page.locator("#director-input");
+    await travelInput.fill("I go to the vestry.");
+    await travelInput.press("Enter");
+    await expect(page.locator("#story-stream")).toContainText("I go to the vestry.", {
+      timeout: 60_000,
+    });
+    await expect(page.locator("#story-stream")).toContainText("enter the vestry");
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText(
+      "Stormbound Chapel / Vestry",
+    );
+    await expect(page.locator("#debug-list-npc-state-changes-items")).toContainText(
+      "Taylor: moved to Vestry.",
+    );
+
+    const blockedTravelInput = page.locator("#director-input");
+    await blockedTravelInput.fill("I go to the bell tower.");
+    await blockedTravelInput.press("Enter");
+    await expect(page.locator("#story-stream")).toContainText("I go to the bell tower.", {
+      timeout: 60_000,
+    });
+    await expect(page.locator("#story-stream")).toContainText("destination remains out of reach");
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText(
+      "Stormbound Chapel / Vestry",
+    );
+    await page.locator("#debug-tab-locations").click();
+    await expect(page.locator("#location-card-bell-tower")).toHaveCount(0);
+
     await page.locator("#rough-reset-button").click();
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
+    await page.locator("#debug-tab-locations").click();
+    await expect(page.locator("#location-card-vestry-description")).toHaveValue(
+      "The vestry smells of old paper and damp wool. A narrow desk sits under shelves of hymnals.",
+    );
+    await expect(page.locator("#location-card-bell-annex")).toHaveCount(0);
+    await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
 
     const followupInput = page.locator("#director-input");
     await followupInput.fill("I listen to the rain.");

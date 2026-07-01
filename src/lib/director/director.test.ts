@@ -26,6 +26,8 @@ import {
   parseDirectorOutput,
   parseNpcStateExtractionOutput,
   parsePlainProseDirectorOutput,
+  parseStateExtractionOutput,
+  validateActorMoves,
   validateNpcUpdates,
 } from "./output";
 import { readLlmConfig, requestOpenAICompatibleChat } from "./provider";
@@ -146,6 +148,39 @@ const context: DirectorContext = {
     mira,
   ],
   objects: [{ key: "lantern", name: "Lantern", description: "A cracked lantern." }],
+  locationCard: {
+    id: "room-id",
+    key: "chapel",
+    name: "Chapel",
+    description: "Rain taps against warped shutters.",
+    facts: [{ key: "sanctity", value: "fading", source: "seed" }],
+    visibleObjects: [{ key: "lantern", name: "Lantern", description: "A cracked lantern." }],
+    visibleExits: [{ label: "north", toLocationKey: "graveyard", toLocationName: "Graveyard" }],
+    presentActors: [
+      { key: "taylor", name: "Taylor", role: "player" },
+      { key: "mira", name: "Mira", role: "npc" },
+    ],
+  },
+  knownLocations: [
+    {
+      id: "room-id",
+      key: "chapel",
+      name: "Chapel",
+      description: "Rain taps against warped shutters.",
+    },
+    {
+      id: "vestry-id",
+      key: "vestry",
+      name: "Vestry",
+      description: "The vestry smells of old paper and damp wool.",
+    },
+    {
+      id: "graveyard-id",
+      key: "graveyard",
+      name: "Graveyard",
+      description: "Tilted stones vanish into the rain.",
+    },
+  ],
   recentFeed: Array.from({ length: 15 }, (_, index) => ({
     id: `entry-${index}`,
     kind: index % 2 === 0 ? ("player" as const) : ("director" as const),
@@ -267,6 +302,8 @@ describe("Director request construction", () => {
       actorKeys: ["taylor", "mira"],
       npcFactKeys: ["mood", "status", "memory"],
       npcProfileKeys: ["mira"],
+      locationKeys: ["chapel", "vestry", "graveyard"],
+      movementMode: "bounded_existing_locations",
       readOnlyKnowledgeKeys: ["mira.knowledge"],
       requiredSceneBeat: {
         kind: "direct_npc_question",
@@ -286,6 +323,8 @@ describe("Director request construction", () => {
     expect(request.requestSummary.promptComponentKeys).toEqual([
       "aiInstructions",
       "world",
+      "locationCard",
+      "knownLocations",
       "npcCards",
       "recentStory",
       "currentInput",
@@ -293,6 +332,12 @@ describe("Director request construction", () => {
     ]);
     expect(userMessage?.content).toContain("AI Instructions:");
     expect(userMessage?.content).toContain("World:");
+    expect(userMessage?.content).toContain("Location Card:");
+    expect(userMessage?.content).toContain("LOCATION CARD: Chapel (chapel)");
+    expect(userMessage?.content).toContain("Facts: sanctity=fading (seed)");
+    expect(userMessage?.content).toContain("Present actors: Taylor (taylor, player); Mira (mira, npc)");
+    expect(userMessage?.content).toContain("Known Locations:");
+    expect(userMessage?.content).toContain("- Vestry (vestry): The vestry smells of old paper and damp wool.");
     expect(userMessage?.content).toContain("NPC Cards:");
     expect(userMessage?.content).toContain("Recent Story:");
     expect(userMessage?.content).toContain("Current Input:");
@@ -386,6 +431,8 @@ describe("Director request construction", () => {
     });
     expect(request.requestSummary.promptComponentKeys).toEqual([
       "extractionInstructions",
+      "locationCard",
+      "knownLocations",
       "npcCards",
       "recentStory",
       "currentInput",
@@ -394,10 +441,12 @@ describe("Director request construction", () => {
     ]);
     expect(systemMessage?.content).toContain("Return only a JSON object");
     expect(userMessage?.content).toContain("Allowed update fields: mood, status, memory");
+    expect(userMessage?.content).toContain("Actor movement is separate from NPC facts");
+    expect(userMessage?.content).toContain("Known Locations:");
     expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
     expect(userMessage?.content).toContain("> I ask Mira about the storm.");
     expect(userMessage?.content).toContain("Mira's hand tightens around the pew");
-    expect(userMessage?.content).toContain('{"npcUpdates":[]}');
+    expect(userMessage?.content).toContain('{"npcUpdates":[],"actorMoves":[]}');
     expect(userMessage?.content).toContain("Do not update description, background, persona");
   });
 
@@ -427,7 +476,12 @@ describe("Director request construction", () => {
     const transcriptRequest = buildTranscriptDirectorRequest(transcriptContext, "I look at Mira.");
     const transcriptUserMessage = transcriptRequest.messages.find((message) => message.role === "user");
     expect(transcriptUserMessage?.content).not.toContain("npcProfiles");
+    expect(transcriptUserMessage?.content).not.toContain("Location Card");
+    expect(transcriptUserMessage?.content).not.toContain("Known Locations");
+    expect(transcriptUserMessage?.content).not.toContain("actorMoves");
     expect(transcriptRequest.requestSummary.npcProfileKeys).toBeUndefined();
+    expect(transcriptRequest.requestSummary.locationKeys).toBeUndefined();
+    expect(transcriptRequest.requestSummary.movementMode).toBeUndefined();
   });
 
   it("includes multiple current-scene NPCs as readable cards and targets the addressed NPC", () => {
@@ -981,6 +1035,33 @@ describe("Director output parsing", () => {
     });
   });
 
+  it("accepts state extraction JSON with NPC updates and actor moves", () => {
+    expect(
+      parseStateExtractionOutput(
+        JSON.stringify({
+          npcUpdates: [],
+          actorMoves: [
+            {
+              actorKey: "taylor",
+              toLocationKey: "vestry",
+              reason: "Taylor entered the vestry in the narration.",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      npcUpdates: [],
+      actorMoves: [
+        {
+          actorKey: "taylor",
+          toLocationKey: "vestry",
+          reason: "Taylor entered the vestry in the narration.",
+        },
+      ],
+    });
+  });
+
   it("rejects malformed NPC state extraction JSON", () => {
     expect(parseNpcStateExtractionOutput("Mira seems different.")).toEqual({
       ok: false,
@@ -993,6 +1074,111 @@ describe("Director output parsing", () => {
       ok: false,
       error: "Game Master returned an empty response.",
     });
+  });
+});
+
+describe("Actor movement validation", () => {
+  it("accepts player and present-NPC moves to existing locations after clear travel", () => {
+    const validation = validateActorMoves(
+      [
+        {
+          actorKey: "taylor",
+          toLocationKey: "vestry",
+          reason: "Taylor enters the vestry.",
+        },
+        {
+          actorKey: "mira",
+          toLocationKey: "vestry",
+          reason: "Mira follows Taylor into the vestry.",
+        },
+      ],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry and ask Mira to follow.",
+      "You enter the vestry as Mira follows close behind you.",
+    );
+
+    expect(validation.acceptedMoves).toEqual([
+      {
+        actorKey: "taylor",
+        actorName: "Taylor",
+        toLocationKey: "vestry",
+        toLocationName: "Vestry",
+        reason: "Taylor enters the vestry.",
+      },
+      {
+        actorKey: "mira",
+        actorName: "Mira",
+        toLocationKey: "vestry",
+        toLocationName: "Vestry",
+        reason: "Mira follows Taylor into the vestry.",
+      },
+    ]);
+    expect(validation.ignoredMoves).toEqual([]);
+  });
+
+  it("rejects unknown destinations, offscreen actors, non-travel input, and unconfirmed arrival", () => {
+    const noTarget = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "bell-tower", reason: "Taylor climbs the bell tower." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the bell tower.",
+      "The chapel offers no obvious route upward.",
+    );
+    const offscreen = validateActorMoves(
+      [{ actorKey: "osric", toLocationKey: "vestry", reason: "Osric enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You enter the vestry.",
+    );
+    const noTravel = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I look at the vestry door.",
+      "The vestry door is damp and swollen in its frame.",
+    );
+    const noArrival = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "The chapel floor creaks under your first step.",
+    );
+
+    expect(noTarget.acceptedMoves).toEqual([]);
+    expect(noTarget.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "bell-tower", reason: "Actor move destination is unknown." },
+    ]);
+    expect(offscreen.ignoredMoves).toMatchObject([
+      { actorKey: "osric", toLocationKey: "vestry", reason: "Actor move actor is unknown or not in the current scene." },
+    ]);
+    expect(noTravel.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Player input did not clearly attempt travel to this location." },
+    ]);
+    expect(noArrival.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Game Master narration did not confirm arrival at this location." },
+    ]);
+  });
+
+  it("rejects NPC movement when the narration only confirms player travel", () => {
+    const validation = validateActorMoves(
+      [{ actorKey: "mira", toLocationKey: "vestry", reason: "Mira follows Taylor into the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You enter the vestry and the damp smell of old hymnals closes around you.",
+    );
+
+    expect(validation.acceptedMoves).toEqual([]);
+    expect(validation.ignoredMoves).toMatchObject([
+      {
+        actorKey: "mira",
+        toLocationKey: "vestry",
+        reason: "Game Master narration did not explicitly confirm this NPC moved.",
+      },
+    ]);
   });
 });
 

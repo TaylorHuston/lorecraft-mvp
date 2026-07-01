@@ -1,6 +1,14 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
@@ -9,6 +17,18 @@ type AcceptedNpcUpdateForWrite = {
   actorName: string;
   reason: string;
   changes: Array<{ key: "mood" | "status" | "memory"; value: string }>;
+};
+type AcceptedActorMoveForWrite = {
+  actorKey: string;
+  actorName: string;
+  toLocationKey: string;
+  toLocationName: string;
+  reason: string;
+};
+type DebugLocationWriteResult = {
+  ok: boolean;
+  error?: string;
+  locationId?: Id<"rooms">;
 };
 
 const WORLD_SLUG = "stormbound-chapel-default";
@@ -79,6 +99,25 @@ const PRIEST_BASELINE_FACTS = [
       "Alden found a torn bell-rope fiber near the altar after midnight, but he has not told Mira because he fears accusing someone without proof.",
   },
 ] as const;
+const SEEDED_ROOMS = [
+  {
+    key: "chapel",
+    name: "Chapel",
+    description:
+      "Rain taps against warped shutters. A cracked lantern hangs beside a stone altar, Mira waits near the aisle, and Brother Alden stands close to the altar with a ledger under one arm.",
+  },
+  {
+    key: "vestry",
+    name: "Vestry",
+    description:
+      "The vestry smells of old paper and damp wool. A narrow desk sits under shelves of hymnals.",
+  },
+  {
+    key: "graveyard",
+    name: "Graveyard",
+    description: "Tilted stones vanish into the rain. The chapel door glows behind you.",
+  },
+] as const;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
@@ -96,11 +135,30 @@ const acceptedNpcUpdate = v.object({
   reason: v.string(),
   changes: v.array(v.object({ key: npcFactKey, value: v.string() })),
 });
+const acceptedActorMove = v.object({
+  actorKey: v.string(),
+  actorName: v.string(),
+  toLocationKey: v.string(),
+  toLocationName: v.string(),
+  reason: v.string(),
+});
 const ignoredNpcUpdate = v.object({
   actorKey: v.optional(v.string()),
   field: v.optional(v.string()),
   reason: v.string(),
   valuePreview: v.optional(v.string()),
+});
+const ignoredActorMove = v.object({
+  actorKey: v.optional(v.string()),
+  toLocationKey: v.optional(v.string()),
+  reason: v.string(),
+  valuePreview: v.optional(v.string()),
+});
+
+const debugLocationWriteResult = v.object({
+  ok: v.boolean(),
+  error: v.optional(v.string()),
+  locationId: v.optional(v.id("rooms")),
 });
 
 function normalized(input: string) {
@@ -113,6 +171,10 @@ function actorSubjectId(actorKey: string) {
 
 function objectSubjectId(objectId: Id<"worldObjects">) {
   return `object:${objectId}`;
+}
+
+function roomSubjectId(roomKey: string) {
+  return `room:${roomKey}`;
 }
 
 function stableActorKey(actor: { key?: string; name: string }) {
@@ -251,6 +313,53 @@ async function applyAcceptedNpcUpdates(
   return changedFacts;
 }
 
+async function applyAcceptedActorMoves(
+  ctx: MutationCtx,
+  args: {
+    worldId: Id<"worlds">;
+    turnId: Id<"turns">;
+    commandId: Id<"commands">;
+    acceptedMoves: AcceptedActorMoveForWrite[];
+  },
+) {
+  if (args.acceptedMoves.length === 0) {
+    return 0;
+  }
+
+  const world = await ctx.db.get(args.worldId);
+  const player = world?.currentPlayerActorId ? await ctx.db.get(world.currentPlayerActorId) : null;
+  const currentRoomId = player?.roomId;
+  const operations: Array<{ op: "moveActor"; actorId: Id<"actors">; toRoomId: Id<"rooms"> }> = [];
+
+  if (!currentRoomId) {
+    return 0;
+  }
+
+  for (const move of args.acceptedMoves) {
+    const actor = await findActorByKeyOrName(ctx, args.worldId, move.actorKey, move.actorName);
+    const toRoom = await findRoomByKey(ctx, args.worldId, move.toLocationKey);
+
+    if (!actor || !toRoom || actor.roomId !== currentRoomId) {
+      continue;
+    }
+
+    await ctx.db.patch(actor._id, { roomId: toRoom._id });
+    operations.push({ op: "moveActor", actorId: actor._id, toRoomId: toRoom._id });
+  }
+
+  if (operations.length > 0) {
+    await ctx.db.insert("stateDiffs", {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      source: "llm",
+      operations,
+    });
+  }
+
+  return operations.length;
+}
+
 async function deleteActorFactByKey(
   ctx: MutationCtx,
   worldId: Id<"worlds">,
@@ -309,6 +418,71 @@ async function restoreSeededNpc(
   return args.facts.length;
 }
 
+async function resetSeededActorLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const chapel = await findRoomByKey(ctx, worldId, "chapel");
+  if (!chapel) {
+    return 0;
+  }
+
+  let moved = 0;
+  const seededActors = [
+    { key: PLAYER_KEY, name: "Taylor" },
+    { key: MIRA_KEY, name: "Mira" },
+    { key: PRIEST_KEY, name: PRIEST_NAME },
+  ];
+
+  for (const seededActor of seededActors) {
+    const actor = await findActorByKeyOrName(ctx, worldId, seededActor.key, seededActor.name);
+    if (!actor || actor.roomId === chapel._id) {
+      continue;
+    }
+    await ctx.db.patch(actor._id, { roomId: chapel._id });
+    moved += 1;
+  }
+
+  return moved;
+}
+
+async function restoreSeededLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
+  let restoredLocations = 0;
+  for (const seededRoom of SEEDED_ROOMS) {
+    const room = await findRoomByKey(ctx, worldId, seededRoom.key);
+    if (!room) {
+      continue;
+    }
+
+    if (room.name !== seededRoom.name || room.description !== seededRoom.description) {
+      await ctx.db.patch(room._id, {
+        name: seededRoom.name,
+        description: seededRoom.description,
+      });
+      restoredLocations += 1;
+    }
+  }
+
+  return restoredLocations;
+}
+
+async function deleteNonSeededLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
+  const rooms = await ctx.db
+    .query("rooms")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("rooms", rooms.length);
+
+  const seededRoomKeys = new Set<string>(SEEDED_ROOMS.map((room) => room.key));
+  let deletedLocations = 0;
+  for (const room of rooms) {
+    if (seededRoomKeys.has(room.key)) {
+      continue;
+    }
+    await ctx.db.delete(room._id);
+    deletedLocations += 1;
+  }
+
+  return deletedLocations;
+}
+
 export const seedDemoWorld = mutation({
   args: {},
   returns: v.id("worlds"),
@@ -324,23 +498,15 @@ export const seedDemoWorld = mutation({
 
     const chapelId = await ctx.db.insert("rooms", {
       worldId,
-      key: "chapel",
-      name: "Chapel",
-      description:
-        "Rain taps against warped shutters. A cracked lantern hangs beside a stone altar, Mira waits near the aisle, and Brother Alden stands close to the altar with a ledger under one arm.",
+      ...SEEDED_ROOMS[0],
     });
     const vestryId = await ctx.db.insert("rooms", {
       worldId,
-      key: "vestry",
-      name: "Vestry",
-      description:
-        "The vestry smells of old paper and damp wool. A narrow desk sits under shelves of hymnals.",
+      ...SEEDED_ROOMS[1],
     });
     const graveyardId = await ctx.db.insert("rooms", {
       worldId,
-      key: "graveyard",
-      name: "Graveyard",
-      description: "Tilted stones vanish into the rain. The chapel door glows behind you.",
+      ...SEEDED_ROOMS[2],
     });
 
     await Promise.all([
@@ -536,6 +702,19 @@ export const getSnapshot = query({
         name: v.string(),
         description: v.string(),
       }),
+      locations: v.array(
+        v.object({
+          _id: v.id("rooms"),
+          key: v.string(),
+          name: v.string(),
+          description: v.string(),
+          actors: v.array(v.object({ key: v.string(), name: v.string(), role: actorRole })),
+          objects: v.array(v.object({ key: v.string(), name: v.string() })),
+          exits: v.array(
+            v.object({ label: v.string(), toLocationKey: v.string(), toLocationName: v.string() }),
+          ),
+        }),
+      ),
       exits: v.array(
         v.object({
           _id: v.id("exits"),
@@ -625,7 +804,19 @@ export const getSnapshot = query({
     }
 
     const { world, player, room } = loaded;
-    const [exits, actors, objects, facts, events, narrations, diffs, directorCalls, turns, feed] =
+    const [
+      exits,
+      actors,
+      objects,
+      facts,
+      events,
+      narrations,
+      diffs,
+      directorCalls,
+      turns,
+      feed,
+      locations,
+    ] =
       await Promise.all([
         loadVisibleExits(ctx, args.worldId, room._id),
         ctx.db
@@ -667,6 +858,7 @@ export const getSnapshot = query({
           .take(10),
         loadTurnSummaries(ctx, args.worldId, 12),
         loadFeed(ctx, args.worldId, 60),
+        loadLocationSummaries(ctx, args.worldId),
       ]);
 
     return {
@@ -687,7 +879,12 @@ export const getSnapshot = query({
         name: room.name,
         description: room.description,
       },
-      exits,
+      locations,
+      exits: exits.map((exit) => ({
+        _id: exit._id,
+        label: exit.label,
+        toRoomName: exit.toRoomName,
+      })),
       actors: actors.map((actor) => ({
         _id: actor._id,
         key: stableActorKey(actor),
@@ -765,10 +962,12 @@ export const getDirectorContext = query({
       exits: v.array(v.object({ label: v.string(), toRoomName: v.string() })),
       actors: v.array(
         v.object({
+          id: v.string(),
           key: v.string(),
           name: v.string(),
           role: actorRole,
           description: v.string(),
+          locationKey: v.string(),
           facts: v.array(
             v.object({
               key: v.string(),
@@ -779,6 +978,34 @@ export const getDirectorContext = query({
         }),
       ),
       objects: v.array(v.object({ key: v.string(), name: v.string(), description: v.string() })),
+      locationCard: v.object({
+        id: v.string(),
+        key: v.string(),
+        name: v.string(),
+        description: v.string(),
+        facts: v.array(v.object({ key: v.string(), value: factValue, source: v.string() })),
+        visibleObjects: v.array(
+          v.object({ key: v.string(), name: v.string(), description: v.string() }),
+        ),
+        visibleExits: v.array(
+          v.object({
+            label: v.string(),
+            toLocationKey: v.string(),
+            toLocationName: v.string(),
+          }),
+        ),
+        presentActors: v.array(
+          v.object({ key: v.string(), name: v.string(), role: actorRole }),
+        ),
+      }),
+      knownLocations: v.array(
+        v.object({
+          id: v.string(),
+          key: v.string(),
+          name: v.string(),
+          description: v.string(),
+        }),
+      ),
       recentFeed: v.array(feedEntry),
     }),
   ),
@@ -789,7 +1016,7 @@ export const getDirectorContext = query({
     }
 
     const { world, player, room } = loaded;
-    const [exits, actors, objects, facts, recentFeed] = await Promise.all([
+    const [exits, actors, objects, facts, recentFeed, allRooms] = await Promise.all([
       loadVisibleExits(ctx, args.worldId, room._id),
       ctx.db
         .query("actors")
@@ -808,7 +1035,23 @@ export const getDirectorContext = query({
         .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
         .take(100),
       loadFeed(ctx, args.worldId, 20),
+      ctx.db
+        .query("rooms")
+        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .take(100),
     ]);
+    const visibleObjects = objects
+      .filter((object) => object.visible)
+      .map((object) => ({
+        key: object.key,
+        name: object.name,
+        description: object.description,
+      }));
+    const actorSummaries = actors.map((actor) => ({
+      key: stableActorKey(actor),
+      name: actor.name,
+      role: actor.role,
+    }));
 
     return {
       world: {
@@ -831,10 +1074,12 @@ export const getDirectorContext = query({
       actors: actors.map((actor) => {
         const actorKey = stableActorKey(actor);
         return {
+          id: actor._id,
           key: actorKey,
           name: actor.name,
           role: actor.role,
           description: actor.description,
+          locationKey: room.key,
           facts: facts
             .filter((fact) => fact.subjectId === actorSubjectId(actorKey))
             .map((fact) => ({
@@ -844,13 +1089,33 @@ export const getDirectorContext = query({
             })),
         };
       }),
-      objects: objects
-        .filter((object) => object.visible)
-        .map((object) => ({
-          key: object.key,
-          name: object.name,
-          description: object.description,
+      objects: visibleObjects,
+      locationCard: {
+        id: room._id,
+        key: room.key,
+        name: room.name,
+        description: room.description,
+        facts: facts
+          .filter((fact) => fact.subjectId === roomSubjectId(room.key))
+          .map((fact) => ({
+            key: fact.key,
+            value: fact.value,
+            source: fact.source,
+          })),
+        visibleObjects,
+        visibleExits: exits.map((exit) => ({
+          label: exit.label,
+          toLocationKey: exit.toRoomKey,
+          toLocationName: exit.toRoomName,
         })),
+        presentActors: actorSummaries,
+      },
+      knownLocations: allRooms.map((knownRoom) => ({
+        id: knownRoom._id,
+        key: knownRoom.key,
+        name: knownRoom.name,
+        description: knownRoom.description,
+      })),
       recentFeed,
     };
   },
@@ -1072,11 +1337,14 @@ export const recordNpcStateExtraction = mutation({
     status: directorStatus,
     acceptedUpdates: v.array(acceptedNpcUpdate),
     ignoredUpdates: v.array(ignoredNpcUpdate),
+    acceptedMoves: v.optional(v.array(acceptedActorMove)),
+    ignoredMoves: v.optional(v.array(ignoredActorMove)),
     error: v.optional(v.string()),
   },
   returns: v.object({
     directorCallId: v.id("directorCalls"),
     changedFacts: v.number(),
+    movedActors: v.number(),
   }),
   handler: async (ctx, args) => {
     const turn = await ctx.db.get(args.turnId);
@@ -1084,6 +1352,14 @@ export const recordNpcStateExtraction = mutation({
       throw new Error("Turn, world, and command do not match.");
     }
 
+    const acceptedMoveUpdates = (args.acceptedMoves ?? []).map((move) => ({
+      type: "actorMove",
+      ...move,
+    }));
+    const ignoredMoveUpdates = (args.ignoredMoves ?? []).map((move) => ({
+      type: "actorMove",
+      ...move,
+    }));
     const directorCall = {
       worldId: args.worldId,
       turnId: args.turnId,
@@ -1092,8 +1368,8 @@ export const recordNpcStateExtraction = mutation({
       model: args.model,
       requestSummary: args.requestSummary,
       status: args.status,
-      acceptedUpdates: args.acceptedUpdates,
-      ignoredUpdates: args.ignoredUpdates,
+      acceptedUpdates: [...args.acceptedUpdates, ...acceptedMoveUpdates],
+      ignoredUpdates: [...args.ignoredUpdates, ...ignoredMoveUpdates],
       ...(args.rawRequest !== undefined ? { rawRequest: args.rawRequest } : {}),
       ...(args.rawResponse !== undefined ? { rawResponse: args.rawResponse } : {}),
       ...(args.parsedResponse !== undefined ? { parsedResponse: args.parsedResponse } : {}),
@@ -1102,7 +1378,7 @@ export const recordNpcStateExtraction = mutation({
     const directorCallId = await ctx.db.insert("directorCalls", directorCall);
 
     if (args.status !== "success") {
-      return { directorCallId, changedFacts: 0 };
+      return { directorCallId, changedFacts: 0, movedActors: 0 };
     }
 
     const changedFacts = await applyAcceptedNpcUpdates(ctx, {
@@ -1111,8 +1387,14 @@ export const recordNpcStateExtraction = mutation({
       commandId: args.commandId,
       acceptedUpdates: args.acceptedUpdates,
     });
+    const movedActors = await applyAcceptedActorMoves(ctx, {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      acceptedMoves: args.acceptedMoves ?? [],
+    });
 
-    return { directorCallId, changedFacts };
+    return { directorCallId, changedFacts, movedActors };
   },
 });
 
@@ -1126,6 +1408,9 @@ export const resetPlaytestWorld = mutation({
     deletedStateDiffs: v.number(),
     deletedDirectorCalls: v.number(),
     restoredFacts: v.number(),
+    resetActorLocations: v.number(),
+    restoredLocations: v.number(),
+    deletedLocations: v.number(),
   }),
   handler: async (ctx, args) => {
     const deletedNarrations = await deleteNarrations(ctx, args.worldId);
@@ -1151,6 +1436,9 @@ export const resetPlaytestWorld = mutation({
       description: PRIEST_DESCRIPTION,
       facts: PRIEST_BASELINE_FACTS,
     });
+    const resetActorLocations = await resetSeededActorLocations(ctx, args.worldId);
+    const restoredLocations = await restoreSeededLocations(ctx, args.worldId);
+    const deletedLocations = await deleteNonSeededLocations(ctx, args.worldId);
 
     return {
       deletedTurns,
@@ -1160,9 +1448,124 @@ export const resetPlaytestWorld = mutation({
       deletedStateDiffs,
       deletedDirectorCalls,
       restoredFacts,
+      resetActorLocations,
+      restoredLocations,
+      deletedLocations,
     };
   },
 });
+
+export const updateLocation = action({
+  args: {
+    worldId: v.id("worlds"),
+    locationId: v.id("rooms"),
+    name: v.string(),
+    description: v.string(),
+  },
+  returns: debugLocationWriteResult,
+  handler: async (ctx, args) => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false, error: "Debug location writes are disabled." };
+    }
+
+    const result: DebugLocationWriteResult = await ctx.runMutation(
+      internal.world.updateLocationInternal,
+      args,
+    );
+    return result;
+  },
+});
+
+export const createLocation = action({
+  args: {
+    worldId: v.id("worlds"),
+    key: v.string(),
+    name: v.string(),
+    description: v.string(),
+  },
+  returns: debugLocationWriteResult,
+  handler: async (ctx, args): Promise<DebugLocationWriteResult> => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false, error: "Debug location writes are disabled." };
+    }
+
+    const result: DebugLocationWriteResult = await ctx.runMutation(
+      internal.world.createLocationInternal,
+      args,
+    );
+    return result;
+  },
+});
+
+export const updateLocationInternal = internalMutation({
+  args: {
+    worldId: v.id("worlds"),
+    locationId: v.id("rooms"),
+    name: v.string(),
+    description: v.string(),
+  },
+  returns: debugLocationWriteResult,
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.locationId);
+    if (!room || room.worldId !== args.worldId) {
+      return { ok: false, error: "Location could not be found in this world." };
+    }
+
+    const name = args.name.trim();
+    const description = args.description.trim();
+    if (!name || !description) {
+      return { ok: false, error: "Location name and description are required." };
+    }
+
+    await ctx.db.patch(room._id, {
+      name: name.slice(0, 120),
+      description: description.slice(0, 1200),
+    });
+    return { ok: true };
+  },
+});
+
+export const createLocationInternal = internalMutation({
+  args: {
+    worldId: v.id("worlds"),
+    key: v.string(),
+    name: v.string(),
+    description: v.string(),
+  },
+  returns: debugLocationWriteResult,
+  handler: async (ctx, args) => {
+    const key = args.key.trim().toLowerCase();
+    const name = args.name.trim();
+    const description = args.description.trim();
+
+    if (!/^[a-z0-9][a-z0-9-]{1,48}$/.test(key)) {
+      return {
+        ok: false,
+        error: "Location key must use lowercase letters, numbers, and hyphens.",
+      };
+    }
+    if (!name || !description) {
+      return { ok: false, error: "Location name and description are required." };
+    }
+
+    const existing = await findRoomByKey(ctx, args.worldId, key);
+    if (existing) {
+      return { ok: false, error: "A location with that key already exists." };
+    }
+
+    const locationId = await ctx.db.insert("rooms", {
+      worldId: args.worldId,
+      key,
+      name: name.slice(0, 120),
+      description: description.slice(0, 1200),
+    });
+    return { ok: true, locationId };
+  },
+});
+
+function debugLocationWritesEnabled() {
+  return process.env.NODE_ENV !== "production" || process.env.LORECRAFT_ENABLE_DEBUG_ROUTES === "1";
+}
 
 async function loadCurrentWorld(ctx: QueryCtx, worldId: Id<"worlds">) {
   const world = await ctx.db.get(worldId);
@@ -1197,10 +1600,60 @@ async function loadVisibleExits(ctx: QueryCtx, worldId: Id<"worlds">, roomId: Id
         return {
           _id: exit._id,
           label: exit.label,
+          toRoomKey: toRoom?.key ?? "unknown",
           toRoomName: toRoom?.name ?? "Unknown",
         };
       }),
   );
+}
+
+async function loadLocationSummaries(ctx: QueryCtx, worldId: Id<"worlds">) {
+  const [rooms, actors, objects, exits] = await Promise.all([
+    ctx.db
+      .query("rooms")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .take(100),
+    ctx.db
+      .query("actors")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .take(100),
+    ctx.db
+      .query("worldObjects")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .take(100),
+    ctx.db
+      .query("exits")
+      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .take(100),
+  ]);
+  const roomsById = new Map(rooms.map((room) => [room._id, room]));
+
+  return rooms.map((room) => ({
+    _id: room._id,
+    key: room.key,
+    name: room.name,
+    description: room.description,
+    actors: actors
+      .filter((actor) => actor.roomId === room._id)
+      .map((actor) => ({
+        key: stableActorKey(actor),
+        name: actor.name,
+        role: actor.role,
+      })),
+    objects: objects
+      .filter((object) => object.roomId === room._id && object.visible)
+      .map((object) => ({ key: object.key, name: object.name })),
+    exits: exits
+      .filter((exit) => exit.fromRoomId === room._id && exit.visible)
+      .map((exit) => {
+        const toRoom = roomsById.get(exit.toRoomId);
+        return {
+          label: exit.label,
+          toLocationKey: toRoom?.key ?? "unknown",
+          toLocationName: toRoom?.name ?? "Unknown",
+        };
+      }),
+  }));
 }
 
 async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {

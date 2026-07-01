@@ -23,11 +23,12 @@ The system SHALL let the player submit narrative text through one input box.
 - THEN the backend treats the text as narrative Game Master input
 - AND the UI does not require the player to choose between command mode and chat mode
 
-#### Scenario R1-S2: Narrative movement does not mutate rooms
+#### Scenario R1-S2: Clear narrative movement can mutate actor location
 
 - WHEN the player submits text such as "I leave the chapel and walk toward the graveyard"
-- THEN the Game Master may narrate the attempted movement
-- AND the system does not update room, exit, or actor-location state in this change
+- AND the Game Master narration resolves the player as reaching an existing canonical location
+- THEN the post-narration state extractor may propose actor movement
+- AND Convex accepts the movement only after validating the actor, current scene, destination, and turn boundary
 
 ### Requirement R2: Resumable Feed
 
@@ -65,7 +66,7 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 
 - `src/app/world-client.tsx` renders the narrative-only split layout, one unified textarea, pending/error states, persisted feed entries, and debug panel.
 - `src/app/api/director/turn/route.ts` receives narrative input from the client and routes it through the backend Game Master workflow.
-- `convex/world.ts` records player inputs, reconstructs the feed from `commands`, `narrations`, and `events`, and does not mutate room, exit, or actor-location state through the Game Master path.
+- `convex/world.ts` records player inputs, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation.
 
 ### Verified By
 
@@ -906,6 +907,139 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 - `npm run dev:debug` plus `npm run playtest:director` passed in default persistent mode before the later plain-prose split; current persistent story generation now shares the plain-prose contract while structured JSON parsing remains available for future extraction.
 - After changing transcript mode to seed-plus-transcript context, `npm run ci:required` and `npm run playtest:director:transcript` passed; latest log inspection confirmed the raw prompt includes `worldSeed` and `transcript` while omitting `sceneState`, `visibleFacts`, `hiddenNpcKnowledge`, and `requiredSceneBeat`.
 - Fresh demo seeding verified through `npx convex codegen`, `npm run ci:required`, `npm run playtest:director:transcript`, and latest log inspection showing a new transcript turn with seed/transcript prompt components and zero accepted/ignored updates.
+
+### Verification Gaps
+
+- Taylor manual browser confirmation remains pending.
+
+## Story LC-001-S12: Lightweight Location Cards And Movement
+
+As a developer-playtester, I want canonical locations to ground narration and support bounded actor movement, so that the story can move through known places without becoming a command-driven MUD.
+
+### Requirement R1: Location Cards In Game Master Context
+
+The system SHALL include canonical location context in persistent Game Master requests.
+
+#### Scenario R1-S1: Current location grounds narration
+
+- WHEN the player submits narrative input in persistent mode
+- THEN the Game Master request includes the current Location Card with key, name, description, visible objects, present actors, and relevant location facts
+- AND the Game Master treats the Location Card as canonical scene truth rather than loose suggestion
+
+#### Scenario R1-S2: Existing locations are eligible destinations
+
+- WHEN the backend builds persistent Game Master context
+- THEN it includes a compact list of existing locations that can be valid movement destinations
+- AND movement eligibility does not require connected exits in this change
+
+#### Scenario R1-S3: Transcript mode excludes live location cards
+
+- WHEN the application runs in transcript mode
+- THEN the Game Master request continues to use the opening seed plus transcript only
+- AND it does not include live Location Cards, actor locations, location edits, or movement extraction
+
+### Requirement R2: Bounded Actor Location Mutation
+
+The system SHALL mutate actor locations only through validated post-narration extraction.
+
+#### Scenario R2-S1: Clear player travel moves the player
+
+- WHEN the player clearly attempts travel to an existing location
+- AND the Game Master narration resolves the player as reaching or entering that location
+- THEN the extractor may propose moving the player actor to that location
+- AND Convex persists the move only after validating the actor and destination location
+
+#### Scenario R2-S2: Present NPC follows or leaves
+
+- WHEN the player clearly attempts travel
+- AND the narration explicitly says a current-scene NPC follows, accompanies, leaves with, or travels to the same existing location
+- THEN the extractor may propose moving that NPC
+- AND Convex persists the move only if the NPC was present in the scene at turn start and the target location exists
+
+#### Scenario R2-S3: Game Master cannot relocate actors autonomously
+
+- WHEN the narration independently relocates the scene without a clear player travel action
+- THEN the extractor returns no actor movement
+- AND actor `roomId` values remain unchanged
+
+#### Scenario R2-S4: Unknown target location is unresolved
+
+- WHEN the player attempts to travel to a destination that is not an existing canonical location
+- THEN the Game Master handles the attempt in-story as unclear, unavailable, blocked, or needing more context
+- AND no new location is created
+- AND no actor location mutation is accepted
+
+#### Scenario R2-S5: Path links are not enforced
+
+- WHEN the player clearly travels to any existing location
+- THEN the backend may accept the move even if no exit links the current location to the target
+- AND future path/link constraints remain deferred
+
+### Requirement R3: Debug Location Editing
+
+The system SHALL provide a debug `Locations` tab for inspecting and editing canonical demo-world locations.
+
+#### Scenario R3-S1: Debug tab shows location state
+
+- WHEN a world is seeded and the debug panel is open
+- THEN the `Locations` tab lists existing locations with key, name, description, visible objects or exits when available, and current actors in each location
+
+#### Scenario R3-S2: Debug edit updates canonical location fields
+
+- WHEN Taylor edits a location's name or description in the debug `Locations` tab
+- THEN the change is persisted to Convex as canonical demo-world state
+- AND the next persistent Game Master request uses the edited Location Card
+
+#### Scenario R3-S3: Debug create adds a canonical location
+
+- WHEN Taylor creates a new location in the debug `Locations` tab
+- THEN the system creates a canonical location with a stable key, name, and description
+- AND that location can become a valid movement target for future turns
+
+#### Scenario R3-S4: Location keys remain stable after creation
+
+- WHEN an existing location is displayed in the debug `Locations` tab
+- THEN its key is treated as stable identity and is not edited in place
+- AND display fields can still be edited
+
+### Requirement R4: Reset And Debug Evidence
+
+The system SHALL make location state, edits, and movement decisions inspectable and resettable.
+
+#### Scenario R4-S1: Reset restores seeded locations
+
+- WHEN the demo world is reset through fresh seed or Reset Session
+- THEN edited seeded locations are restored to seed values
+- AND debug-created locations are removed
+- AND actor locations return to the seeded setup
+
+#### Scenario R4-S2: Accepted movement is turn-scoped
+
+- WHEN actor movement is accepted for a turn
+- THEN the system records a turn-scoped state diff with `moveActor` operations
+- AND debug records identify the moved actors, target location keys, and extractor reason
+
+#### Scenario R4-S3: Rejected movement is inspectable
+
+- WHEN an actor movement proposal is rejected because the actor is invalid, offscreen, or the target location is unknown
+- THEN no actor `roomId` changes
+- AND debug evidence records why the proposal was ignored
+
+### Implemented By
+
+- `convex/world.ts` exposes Location Card data through persistent Game Master context, debug snapshot location summaries, debug-gated location edit/create actions backed by internal mutations, validated actor movement persistence, session location/actor reset, and turn-scoped `moveActor` state diffs.
+- `src/lib/director/prompt.ts` renders current Location Card and Known Locations prompt sections in persistent mode while keeping transcript mode seed-plus-transcript only.
+- `src/lib/director/output.ts` parses state extraction output with `npcUpdates` and `actorMoves`, validates movement against current-scene actors, existing known locations, clear travel input, narration-confirmed arrival, and explicit NPC movement narration.
+- `src/app/api/director/turn/route.ts` records validated actor moves through the post-narration extractor path and skips movement extraction in transcript mode.
+- `src/app/world-client.tsx` adds the debug `Locations` tab with canonical location inspection, edit, create, and actor/object/exit summaries.
+- `scripts/llm-fixture-server.mjs` and `tests/e2e/lorecraft-playtest.spec.ts` cover deterministic fixture-backed movement in browser E2E.
+
+### Verified By
+
+- `npm run test -- src/lib/director/director.test.ts` passed with Location Card prompt context, transcript exclusion, state extraction parsing, accepted actor movement, rejected movement proposals, and silent NPC relocation rejection.
+- `npm run ci:required` passed, covering lint, full Vitest suite, typecheck, and production build.
+- `npm run e2e` passed with deterministic browser coverage for the debug `Locations` tab, location edit/create, accepted movement to the Vestry, rejected unknown bell-tower movement, Reset Session restoration of seeded locations, and turn/debug evidence.
+- `npx convex codegen` passed after adding location context, debug-gated location write actions, and movement persistence functions.
 
 ### Verification Gaps
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { NpcDebugOverride } from "@/lib/director/types";
@@ -24,7 +24,7 @@ type DirectorPromptGuidance = {
   persistence: string;
 };
 
-type DebugTab = "prompt" | "npcs" | "state";
+type DebugTab = "prompt" | "npcs" | "locations" | "state";
 
 type NpcOverrideResponse =
   | { ok: true; overrides: Record<string, NpcDebugOverride> }
@@ -54,6 +54,8 @@ export function WorldClient() {
   const defaultWorldId = useQuery(api.world.getDefaultWorld);
   const seedWorld = useMutation(api.world.seedDemoWorld);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
+  const updateLocation = useAction(api.world.updateLocation);
+  const createLocation = useAction(api.world.createLocation);
   const [selectedWorldId, setSelectedWorldId] = useState<Id<"worlds"> | null>(null);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -68,6 +70,11 @@ export function WorldClient() {
   >({});
   const [collapsedNpcKeys, setCollapsedNpcKeys] = useState<Record<string, boolean>>({});
   const [savingNpcKey, setSavingNpcKey] = useState<string | null>(null);
+  const [newLocation, setNewLocation] = useState({
+    key: "",
+    name: "",
+    description: "",
+  });
   const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
     DEFAULT_PROMPT_GUIDANCE,
   );
@@ -147,7 +154,7 @@ export function WorldClient() {
     try {
       const result = await resetPlaytestWorld({ worldId });
       setNotice(
-        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, and restored ${result.restoredFacts} NPC facts.`,
+        `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, restored ${result.restoredFacts} NPC facts, and reset ${result.resetActorLocations} actor locations.`,
       );
     } catch (resetError) {
       setError(errorMessage(resetError));
@@ -318,6 +325,51 @@ export function WorldClient() {
     } finally {
       setSavingNpcKey(null);
     }
+  }
+
+  async function saveLocation(
+    locationId: Id<"rooms">,
+    name: string,
+    description: string,
+  ) {
+    if (!worldId) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    const result = await updateLocation({
+      worldId,
+      locationId,
+      name,
+      description,
+    });
+    if (!result.ok) {
+      setError(result.error ?? "Failed to save location.");
+      return;
+    }
+    setNotice("Location saved.");
+  }
+
+  async function handleCreateLocation() {
+    if (!worldId) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    const result = await createLocation({
+      worldId,
+      key: newLocation.key,
+      name: newLocation.name,
+      description: newLocation.description,
+    });
+    if (!result.ok) {
+      setError(result.error ?? "Failed to create location.");
+      return;
+    }
+    setNewLocation({ key: "", name: "", description: "" });
+    setNotice("Location created.");
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -549,6 +601,15 @@ export function WorldClient() {
                   onClear={clearNpcOverride}
                 />
               ) : null}
+              {debugTab === "locations" ? (
+                <LocationDebugPanel
+                  locations={snapshot.locations}
+                  newLocation={newLocation}
+                  onNewLocationChange={setNewLocation}
+                  onSave={saveLocation}
+                  onCreate={handleCreateLocation}
+                />
+              ) : null}
               {debugTab === "state" ? (
                 <>
                   <DebugList
@@ -713,11 +774,12 @@ function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: Deb
   const tabs: Array<{ value: DebugTab; label: string }> = [
     { value: "prompt", label: "Prompt" },
     { value: "npcs", label: "NPCs" },
+    { value: "locations", label: "Locations" },
     { value: "state", label: "State" },
   ];
 
   return (
-    <div id="debug-tabs" className="grid grid-cols-3 rounded-md border border-zinc-800 text-xs uppercase">
+    <div id="debug-tabs" className="grid grid-cols-4 rounded-md border border-zinc-800 text-xs uppercase">
       {tabs.map((tab) => (
         <button
           id={`debug-tab-${tab.value}`}
@@ -901,6 +963,208 @@ function NpcDebugPanel({
         <p id="npc-debug-panel-empty-state" className="text-sm text-zinc-500">No NPCs in the current scene.</p>
       )}
     </section>
+  );
+}
+
+function LocationDebugPanel({
+  locations,
+  newLocation,
+  onNewLocationChange,
+  onSave,
+  onCreate,
+}: {
+  locations: Array<{
+    _id: Id<"rooms">;
+    key: string;
+    name: string;
+    description: string;
+    actors: Array<{ key: string; name: string; role: "player" | "npc" }>;
+    objects: Array<{ key: string; name: string }>;
+    exits: Array<{ label: string; toLocationKey: string; toLocationName: string }>;
+  }>;
+  newLocation: { key: string; name: string; description: string };
+  onNewLocationChange: (location: { key: string; name: string; description: string }) => void;
+  onSave: (locationId: Id<"rooms">, name: string, description: string) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <section id="location-debug-panel" className="space-y-4">
+      <div id="location-debug-panel-header">
+        <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">
+          Locations
+        </h3>
+        <p className="mt-2 text-xs leading-5 text-zinc-500">
+          Canonical demo-world locations. Keys are stable; names and descriptions can be edited.
+        </p>
+      </div>
+
+      <div id="location-create-card" className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
+        <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
+          Add location
+        </h4>
+        <div id="location-create-fields" className="mt-4 space-y-3">
+          <LocationInput
+            id="new-location-key"
+            label="Key"
+            value={newLocation.key}
+            onChange={(key) => onNewLocationChange({ ...newLocation, key })}
+          />
+          <LocationInput
+            id="new-location-name"
+            label="Name"
+            value={newLocation.name}
+            onChange={(name) => onNewLocationChange({ ...newLocation, name })}
+          />
+          <LocationTextarea
+            id="new-location-description"
+            label="Description"
+            value={newLocation.description}
+            onChange={(description) => onNewLocationChange({ ...newLocation, description })}
+          />
+        </div>
+        <button
+          id="create-location-button"
+          type="button"
+          onClick={onCreate}
+          className="mt-3 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+        >
+          Add Location
+        </button>
+      </div>
+
+      {locations.map((location) => (
+        <LocationCardEditor
+          key={`${location.key}-${location.name}-${location.description}`}
+          location={location}
+          onSave={onSave}
+        />
+      ))}
+    </section>
+  );
+}
+
+function LocationCardEditor({
+  location,
+  onSave,
+}: {
+  location: {
+    _id: Id<"rooms">;
+    key: string;
+    name: string;
+    description: string;
+    actors: Array<{ key: string; name: string; role: "player" | "npc" }>;
+    objects: Array<{ key: string; name: string }>;
+    exits: Array<{ label: string; toLocationKey: string; toLocationName: string }>;
+  };
+  onSave: (locationId: Id<"rooms">, name: string, description: string) => void;
+}) {
+  const [name, setName] = useState(location.name);
+  const [description, setDescription] = useState(location.description);
+  const locationDomId = `location-card-${domId(location.key)}`;
+
+  function saveIfChanged() {
+    if (name !== location.name || description !== location.description) {
+      onSave(location._id, name, description);
+    }
+  }
+
+  return (
+    <div id={locationDomId} className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
+      <div id={`${locationDomId}-header`}>
+        <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
+          {location.name} <span className="text-zinc-600">({location.key})</span>
+        </h4>
+        <p className="mt-2 text-xs leading-5 text-zinc-500">
+          Actors: {location.actors.map((actor) => `${actor.name} (${actor.role})`).join(", ") || "none"}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-zinc-500">
+          Objects: {location.objects.map((object) => object.name).join(", ") || "none"}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-zinc-500">
+          Exits: {location.exits.map((exit) => `${exit.label} to ${exit.toLocationName}`).join(", ") || "none"}
+        </p>
+      </div>
+      <div id={`${locationDomId}-fields`} className="mt-4 space-y-4">
+        <LocationInput
+          id={`${locationDomId}-name`}
+          label="Name"
+          value={name}
+          onChange={setName}
+          onBlur={saveIfChanged}
+        />
+        <LocationTextarea
+          id={`${locationDomId}-description`}
+          label="Description"
+          value={description}
+          onChange={setDescription}
+          onBlur={saveIfChanged}
+        />
+      </div>
+    </div>
+  );
+}
+
+function LocationInput({
+  id,
+  label,
+  value,
+  onChange,
+  onBlur,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+}) {
+  return (
+    <div id={`${id}-field`}>
+      <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+        {label}
+      </label>
+      <input
+        id={id}
+        value={value}
+        maxLength={120}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        className="mt-2 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
+      />
+    </div>
+  );
+}
+
+function LocationTextarea({
+  id,
+  label,
+  value,
+  onChange,
+  onBlur,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+}) {
+  return (
+    <div id={`${id}-field`}>
+      <div id={`${id}-field-header`} className="mb-2 flex items-center justify-between gap-3">
+        <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+          {label}
+        </label>
+        <span className="text-xs tabular-nums text-zinc-600">{value.length}/1200</span>
+      </div>
+      <textarea
+        id={id}
+        value={value}
+        maxLength={1200}
+        rows={3}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
+      />
+    </div>
   );
 }
 
@@ -1143,6 +1407,22 @@ function directorUpdateItems(directorCalls: unknown[]) {
 
     return call.acceptedUpdates.flatMap((update) => {
       if (!isRecord(update) || !Array.isArray(update.changes)) {
+        if (update.type === "actorMove") {
+          const actorName =
+            typeof update.actorName === "string"
+              ? update.actorName
+              : typeof update.actorKey === "string"
+                ? update.actorKey
+                : "Unknown actor";
+          const locationName =
+            typeof update.toLocationName === "string"
+              ? update.toLocationName
+              : typeof update.toLocationKey === "string"
+                ? update.toLocationKey
+                : "Unknown location";
+          const reason = typeof update.reason === "string" ? ` Reason: ${update.reason}` : "";
+          return [`${actorName}: moved to ${locationName}.${reason}`];
+        }
         return [];
       }
 

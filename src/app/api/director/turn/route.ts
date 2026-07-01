@@ -10,8 +10,9 @@ import {
 } from "@/lib/director/prompt";
 import {
   applySceneBeatPersistenceBoundary,
-  parseNpcStateExtractionOutput,
+  parseStateExtractionOutput,
   parsePlainProseDirectorOutput,
+  validateActorMoves,
   validateNpcUpdates,
 } from "@/lib/director/output";
 import { ProviderError, readLlmConfig, requestOpenAICompatibleChat } from "@/lib/director/provider";
@@ -396,7 +397,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const extractionParsed = parseNpcStateExtractionOutput(extractionRawOutput);
+  const extractionParsed = parseStateExtractionOutput(extractionRawOutput);
   if (!extractionParsed.ok) {
     await convex.mutation(api.world.recordNpcStateExtraction, {
       worldId,
@@ -446,6 +447,13 @@ export async function POST(request: Request) {
     validateNpcUpdates(extractionParsed.npcUpdates, persistentContext.actors),
     extractionRequest.requestSummary.requiredSceneBeat,
   );
+  const movementValidated = validateActorMoves(
+    extractionParsed.actorMoves,
+    persistentContext.actors,
+    persistentContext.knownLocations ?? [],
+    input,
+    parsed.output.narration,
+  );
   await convex.mutation(api.world.recordNpcStateExtraction, {
     worldId,
     turnId: recorded.turnId,
@@ -455,10 +463,15 @@ export async function POST(request: Request) {
     requestSummary: extractionRequest.requestSummary,
     ...(extractionRawRequest !== undefined ? { rawRequest: extractionRawRequest } : {}),
     rawResponse: extractionRawOutput,
-    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
+    parsedResponse: {
+      npcUpdates: extractionParsed.npcUpdates,
+      actorMoves: extractionParsed.actorMoves,
+    },
     status: "success",
     acceptedUpdates: extractionValidated.acceptedUpdates,
     ignoredUpdates: extractionValidated.ignoredUpdates,
+    acceptedMoves: movementValidated.acceptedMoves,
+    ignoredMoves: movementValidated.ignoredMoves,
   });
   await logDirectorTurn({
     event: "director.turn.extraction",
@@ -474,9 +487,12 @@ export async function POST(request: Request) {
     status: "success",
     httpStatus: 200,
     rawResponse: extractionRawOutput,
-    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
-    acceptedUpdates: extractionValidated.acceptedUpdates,
-    ignoredUpdates: extractionValidated.ignoredUpdates,
+    parsedResponse: {
+      npcUpdates: extractionParsed.npcUpdates,
+      actorMoves: extractionParsed.actorMoves,
+    },
+    acceptedUpdates: [...extractionValidated.acceptedUpdates, ...movementValidated.acceptedMoves],
+    ignoredUpdates: [...extractionValidated.ignoredUpdates, ...movementValidated.ignoredMoves],
     timingsMs: {
       provider: elapsedSince(extractionStartedAt),
       total: elapsedSince(startedAt),
@@ -486,8 +502,8 @@ export async function POST(request: Request) {
   return json<TurnResponse>({
     ok: true,
     narration: parsed.output.narration,
-    acceptedUpdates: extractionValidated.acceptedUpdates,
-    ignoredUpdates: extractionValidated.ignoredUpdates,
+    acceptedUpdates: [...extractionValidated.acceptedUpdates, ...movementValidated.acceptedMoves],
+    ignoredUpdates: [...extractionValidated.ignoredUpdates, ...movementValidated.ignoredMoves],
   });
 }
 

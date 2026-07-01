@@ -106,7 +106,7 @@ Run the deterministic browser E2E smoke check:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It builds and runs Next on a separate port so it can run without stopping an already-running `next dev` server for normal playtesting. It verifies the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the persisted story, inspect debug turn evidence, and reset for another turn. This path is deterministic and does not call Ollama, OpenRouter, Vercel AI Gateway, or any hosted model.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It builds and runs Next on a separate port so it can run without stopping an already-running `next dev` server for normal playtesting. It verifies the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the persisted story, inspect debug turn evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset location state for another turn. This path is deterministic and does not call Ollama, OpenRouter, Vercel AI Gateway, or any hosted model.
 
 The E2E script is intentionally local-only and destructive against its local test state. `LORECRAFT_E2E_BASE_URL` must point to the configured local E2E app origin, which defaults to `http://127.0.0.1:3101`, and the local Convex port `3210` must be free so Playwright starts the intended anonymous E2E Convex service instead of reusing an existing playtest backend.
 
@@ -122,7 +122,7 @@ Live-provider playtest scripts remain separate because they evaluate local model
 - `src/app/providers.tsx` wires the Convex React provider into the App Router root.
 - `playwright.config.ts`, `scripts/llm-fixture-server.mjs`, and `tests/e2e/` provide deterministic browser E2E coverage of the current playtest loop.
 
-Persistent story generation remains plain prose. NPC `mood`, `status`, and `memory` can be updated only by the separate post-narration extractor after Convex validates the actor, field, value, and scene boundary.
+Persistent story generation remains plain prose. NPC `mood`, `status`, and `memory` can be updated only by the separate post-narration extractor after Convex validates the actor, field, value, and scene boundary. Actor location can also move only through that extractor, and only when the player clearly travels to an existing canonical location and the narration confirms arrival.
 
 The persistence strategy is documented in [`docs/persistence-system.md`](docs/persistence-system.md). The canonical object and field reference is [`docs/data-model.md`](docs/data-model.md). Update them when canonical state, Game Master mutation authority, feed reconstruction, reset behavior, or object semantics change.
 
@@ -136,11 +136,11 @@ Direct questions to present NPCs derive a required scene beat so the Game Master
 
 The seeded chapel currently includes Mira and Brother Alden so local playtesting can compare how the Game Master handles multiple NPCs in the same scene.
 
-The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. It also includes an `NPCs` tab for temporary server-local NPC description/fact overrides. These sections and overrides are sent with the next persistent Game Master turn and are summarized in the latest Game Master call debug metadata. NPC debug overrides are not stored in Convex and disappear when the application server restarts.
+The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. It also includes an `NPCs` tab for temporary server-local NPC description/fact overrides and a `Locations` tab for rough canonical location inspection, editing, and creation. Prompt guidance, NPC overrides, and Location Cards are summarized in Game Master debug metadata. NPC debug overrides are not stored in Convex and disappear when the application server restarts; location edits are canonical demo-world rows and can be reset by seeding a fresh world or using Reset Session.
 
 The NPC override API is local-debug tooling. It is available outside production by default and returns 404 in production unless `LORECRAFT_ENABLE_DEBUG_ROUTES=1` is explicitly set.
 
-The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, room movement mutation, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
+The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, linked path enforcement, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
 
 ## Current Intent
 

@@ -15,10 +15,12 @@ export type DirectorFeedEntry = {
 };
 
 export type DirectorActor = {
+  id?: string;
   key: string;
   name: string;
   role: "player" | "npc";
   description: string;
+  locationKey?: string;
   facts: Array<{
     key: string;
     value: string | number | boolean | null;
@@ -43,6 +45,40 @@ export type NpcDebugOverride = {
   name?: string;
   description?: string;
   facts?: Record<string, string>;
+};
+
+export type DirectorLocationCard = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  facts: Array<{
+    key: string;
+    value: string | number | boolean | null;
+    source: string;
+  }>;
+  visibleObjects: Array<{
+    key: string;
+    name: string;
+    description: string;
+  }>;
+  visibleExits: Array<{
+    label: string;
+    toLocationKey: string;
+    toLocationName: string;
+  }>;
+  presentActors: Array<{
+    key: string;
+    name: string;
+    role: "player" | "npc";
+  }>;
+};
+
+export type DirectorKnownLocation = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
 };
 
 export type DirectorContext = {
@@ -73,6 +109,8 @@ export type DirectorContext = {
     name: string;
     description: string;
   }>;
+  locationCard?: DirectorLocationCard;
+  knownLocations?: DirectorKnownLocation[];
   recentFeed: DirectorFeedEntry[];
 };
 
@@ -109,6 +147,8 @@ export type DirectorRequestSummary = {
   npcProfileKeys?: string[];
   npcOverrideKeys?: string[];
   npcMutationMode?: "read_only" | "bounded_updates";
+  locationKeys?: string[];
+  movementMode?: "read_only" | "bounded_existing_locations";
   readOnlyKnowledgeKeys: string[];
   requiredSceneBeat: {
     kind: SceneBeatKind;
@@ -164,6 +204,12 @@ export type ParsedNpcUpdate = {
   changes: Record<string, unknown>;
 };
 
+export type ParsedActorMove = {
+  actorKey: string;
+  toLocationKey: string;
+  reason: string;
+};
+
 export type ParsedDirectorOutput = {
   narration: string;
   npcUpdates: ParsedNpcUpdate[];
@@ -191,4 +237,24 @@ export type IgnoredNpcUpdate = {
 export type ValidatedNpcUpdates = {
   acceptedUpdates: AcceptedNpcUpdate[];
   ignoredUpdates: IgnoredNpcUpdate[];
+};
+
+export type AcceptedActorMove = {
+  actorKey: string;
+  actorName: string;
+  toLocationKey: string;
+  toLocationName: string;
+  reason: string;
+};
+
+export type IgnoredActorMove = {
+  actorKey?: string;
+  toLocationKey?: string;
+  reason: string;
+  valuePreview?: string;
+};
+
+export type ValidatedActorMoves = {
+  acceptedMoves: AcceptedActorMove[];
+  ignoredMoves: IgnoredActorMove[];
 };
