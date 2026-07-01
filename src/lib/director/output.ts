@@ -17,6 +17,10 @@ export type DirectorParseResult =
   | { ok: true; output: ParsedDirectorOutput }
   | { ok: false; error: string };
 
+export type NpcStateExtractionParseResult =
+  | { ok: true; npcUpdates: ParsedNpcUpdate[] }
+  | { ok: false; error: string };
+
 export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
   const trimmed = rawOutput.trim();
   if (!trimmed) {
@@ -54,7 +58,7 @@ export function parseDirectorOutput(rawOutput: string): DirectorParseResult {
 }
 
 export function parsePlainProseDirectorOutput(rawOutput: string): DirectorParseResult {
-  const narration = rawOutput.trim();
+  const narration = trimIncompleteTrailingSentence(rawOutput);
   if (!narration) {
     return { ok: false, error: "Game Master returned an empty response." };
   }
@@ -65,6 +69,70 @@ export function parsePlainProseDirectorOutput(rawOutput: string): DirectorParseR
       narration,
       npcUpdates: [],
     },
+  };
+}
+
+function trimIncompleteTrailingSentence(rawOutput: string) {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0 || hasCompleteSentenceEnding(trimmed)) {
+    return trimmed;
+  }
+
+  const sentenceEnd = findLastSentenceEnd(trimmed);
+  if (sentenceEnd === -1) {
+    return trimmed;
+  }
+
+  const candidate = trimmed.slice(0, sentenceEnd).trim();
+  const minimumUsefulLength = Math.min(80, Math.floor(trimmed.length * 0.6));
+  return candidate.length >= minimumUsefulLength ? candidate : trimmed;
+}
+
+function hasCompleteSentenceEnding(text: string) {
+  return /[.!?]["')\]]?$/.test(text);
+}
+
+function findLastSentenceEnd(text: string) {
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    if (!".!?".includes(text[index])) {
+      continue;
+    }
+
+    let end = index + 1;
+    while (end < text.length && `"')]} `.includes(text[end])) {
+      end += 1;
+    }
+    return end;
+  }
+
+  return -1;
+}
+
+export function parseNpcStateExtractionOutput(rawOutput: string): NpcStateExtractionParseResult {
+  const trimmed = rawOutput.trim();
+  if (!trimmed) {
+    return { ok: false, error: "NPC state extractor returned an empty response." };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: "NPC state extractor response was not valid JSON." };
+  }
+
+  if (!isRecord(parsed)) {
+    return { ok: false, error: "NPC state extractor response must be a JSON object." };
+  }
+
+  const rawUpdates = parsed.npcUpdates ?? [];
+  if (!Array.isArray(rawUpdates)) {
+    return { ok: false, error: '"npcUpdates" must be an array when provided.' };
+  }
+
+  return {
+    ok: true,
+    npcUpdates: rawUpdates.map(normalizeNpcUpdate),
   };
 }
 

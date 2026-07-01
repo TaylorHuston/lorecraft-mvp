@@ -305,7 +305,14 @@ Debug records are intentionally separate from story state.
 
 `directorCalls` stores provider/model metadata, request summaries, raw or parsed output, accepted updates, ignored updates, and errors. Local JSONL logging can also be enabled for troubleshooting route stages and timing.
 
-These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world.
+In persistent mode, a successful turn can now create two provider/debug records:
+
+- `story_generation`: the player-facing plain-prose Game Master response.
+- `npc_state_extraction`: the post-narration JSON extraction pass that may propose bounded NPC `mood`, `status`, and `memory` changes.
+
+The extractor is allowed to fail closed. If story narration succeeds but extraction fails or returns invalid JSON, the story turn remains succeeded, no fake state is written, and the extractor failure is inspectable through local logs and `directorCalls`.
+
+These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world. Accepted extractor updates become canonical only after Convex validates and writes actor-scoped facts plus turn-scoped state diffs.
 
 The debug panel also exposes recent turn summaries: sequence number, status, player input, related narration/event/diff counts, and Game Master call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
 
