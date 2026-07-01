@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: fresh `/sdd-review` safe fixes are implemented and verified.
-- Last completed action: addressed review coverage, UI/accessibility, and stale E2E guidance findings; reran focused unit tests, required CI, and deterministic browser E2E.
-- Next action: leave `npm run dev:debug` running for manual playtest, then merge only with user authorization.
-- Active branch/ref: `change/lightweight-location-objects`
-- Expected dirty files: none after the review-fix commit.
+- Current state: change closed and merged into `develop`.
+- Last completed action: merged reviewed branch into `develop`, moved this change folder under `docs/changes/closed/`, and recorded closeout state.
+- Next action: use a new SDD change for further Location/NPC iteration.
+- Active branch/ref: `develop`
+- Expected dirty files: none after the closeout commit.
 - Known blockers: none for local integration. Taylor manual UI confirmation and live provider-backed playtest remain pending/deferred.
 
 ## Task Checklist
@@ -89,8 +89,8 @@
 - [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - [x] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -197,10 +197,10 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Verified By maps current: yes
 - Changelog current: yes
 - `sdd-review` verdict: ready after fresh review fixes and verification
-- Review record: `docs/changes/2026-06-30-lightweight-location-objects/review.md`
+- Review record: `docs/changes/closed/2026-06-30-lightweight-location-objects/review.md`
 - `review.md` findings resolved: yes
 - Planning updates resolved: no unresolved planning blockers
 - Manual UI confirmation status: pending user
-- PR / merge state: not started
+- PR / merge state: merged locally into `develop`
 - Deferred scope accepted: live provider-backed `npm run dev:debug` playtest, manual UI confirmation, Dungeon mode, path/link constraints, dynamic location creation by LLM, player-facing location widget, polished World Builder, object/exit editing, full production auth/ownership/rate limiting
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
