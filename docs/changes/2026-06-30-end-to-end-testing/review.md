@@ -43,6 +43,7 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 - `npm run ci:required`: passed after the loading-state fix; proves lint, 42 Vitest tests, typecheck, and production build still pass.
 - `npm run e2e`: initially failed with a seed-button timeout, then passed after the loading-state fix; proves the deterministic browser flow now handles existing persisted local Convex state.
 - `lsof -nP -iTCP:3101 -iTCP:3102 -iTCP:3210 -sTCP:LISTEN`: no listeners after E2E; proves the test stack was cleaned up.
+- `git merge-tree --write-tree develop change/end-to-end-testing`: exited 0 with tree `79f279af962e7078e8d70c596d15d9421e78e348` after the review-fix commit.
 - `npm audit --omit=dev`: failed with existing Next/PostCSS moderate advisory; `npm audit fix --force` would install incompatible `next@9.3.3`, so no automated fix was applied.
 
 ## Review Bundle
@@ -50,12 +51,12 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 - Source branch/ref: `change/end-to-end-testing`
 - Target branch/ref: `develop`
 - Merge base: `dcb7b5ebda16cf267b6db1972b6723ea25c8b454`
-- Source-only commits: `c049e0d Add deterministic Playwright E2E`
+- Source-only commits: `c049e0d Add deterministic Playwright E2E`; `b27ec6f Address e2e review finding`
 - Target-only commits: none
 - Changed files: `.gitignore`, `CHANGELOG.md`, `README.md`, change artifacts, `docs/ci-cd.md`, LC-001 Epic, package files, Playwright config, E2E scripts, E2E spec, Vitest config, plus review fix in `src/app/world-client.tsx`
-- Diff stat: 15 files changed, 977 insertions, 1 deletion before review fix
-- Conflict check: `git merge-tree --write-tree develop change/end-to-end-testing` exited 0 with tree `51573560bcd258cf188fb623316e6497dee37395`
-- Dirty state: app repo has the intended review-fix files plus the pre-existing unstaged `docs/ci-cd.md` frontmatter edit; vault root has unrelated dirty files outside this app review
+- Diff stat: 17 files changed, 1069 insertions, 2 deletions
+- Conflict check: `git merge-tree --write-tree develop change/end-to-end-testing` exited 0 with tree `79f279af962e7078e8d70c596d15d9421e78e348`
+- Dirty state: app repo has the pre-existing unstaged `docs/ci-cd.md` frontmatter edit; vault root has unrelated dirty files outside this app review
 - Branch policy: compliant `change/*` branch from `develop`; no PR, merge, push, or closeout authorized by this review request
 
 ## Delegated Review Passes
@@ -69,7 +70,7 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 - Source branch: `change/end-to-end-testing`
 - Target branch: `develop`
 - Conflict check: clean before review fix
-- Commit state: original implementation committed; review fix handled in a separate local review-fix commit
+- Commit state: original implementation committed; review fix committed as `b27ec6f`
 - PR status: not requested
 - Merge status: not requested
 
