@@ -36,10 +36,14 @@ These checks are useful locally or during release, but they are not part of the 
 
 - `npm run convex:once`
 - `npx convex codegen`
+- `npm run e2e:install`
+- `npm run e2e`
 - Manual browser playtests against `npm run dev`
 - Provider-backed Game Master playtests with Ollama or another OpenAI-compatible endpoint
 
-Keep provider-backed and browser checks optional until they are stable, cheap, and have isolated non-production resources.
+`npm run e2e` is the deterministic browser check. It starts a local fixture OpenAI-compatible provider and a debug-enabled local app stack on test ports so Playwright can exercise the real browser, Next route, Convex state, and provider adapter without requiring a live LLM or stopping an existing normal dev server.
+
+Keep provider-backed and browser checks optional until they are stable, cheap, and have isolated non-production resources. Promote deterministic E2E to a required hosted gate only after it proves reliable enough for routine branch protection.
 
 ## Secrets And Configuration
 
