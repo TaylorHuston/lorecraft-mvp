@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Ready for `/sdd-review` on the accumulated UI polish pass.
-- Current scope: small polish on the Lorecraft MVP playtest UI only.
+- Closed on 2026-06-30 after local merge to `develop`.
+- Current scope was small polish on the Lorecraft MVP playtest UI only.
 
 ## Interactive Log
 
@@ -305,8 +305,8 @@
 ## Closeout
 
 - Review record: `review.md`.
-- Manual UI confirmation status: pending Taylor acceptance of the accumulated UI polish pass.
+- Manual UI confirmation status: Taylor accepted close/merge by requesting closeout.
 - Changelog status: not needed; this is internal MVP playtest UI polish without a release-facing behavior change.
-- PR / merge state: branch `change/ui-polish` is open locally and reviewed against `develop`; no PR, merge, or closeout has been authorized.
+- PR / merge state: merged locally into `develop` on 2026-06-30 via merge commit `Merge change/ui-polish`; no remote PR was created.
 - Deferred gaps accepted: none.
-- Folder state: active under `docs/changes/2026-06-30-ui-polish/`.
+- Folder state: closed under `docs/changes/closed/2026-06-30-ui-polish/`.
