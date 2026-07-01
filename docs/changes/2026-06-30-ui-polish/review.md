@@ -44,7 +44,7 @@ ready
   - `npm run typecheck`: passed.
   - `npm run build`: passed for Next.js 16.2.9.
 - `git diff --check develop...HEAD`: passed.
-- `git merge-tree "$(git merge-base develop HEAD)" develop HEAD | rg -n "CONFLICT|<<<<<<<|changed in both"`: no conflicts reported.
+- `git merge-tree --write-tree develop HEAD`: exited `0` and produced a merged tree object, proving the source branch can merge with `develop` without conflicts.
 - Story heading traceability check found one active heading each for `LC-001-S1` through `LC-001-S10`.
 
 ## Review Bundle
