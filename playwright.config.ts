@@ -6,8 +6,9 @@ const fixturePort = parsePort(
   3102,
   "LORECRAFT_E2E_FIXTURE_PORT",
 );
-const baseURL = process.env.LORECRAFT_E2E_BASE_URL ?? `http://127.0.0.1:${appPort}`;
-assertLoopbackBaseURL(baseURL);
+const defaultBaseURL = `http://127.0.0.1:${appPort}`;
+const baseURL = process.env.LORECRAFT_E2E_BASE_URL ?? defaultBaseURL;
+assertE2EAppBaseURL(baseURL, appPort);
 const fixtureURL = `http://127.0.0.1:${fixturePort}`;
 
 export default defineConfig({
@@ -66,7 +67,7 @@ function parsePort(value: string | undefined, fallback: number, name: string) {
   return String(port);
 }
 
-function assertLoopbackBaseURL(value: string) {
+function assertE2EAppBaseURL(value: string, expectedPort: string) {
   let url: URL;
   try {
     url = new URL(value);
@@ -80,5 +81,13 @@ function assertLoopbackBaseURL(value: string) {
 
   if (!["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
     throw new Error("LORECRAFT_E2E_BASE_URL must point to localhost or loopback.");
+  }
+
+  if (url.port !== expectedPort) {
+    throw new Error(`LORECRAFT_E2E_BASE_URL must use the configured E2E app port ${expectedPort}.`);
+  }
+
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("LORECRAFT_E2E_BASE_URL must be the E2E app origin without a path, query, or hash.");
   }
 }

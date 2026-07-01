@@ -1,3 +1,6 @@
+---
+modified: 2026-06-30
+---
 # CI/CD
 
 Lorecraft keeps its CI/CD policy in this file so the repository is self-contained.
