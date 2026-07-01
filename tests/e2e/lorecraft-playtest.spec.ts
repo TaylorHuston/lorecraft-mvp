@@ -43,6 +43,9 @@ test.describe("LC-001-S11 End To End Playtest Verification", () => {
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "npc_state_extraction",
     );
+    await expect(page.locator("#debug-list-npc-state-changes-items")).toContainText(
+      "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
+    );
 
     await page.locator("#rough-reset-button").click();
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });

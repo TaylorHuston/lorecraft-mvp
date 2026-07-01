@@ -108,6 +108,8 @@ npm run e2e
 
 The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It builds and runs Next on a separate port so it can run without stopping an already-running `next dev` server for normal playtesting. It verifies the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the persisted story, inspect debug turn evidence, and reset for another turn. This path is deterministic and does not call Ollama, OpenRouter, Vercel AI Gateway, or any hosted model.
 
+The E2E script is intentionally local-only and destructive against its local test state. `LORECRAFT_E2E_BASE_URL` must point to localhost or loopback, and the local Convex port `3210` must be free so Playwright starts the intended anonymous E2E Convex service instead of reusing an existing playtest backend.
+
 Live-provider playtest scripts remain separate because they evaluate local model/runtime behavior rather than deterministic browser integration.
 
 ## What Is Scaffolded

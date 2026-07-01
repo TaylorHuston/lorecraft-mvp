@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: review finding fixed; ready for fresh `/sdd-review`
-- Last completed action: `/sdd-review` found a seed-button race, fixed it, and verification passed
+- Current state: delegated review findings fixed; ready for fresh `/sdd-review`
+- Last completed action: delegated `/sdd-review` found E2E isolation, R3 assertion, and artifact drift issues; fixes were applied and verification passed
 - Next action: rerun `/sdd-review` for a fresh clean verdict
 - Active branch/ref: `change/end-to-end-testing`
 - Branch note: branch policy compliant for planned test/config/runtime implementation; target branch is `develop`
@@ -47,6 +47,7 @@
       - [x] Scenario R2-S3: Reset returns to a clean playtest state
 - [x] 2.6 Update Story-level Implemented By maps with current code locations.
 - [x] 2.7 Address review-found default-world loading race so the seed-empty state is not rendered while Convex is still loading the default world.
+- [x] 2.8 Address delegated review findings for local-only E2E guardrails, Convex reuse prevention, port validation, and accepted extraction assertions.
 
 ### 3. Verification
 
@@ -67,7 +68,7 @@
 - [x] 5.1 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
 - [x] 5.2 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit Taylor-approved review waiver.
 - [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 5.4 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
+- [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [ ] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
 - [ ] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
@@ -84,6 +85,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-30 | LC-001-S11 implementation | main with Playwright and local Next docs; Convex guidelines checked because E2E drives Convex state | `playwright.config.ts`, `scripts/llm-fixture-server.mjs`, `scripts/e2e-next-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts`, `vitest.config.ts`, package files | Added deterministic fixture-backed browser E2E for seed/reset, Enter submission, pending state, persisted reload, debug drawer, Game Master evidence, and reset reuse | committed |
 | 2026-06-30 | Documentation and Epic reconciliation | main | LC-001 Epic, README, `docs/ci-cd.md`, CHANGELOG, change artifacts | Documented E2E scripts, optional CI placement, deterministic fixture behavior, and current verification evidence | committed |
 | 2026-06-30 | Review remediation | main with `sdd-review` | `src/app/world-client.tsx`, LC-001 Epic, change review artifacts | Fixed default-world loading race exposed by review E2E rerun; seed-empty state no longer appears while Convex is still loading the default world | review-fix commit |
+| 2026-07-01 | Delegated review remediation | main with delegated `sdd-review` passes | `playwright.config.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, README, LC-001 Epic, change artifacts | Added loopback-only E2E base URL guard, E2E port validation, no-reuse Convex startup, accepted NPC extraction assertion, and stale artifact cleanup | review-fix commit |
 
 ## Verification Ledger
 
@@ -104,6 +106,14 @@ Record proof as it happens.
 | 2026-06-30 | Review rerun: test server cleanup check | E2E fixture, Convex, and Next test ports were not left listening after successful rerun | passed |
 | 2026-06-30 | Review rerun: `git merge-tree --write-tree develop change/end-to-end-testing` | Updated source branch can merge cleanly into `develop` without performing the merge | passed |
 | 2026-06-30 | Review rerun: `npm audit --omit=dev` | Production dependency audit after dependency addition | failed: existing Next/PostCSS moderate advisory; `npm audit fix --force` would install incompatible Next 9.3.3, so no automated fix applied |
+| 2026-07-01 | Delegated review: artifact truth | Proposal/design/tasks/Epic/review consistency | changes requested: stale implemented/verified design text, stale LC-001-S1 browser gap, stale manual-status checklist, and stale review verdict were found |
+| 2026-07-01 | Delegated review: code/security | E2E harness safety, local mutation boundaries, dependency/security review | changes requested: remote base URL mutation risk, Convex reuse risk, and port env validation suggestion were found |
+| 2026-07-01 | Delegated review: verification/docs/integration | R1-R4 coverage, docs/changelog accuracy, merge readiness | changes requested: missing R3-S2 accepted extraction assertion and stale lifecycle state were found |
+| 2026-07-01 | Delegated review rerun: `npm run ci:required` | Safe delegated review fixes preserve lint, Vitest, typecheck, and production build | passed |
+| 2026-07-01 | Delegated review rerun: `npm run e2e` | Safe delegated review fixes preserve deterministic browser E2E with accepted extraction assertion | passed |
+| 2026-07-01 | Delegated review rerun: test server cleanup check | E2E fixture, Convex, and Next test ports were not left listening after successful rerun | passed |
+| 2026-07-01 | Delegated review rerun: `LORECRAFT_E2E_BASE_URL=https://example.com npx playwright test --list` | E2E config refuses non-loopback targets before starting destructive browser flows | passed: failed closed with expected loopback error |
+| 2026-07-01 | Delegated review rerun: `npm audit --omit=dev` | Production dependency audit after dependency addition | failed: existing Next/PostCSS moderate advisory; `npm audit fix --force` would install incompatible Next 9.3.3, so no automated fix applied |
 
 ## Manual Feedback
 
@@ -167,11 +177,11 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Implemented By maps current: yes
 - Verified By maps current: yes
 - Changelog current: yes
-- `sdd-review` verdict: changes-requested; review finding fixed and ready for fresh review
+- `sdd-review` verdict: changes-requested; delegated review findings fixed and ready for fresh review
 - Review record: `docs/changes/2026-06-30-end-to-end-testing/review.md`
-- `review.md` findings resolved:
-- Planning updates resolved:
-- Manual UI confirmation status:
+- `review.md` findings resolved: yes, pending a fresh clean review verdict
+- Planning updates resolved: yes
+- Manual UI confirmation status: pending Taylor
 - PR / merge state:
-- Deferred scope accepted:
+- Deferred scope accepted: visual regression, cross-browser matrix, required real-model/provider E2E, hosted branch-protection E2E, load/concurrency/rollback/mobile testing remain deferred
 - Change moved to `docs/changes/closed/`:

@@ -76,11 +76,12 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 - Runtime `curl http://localhost:3000` under `npm run dev` returned the narrative UI HTML.
 - Runtime POST to `/api/director/turn` with local Ollama `llama3.1:8b` returned a persisted Game Master narration.
 - `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed player input, Game Master narration, and event feed entries ordered from persisted rows.
+- `npm run e2e` passed with browser assertions for seeded world readiness, narrative input submission, pending state, persisted reload, debug turn evidence, and reset reuse.
 
 ### Verification Gaps
 
 - No unresolved implementation gap for this Story.
-- Full browser click automation is not yet installed; verification used route-level HTTP checks, Convex snapshot reads, and build/lint/type checks.
+- No unresolved browser automation gap for the current MVP play-feed path.
 
 ## Story LC-001-S2: Provider-Agnostic Backend Game Master Boundary
 
@@ -1240,7 +1241,7 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 - `npm run typecheck` passed after adding Playwright config and E2E tests.
 - `npm run lint` passed after adding Playwright config and E2E tests.
 - `npm run e2e:install` installed the local Chromium browser for Playwright.
-- `npm run e2e` passed after adding deterministic fixture provider, split Convex/Next server startup, and browser assertions for seed/reset, Enter submission, pending state, persisted reload state, debug drawer toggling, Game Master call evidence, and reset reuse.
+- `npm run e2e` passed after adding deterministic fixture provider, split Convex/Next server startup, and browser assertions for seed/reset, Enter submission, pending state, persisted reload state, debug drawer toggling, Game Master call evidence, accepted NPC memory extraction evidence, and reset reuse.
 - `npm run ci:required` passed after excluding Playwright specs from Vitest unit-test discovery.
 - During `/sdd-review`, `npm run e2e` initially reproduced a seed-button race against persisted local Convex state; after adding the default-world loading state, `npm run ci:required` and `npm run e2e` passed.
 

@@ -4,22 +4,22 @@
 
 changes-requested
 
-The review found one deterministic E2E reliability issue. It was fixed during review and the affected checks now pass. Per `/sdd-review` remediation rules, rerun `/sdd-review` for a fresh clean verdict before merge or closeout.
+Delegated `/sdd-review` found artifact drift, E2E safety guardrail gaps, and one missing R3 extraction assertion. The findings were fixed during review and the affected checks now pass. Per `/sdd-review` remediation rules, rerun `/sdd-review` for a fresh clean verdict before merge or closeout.
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | pass after fix | Proposal/design/tasks align with `LC-001-S11`; tasks now records this review finding and remediation. |
-| Epic truth | pass after fix | `LC-001-S11` exists with concrete Requirements, Scenarios, Implemented By, Verified By, and gaps. |
-| Requirements and Scenarios | pass after fix | R1-R4 are covered by deterministic E2E and script/docs boundaries. |
+| Change artifacts | pass after fix | Proposal/design/tasks align with `LC-001-S11`; tasks records delegated findings and remediation. |
+| Epic truth | pass after fix | `LC-001-S11` exists with concrete Requirements, Scenarios, Implemented By, Verified By, and gaps; stale `LC-001-S1` browser automation gap was removed. |
+| Requirements and Scenarios | pass after fix | R1-R4 are covered by deterministic E2E and script/docs boundaries; R3-S2 now asserts accepted NPC extraction evidence. |
 | ID traceability | pass | Story IDs are unique across active app Epics. |
 | Tests and verification | pass after fix | Review rerun passed `npm run ci:required` and `npm run e2e`. |
 | Manual UI confirmation | pass with pending status | `tasks.md` records Taylor confirmation as pending with a walkthrough. |
-| Code review | changes-requested, fixed | Review rerun exposed a seed-button race; fixed in `src/app/world-client.tsx`. |
-| Visual / UX consistency | pass | The loading-state fix is minimal and consistent with existing dark loading copy. |
-| Security review | pass with known dependency advisory | No secrets or new public attack surface. `npm audit --omit=dev` still reports the existing Next/PostCSS advisory with no safe automated fix. |
-| Documentation | pass after fix | README, CI/CD docs, Epic, and tasks describe the E2E layer. |
+| Code review | pass after fix | Default-world loading race, E2E remote-target risk, Convex reuse risk, port validation, and R3 assertion gap were fixed. |
+| Visual / UX consistency | pass | The only UI change is a minimal loading-state distinction consistent with existing dark loading copy. |
+| Security review | pass with known dependency advisory | No secrets or new production auth surface. `npm audit --omit=dev` still reports the existing Next/PostCSS advisory with no safe automated fix. |
+| Documentation | pass after fix | README, CI/CD docs, Epic, and tasks describe the E2E layer and local-only guardrails. |
 | Changelog | pass | `CHANGELOG.md` has a public-safe Unreleased Added entry. |
 | Branch and merge readiness | changes-requested until fresh review | Source branch follows policy and merge-tree is clean; rerun review after this safe-fix commit. |
 | PRD alignment | not applicable | This is test infrastructure for the existing MVP scope, not a product scope change. |
@@ -28,22 +28,29 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 
 ### BLOCKING
 
-- [x] `src/app/world-client.tsx:373` - The app rendered the seed-empty state while `useQuery(api.world.getDefaultWorld)` was still loading, so the Playwright test could see `#seed-world-button`, then the existing-world UI replaced it before the click. Impact: deterministic E2E could hang for the full test timeout when prior local Convex state existed. Recommendation: distinguish default-world loading from no-world state before rendering the seed control.
+- [x] `tests/e2e/lorecraft-playtest.spec.ts` - R3-S2 was overclaimed because E2E checked only that `npc_state_extraction` appeared in debug calls, not that the fixture's expected bounded NPC update was accepted. Impact: the deterministic fixture extraction path could regress while the Story still appeared verified. Recommendation: assert the expected accepted NPC memory update in the debug `NPC state changes` list.
 
 ### REQUIRED
 
-- None.
+- [x] `docs/changes/2026-06-30-end-to-end-testing/design.md` - The design Story section still said `Not implemented yet`, `Not verified yet`, and implementation/verification were pending. Impact: active change artifacts contradicted Epic truth and repo reality. Recommendation: update the design with implementation and verification evidence.
+- [x] `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` - `LC-001-S1` still said full browser click automation was not installed. Impact: stale verification gap after Playwright E2E now covers the current MVP play-feed path. Recommendation: add E2E evidence and replace the stale gap.
+- [x] `docs/changes/2026-06-30-end-to-end-testing/tasks.md` - Manual UI confirmation status was present as `pending Taylor`, but checklist/closeout fields were not reconciled. Impact: closeout state stayed contradictory. Recommendation: mark status recording complete and fill closeout status fields.
+- [x] `playwright.config.ts` - `LORECRAFT_E2E_BASE_URL` could point the destructive seed/reset test at a non-local app. Impact: accidental mutation of preview, production, or shared data. Recommendation: fail closed unless the base URL is localhost or loopback.
+- [x] `playwright.config.ts` - Convex `webServer` used `reuseExistingServer: true` for port `3210`. Impact: E2E could run destructive seed/reset flows against a developer's existing local playtest backend and hide startup failures. Recommendation: do not reuse an existing Convex server for deterministic E2E.
+- [x] `playwright.config.ts` - E2E port environment variables were interpolated into shell command strings without validation. Impact: malformed values could break startup and widened command-string risk. Recommendation: parse and validate ports before constructing commands.
+- [x] `docs/changes/2026-06-30-end-to-end-testing/review.md` and `tasks.md` - Lifecycle still reflected the previous `changes-requested` review state. Impact: accurate before this run, but not ready for a fresh verdict until updated after delegated review. Recommendation: record current delegated findings and remediation.
 
 ### SUGGESTION
 
-- None.
+- None remaining after remediation.
 
 ## Verification Evidence
 
-- `npm run ci:required`: passed after the loading-state fix; proves lint, 42 Vitest tests, typecheck, and production build still pass.
-- `npm run e2e`: initially failed with a seed-button timeout, then passed after the loading-state fix; proves the deterministic browser flow now handles existing persisted local Convex state.
+- `npm run ci:required`: passed after delegated review remediation; proves lint, 42 Vitest tests, typecheck, and production build still pass.
+- `npm run e2e`: passed after delegated review remediation; proves the deterministic browser flow, loopback-only E2E configuration, non-reused Convex startup, and accepted NPC extraction assertion.
 - `lsof -nP -iTCP:3101 -iTCP:3102 -iTCP:3210 -sTCP:LISTEN`: no listeners after E2E; proves the test stack was cleaned up.
-- `git merge-tree --write-tree develop change/end-to-end-testing`: exited 0 after review remediation.
+- `LORECRAFT_E2E_BASE_URL=https://example.com npx playwright test --list`: failed closed with the expected loopback-only error before starting any web servers.
+- `git merge-tree --write-tree develop change/end-to-end-testing`: exited 0 during review before the latest safe-fix commit; rerun on the next review pass before merge.
 - `npm audit --omit=dev`: failed with existing Next/PostCSS moderate advisory; `npm audit fix --force` would install incompatible `next@9.3.3`, so no automated fix was applied.
 
 ## Review Bundle
@@ -51,11 +58,11 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 - Source branch/ref: `change/end-to-end-testing`
 - Target branch/ref: `develop`
 - Merge base: `dcb7b5ebda16cf267b6db1972b6723ea25c8b454`
-- Source-only commits: implementation commit plus review remediation/evidence commits on `change/end-to-end-testing`
+- Source-only commits before this remediation: `c049e0d`, `b27ec6f`, `84d7ebe`, `ecf6599`
 - Target-only commits: none
-- Changed files: `.gitignore`, `CHANGELOG.md`, `README.md`, change artifacts, `docs/ci-cd.md`, LC-001 Epic, package files, Playwright config, E2E scripts, E2E spec, Vitest config, plus review fix in `src/app/world-client.tsx`
-- Diff stat: 17 files changed, 1069 insertions, 2 deletions
-- Conflict check: `git merge-tree --write-tree develop change/end-to-end-testing` exited 0 after review remediation
+- Changed files: `.gitignore`, `CHANGELOG.md`, `README.md`, change artifacts, `docs/ci-cd.md`, LC-001 Epic, package files, Playwright config, E2E scripts, E2E spec, Vitest config, plus review fixes in `src/app/world-client.tsx`
+- Diff stat before delegated review remediation: 17 files changed, 1071 insertions, 2 deletions
+- Conflict check: `git merge-tree --write-tree develop change/end-to-end-testing` exited 0 before delegated review remediation
 - Dirty state: app repo has the pre-existing unstaged `docs/ci-cd.md` frontmatter edit; vault root has unrelated dirty files outside this app review
 - Branch policy: compliant `change/*` branch from `develop`; no PR, merge, push, or closeout authorized by this review request
 
@@ -63,17 +70,21 @@ The review found one deterministic E2E reliability issue. It was fixed during re
 
 | Pass | Reviewer | Result | Notes |
 |---|---|---|---|
-| Main-thread review | Codex | changes-requested, fixed | Subagent tooling was available but current tool policy requires explicit user delegation, so review stayed on the main thread. |
+| Artifact truth / Epic traceability | Bernoulli | changes-requested, fixed | Found stale design implementation/verification text, stale `LC-001-S1` browser automation gap, stale manual-status checklist, and stale review lifecycle state. |
+| Code / security | Arendt | changes-requested, fixed | Found remote base URL mutation risk, Convex server reuse risk, and unvalidated E2E port env vars. |
+| Verification / docs / integration | Plato | changes-requested, fixed | Found missing R3-S2 accepted extraction assertion and stale lifecycle state. |
+| Main-thread validation | Codex | changes-requested, fixed | Validated delegated claims, applied safe fixes, reran required CI, E2E, audit, and test-port cleanup. |
 
 ## PR / Merge Readiness
 
 - Source branch: `change/end-to-end-testing`
 - Target branch: `develop`
-- Conflict check: clean before review fix
-- Commit state: original implementation committed; review remediation committed separately
+- Conflict check: clean before delegated review remediation; rerun after this safe-fix commit before merge
+- Commit state: original implementation and first review remediation committed; delegated review remediation handled as a separate review-fix commit
 - PR status: not requested
 - Merge status: not requested
 
 ## Review Log
 
 - 2026-06-30: Review created after finding and fixing the default-world loading race exposed by `npm run e2e`.
+- 2026-07-01: Delegated review found additional artifact, E2E safety, and R3 assertion gaps; fixes were applied and verification passed.

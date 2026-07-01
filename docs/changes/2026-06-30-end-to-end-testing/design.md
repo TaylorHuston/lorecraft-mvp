@@ -133,15 +133,21 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 
 ##### Implemented By
 
-Not implemented yet.
+- `playwright.config.ts` configures the deterministic local Chromium E2E stack.
+- `scripts/llm-fixture-server.mjs` provides the fixture OpenAI-compatible provider.
+- `scripts/e2e-next-server.mjs` builds and serves the Next app for the E2E run.
+- `tests/e2e/lorecraft-playtest.spec.ts` verifies seed/reset, turn submission, persisted reload, debug evidence, and NPC extraction output.
+- `src/app/world-client.tsx` provides stable loading/seed states and debug evidence for the browser test.
 
 ##### Verified By
 
-Not verified yet.
+- `npm run ci:required` passed after implementation and review remediation.
+- `npm run e2e` passed after implementation and review remediation.
+- Delegated `/sdd-review` passes checked artifact truth, code/security, verification coverage, docs, and integration readiness.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Taylor manual browser confirmation remains pending.
 
 ## Technical Approach
 
