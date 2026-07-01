@@ -60,6 +60,7 @@ export function WorldClient() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(false);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
   const [npcOverrides, setNpcOverrides] = useState<Record<string, NpcDebugOverride>>({});
   const [npcOverrideSaveStatus, setNpcOverrideSaveStatus] = useState<
@@ -79,6 +80,7 @@ export function WorldClient() {
   const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
+  const topBarWorldName = snapshot?.world.name ?? (worldId ? "Loading world" : "No world");
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -183,7 +185,6 @@ export function WorldClient() {
         return;
       }
 
-      setNotice("Game Master response persisted.");
     } catch (submitError) {
       setError(errorMessage(submitError));
       setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
@@ -328,44 +329,75 @@ export function WorldClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[#08090b] text-zinc-100">
-      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:h-screen lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
-        <section className="flex h-screen min-h-0 flex-col px-5 py-6 sm:px-8 lg:px-10">
-          <header className="shrink-0 border-b border-zinc-800 pb-5">
-            <p className="text-sm uppercase text-cyan-300">Lorecraft MVP</p>
-            <h1 className="mt-3 text-3xl font-semibold text-zinc-50 sm:text-5xl">
-              Stormbound Chapel
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-300">
-              A narrative Game Master loop for testing persistent scene memory and Mira&apos;s evolving state.
-            </p>
-          </header>
-
-          <div className="flex min-h-0 flex-1 flex-col gap-5 py-6">
+    <main id="lorecraft-app" className="min-h-screen bg-[#090908] pt-12 text-zinc-100">
+      <div
+        id="app-top-bar"
+        className="fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
+      >
+        <div
+          id="app-top-bar-inner"
+          className="flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
+        >
+          <div id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
+            <span className="text-amber-300">Lorecraft</span>
+            <span className="px-2 text-zinc-600">-</span>
+            <span className="truncate text-zinc-300">{topBarWorldName}</span>
+          </div>
+          <button
+            id="debug-panel-toggle"
+            type="button"
+            onClick={() => setIsDebugPanelCollapsed((current) => !current)}
+            aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+            aria-pressed={!isDebugPanelCollapsed}
+            className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
+              isDebugPanelCollapsed
+                ? "border-zinc-700"
+                : "border-amber-300/70 bg-amber-950/20 text-amber-200"
+            }`}
+            title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+          >
+            <GearIcon />
+          </button>
+        </div>
+      </div>
+      <div
+        id="app-workbench"
+        className="grid min-h-[calc(100vh-3rem)] grid-cols-1 lg:h-[calc(100vh-3rem)] lg:overflow-hidden"
+      >
+        <section
+          id="story-panel"
+          className="flex h-[calc(100vh-3rem)] min-h-0 flex-col"
+        >
+          <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
             {!worldId ? (
-              <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4">
-                <p className="max-w-xl text-lg text-zinc-300">
+              <div
+                id="seed-world-empty-state"
+                className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4"
+              >
+                <p className="max-w-xl text-base leading-7 text-zinc-300">
                   Seed a fresh demo world to begin the transcript playtest.
                 </p>
                 <button
+                  id="seed-world-button"
                   type="button"
                   onClick={handleSeed}
-                  className="border border-cyan-300 bg-cyan-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-cyan-200"
+                  className="rounded-md border border-amber-300 bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200"
                 >
                   Seed Stormbound Chapel
                 </button>
               </div>
             ) : snapshot === undefined ? (
-              <p className="text-zinc-400">Loading world state...</p>
+              <p id="world-loading-state" className="text-zinc-400">Loading world state...</p>
             ) : snapshot === null ? (
-              <div className="min-h-0 flex-1 space-y-4">
+              <div id="world-missing-state" className="min-h-0 flex-1 space-y-4">
                 <p className="text-zinc-300">
                   The selected world is missing required player or room state.
                 </p>
                 <button
+                  id="seed-or-reload-world-button"
                   type="button"
                   onClick={handleSeed}
-                  className="border border-cyan-300 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-zinc-900"
+                  className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-950/20"
                 >
                   Seed or reload demo world
                 </button>
@@ -373,15 +405,20 @@ export function WorldClient() {
             ) : (
               <>
                 <section
+                  id="story-stream"
                   ref={storyScrollerRef}
-                  className="min-h-0 flex-1 overflow-y-auto border-y border-zinc-800 bg-zinc-950/40 px-3 py-5 sm:px-5"
+                  className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10"
                 >
-                  <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end">
+                  <div
+                    id="story-stream-inner"
+                    className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end pr-0 sm:pr-12"
+                  >
                     {snapshot.feed.length > 0 ? (
-                      <div className="space-y-7">
+                      <div id="story-feed" className="space-y-8">
                         {snapshot.feed.map((entry) => (
                           <StoryEntry
                             key={entry.id}
+                            id={entry.id}
                             kind={entry.kind}
                             text={entry.text}
                             turnNumber={entry.turnId ? turnSequenceById.get(entry.turnId) : undefined}
@@ -389,9 +426,9 @@ export function WorldClient() {
                         ))}
                       </div>
                     ) : (
-                      <div className="flex flex-1 items-end pb-8 text-zinc-500">
+                      <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
                         <p className="max-w-md text-base leading-7 text-zinc-400">
-                          The chapel waits in rain and lanternlight.
+                          The chapel waits in rain and lantern light.
                         </p>
                       </div>
                     )}
@@ -399,59 +436,92 @@ export function WorldClient() {
                 </section>
 
                 <form
+                  id="narrative-input-form"
                   onSubmit={handleSubmit}
-                  className="shrink-0 border border-zinc-800 bg-zinc-900/80 p-4 shadow-2xl shadow-black/30"
+                  className="mx-auto mb-5 w-[calc(100%-2.5rem)] max-w-[50rem] shrink-0 rounded-2xl bg-zinc-800/95 px-5 py-3 shadow-2xl shadow-black/35 sm:w-[calc(100%-4rem)] lg:w-[calc(100%-5rem)]"
                 >
-                  <label htmlFor="director-input" className="text-sm font-medium text-zinc-300">
-                    Continue
-                  </label>
-                  <textarea
-                    id="director-input"
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={handleInputKeyDown}
-                    placeholder="I ask Mira what she knows about the storm."
-                    rows={3}
-                    className="mt-2 min-h-24 w-full resize-y border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-300"
-                  />
-                  {isSubmitting ? <p className="mt-3 text-sm text-zinc-400">Game Master thinking...</p> : null}
-                  {notice ? <p className="mt-3 text-sm text-cyan-200">{notice}</p> : null}
-                  {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
+                  {isSubmitting ? (
+                    <TurnPendingPlaceholder />
+                  ) : (
+                    <>
+                      <label
+                        htmlFor="director-input"
+                        className="block text-sm font-medium leading-6 text-zinc-100"
+                      >
+                        What do you do next?
+                      </label>
+                      <textarea
+                        id="director-input"
+                        value={input}
+                        onChange={(event) => setInput(event.target.value)}
+                        onKeyDown={handleInputKeyDown}
+                        placeholder="Type your response..."
+                        rows={2}
+                        className="mt-1 min-h-12 w-full resize-none bg-transparent text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
+                      />
+                    </>
+                  )}
+                  {notice ? (
+                    <p id="turn-notice-message" className="mt-3 text-xs text-emerald-300/80">
+                      {notice}
+                    </p>
+                  ) : null}
+                  {error ? (
+                    <p id="turn-error-message" className="mt-3 text-sm text-rose-300">
+                      {error}
+                    </p>
+                  ) : null}
                 </form>
               </>
             )}
           </div>
         </section>
 
-        <aside className="border-t border-zinc-800 bg-zinc-900 px-5 py-6 lg:h-screen lg:overflow-y-auto lg:border-l lg:border-t-0">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-50">Debug panel</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">
+        <aside
+          id="debug-panel"
+          className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[380px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[380px] ${
+            isDebugPanelCollapsed
+              ? "pointer-events-none translate-x-full"
+              : "translate-x-0"
+          }`}
+          aria-hidden={isDebugPanelCollapsed}
+          inert={isDebugPanelCollapsed ? true : undefined}
+        >
+          <div
+            id="debug-panel-header"
+            className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col"
+          >
+            <div id="debug-panel-title-block">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-zinc-300">
+                Debug panel
+              </h2>
+              <p className="mt-2 text-xs leading-5 text-zinc-500">
                 Hidden world state, Game Master calls, validation decisions, events, and state diffs.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div id="debug-panel-actions" className="flex flex-wrap gap-2">
               <button
+                id="fresh-seed-button"
                 type="button"
                 onClick={handleSeed}
-                className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
               >
-                Fresh seed
+                Reset World
               </button>
               <button
+                id="rough-reset-button"
                 type="button"
                 onClick={handleReset}
                 disabled={!worldId || isResetting}
-                className="border border-rose-400 px-3 py-2 text-sm text-rose-200 hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded border border-rose-500/70 px-3 py-1.5 text-xs text-rose-200 hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isResetting ? "Resetting" : "Rough reset"}
+                {isResetting ? "Resetting" : "Reset Session"}
               </button>
             </div>
           </div>
 
           {snapshot ? (
-            <div className="mt-6 space-y-6">
+            <div id="debug-panel-content" className="mt-6 space-y-6">
               <DebugTabs value={debugTab} onChange={setDebugTab} />
               {debugTab === "prompt" ? (
                 <DirectorPromptControls
@@ -513,7 +583,9 @@ export function WorldClient() {
               ) : null}
             </div>
           ) : (
-            <p className="mt-6 text-sm text-zinc-500">Seed a world to inspect state.</p>
+            <p id="debug-panel-empty-state" className="mt-6 text-sm text-zinc-500">
+              Seed a world to inspect state.
+            </p>
           )}
         </aside>
       </div>
@@ -521,21 +593,66 @@ export function WorldClient() {
   );
 }
 
+function GearIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
+      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.7a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.3a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
+    </svg>
+  );
+}
+
+function TurnPendingPlaceholder() {
+  return (
+    <div
+      id="turn-pending-placeholder"
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[4.5rem] items-center gap-3 text-sm text-zinc-300"
+    >
+      <span className="sr-only">Game Master is writing a response.</span>
+      <span className="flex gap-1" aria-hidden="true">
+        <span className="size-2 animate-pulse rounded-full bg-amber-300/90 [animation-delay:0ms]" />
+        <span className="size-2 animate-pulse rounded-full bg-amber-300/70 [animation-delay:150ms]" />
+        <span className="size-2 animate-pulse rounded-full bg-amber-300/50 [animation-delay:300ms]" />
+      </span>
+      <span aria-hidden="true" className="text-zinc-400">
+        The story is turning...
+      </span>
+    </div>
+  );
+}
+
 function StoryEntry({
+  id,
   kind,
   text,
   turnNumber,
 }: {
+  id: string;
   kind: "player" | "director" | "event";
   text: string;
   turnNumber?: number;
 }) {
+  const entryDomId = `story-entry-${kind}-${domId(id)}`;
+
   if (kind === "player") {
     return (
-      <StoryEntryShell turnNumber={turnNumber}>
-        <article className="border-l-2 border-cyan-400/70 pl-4 text-cyan-50">
-          <p className="text-xs uppercase text-cyan-300">Player</p>
-          <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-cyan-50">{text}</p>
+      <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+        <article id={`${entryDomId}-player-input`} className="border-l-2 border-amber-300/70 pl-4 text-amber-50">
+          <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-amber-300/80">
+            Player
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-amber-50">{text}</p>
         </article>
       </StoryEntryShell>
     );
@@ -543,8 +660,11 @@ function StoryEntry({
 
   if (kind === "event") {
     return (
-      <StoryEntryShell turnNumber={turnNumber}>
-        <aside className="mx-auto max-w-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-center text-xs leading-5 text-zinc-500">
+      <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+        <aside
+          id={`${entryDomId}-world-event`}
+          className="mx-auto max-w-xl rounded border border-emerald-900/60 bg-emerald-950/10 px-3 py-2 text-center text-xs leading-5 text-emerald-300/60"
+        >
           {text}
         </aside>
       </StoryEntryShell>
@@ -552,9 +672,9 @@ function StoryEntry({
   }
 
   return (
-    <StoryEntryShell turnNumber={turnNumber}>
-      <article>
-        <p className="whitespace-pre-wrap text-base leading-7 text-zinc-100 sm:text-lg sm:leading-8">
+    <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+      <article id={`${entryDomId}-game-master-narration`}>
+        <p className="whitespace-pre-wrap text-[1.08rem] leading-8 text-zinc-200 text-justify">
           {text}
         </p>
       </article>
@@ -563,18 +683,23 @@ function StoryEntry({
 }
 
 function StoryEntryShell({
+  id,
   turnNumber,
   children,
 }: {
+  id: string;
   turnNumber?: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.5rem_minmax(0,1fr)]">
-      <div className="pt-1 text-right text-xs tabular-nums text-zinc-600">
+    <div
+      id={id}
+      className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.25rem_minmax(0,1fr)]"
+    >
+      <div id={`${id}-turn-number`} className="pt-1 text-right text-xs tabular-nums text-zinc-700">
         {turnNumber ? turnNumber : ""}
       </div>
-      <div className="min-w-0">{children}</div>
+      <div id={`${id}-body`} className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -587,15 +712,16 @@ function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: Deb
   ];
 
   return (
-    <div className="grid grid-cols-3 border border-zinc-800 text-xs uppercase">
+    <div id="debug-tabs" className="grid grid-cols-3 rounded-md border border-zinc-800 text-xs uppercase">
       {tabs.map((tab) => (
         <button
+          id={`debug-tab-${tab.value}`}
           key={tab.value}
           type="button"
           onClick={() => onChange(tab.value)}
           className={`px-3 py-2 ${
             value === tab.value
-              ? "bg-zinc-100 text-zinc-950"
+              ? "bg-amber-300 text-zinc-950"
               : "bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
           }`}
         >
@@ -654,24 +780,26 @@ function NpcDebugPanel({
   ];
 
   return (
-    <section className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-medium uppercase text-zinc-300">NPCs</h3>
+    <section id="npc-debug-panel" className="space-y-4">
+      <div id="npc-debug-panel-header" className="flex items-start justify-between gap-4">
+        <div id="npc-debug-panel-title-block">
+          <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">NPCs</h3>
           <p className="mt-2 text-xs leading-5 text-zinc-500">
             Temporary debug NPC values are server-local and disappear on restart.
           </p>
         </div>
         <button
+          id="add-debug-npc-button"
           type="button"
           onClick={onAdd}
-          className="shrink-0 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+          className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
         >
           Add NPC
         </button>
       </div>
       {npcs.length > 0 ? (
         npcs.map((npc) => {
+          const npcDomId = `npc-card-${domId(npc.key)}`;
           const override = overrides[npc.key] ?? {};
           const overrideFacts = override.facts ?? {};
           const actorFacts = npc.debugOnly
@@ -688,10 +816,14 @@ function NpcDebugPanel({
           const isCollapsed = Boolean(collapsedNpcKeys[npc.key]);
 
           return (
-            <div key={npc.key} className="border border-zinc-800 bg-zinc-950/50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium uppercase text-zinc-300">
+            <div
+              id={npcDomId}
+              key={npc.key}
+              className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3"
+            >
+              <div id={`${npcDomId}-header`} className="flex items-start justify-between gap-3">
+                <div id={`${npcDomId}-identity`}>
+                  <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
                     {npc.name} <span className="text-zinc-600">({npc.key})</span>
                   </h3>
                   <p className="mt-2 text-xs leading-5 text-zinc-500">
@@ -699,20 +831,22 @@ function NpcDebugPanel({
                     {npc.debugOnly ? " (debug-only)" : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs uppercase text-zinc-500">{statusLabel}</span>
+                <div id={`${npcDomId}-actions`} className="flex shrink-0 items-center gap-2">
+                  <span id={`${npcDomId}-save-status`} className="text-xs uppercase text-emerald-300/60">{statusLabel}</span>
                   <button
+                    id={`${npcDomId}-collapse-toggle`}
                     type="button"
                     onClick={() => onToggleCollapsed(npc.key)}
-                    className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
                   >
                     {isCollapsed ? "Expand" : "Collapse"}
                   </button>
                   <button
+                    id={`${npcDomId}-reset-button`}
                     type="button"
                     onClick={() => onClear(npc.key)}
                     disabled={isSaving || !overrides[npc.key]}
-                    className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Reset
                   </button>
@@ -720,7 +854,7 @@ function NpcDebugPanel({
               </div>
 
               {!isCollapsed ? (
-                <div className="mt-4 space-y-4">
+                <div id={`${npcDomId}-fields`} className="mt-4 space-y-4">
                   <NpcOverrideTextarea
                     actorKey={npc.key}
                     label="Name"
@@ -759,7 +893,7 @@ function NpcDebugPanel({
           );
         })
       ) : (
-        <p className="text-sm text-zinc-500">No NPCs in the current scene.</p>
+        <p id="npc-debug-panel-empty-state" className="text-sm text-zinc-500">No NPCs in the current scene.</p>
       )}
     </section>
   );
@@ -806,11 +940,11 @@ function NpcOverrideTextarea({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const id = `npc-override-${actorKey}-${label}`.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+  const id = `npc-override-${domId(actorKey)}-${domId(label)}`;
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div id={`${id}-field`}>
+      <div id={`${id}-field-header`} className="mb-2 flex items-center justify-between gap-3">
         <label htmlFor={id} className="text-xs font-medium text-zinc-400">
           {label}
           <span className="ml-2 font-normal text-zinc-600">{meta}</span>
@@ -823,21 +957,23 @@ function NpcOverrideTextarea({
         rows={3}
         maxLength={1200}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-20 w-full resize-y border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-cyan-300"
+        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-amber-300"
       />
     </div>
   );
 }
 
 function DebugList({ title, items }: { title: string; items: string[] }) {
+  const listDomId = `debug-list-${domId(title)}`;
+
   return (
-    <div>
-      <h3 className="text-sm font-medium uppercase text-zinc-400">{title}</h3>
-      <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
+    <div id={listDomId}>
+      <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">{title}</h3>
+      <ul id={`${listDomId}-items`} className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
         {items.length > 0 ? (
-          items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)
+          items.map((item, index) => <li id={`${listDomId}-item-${index + 1}`} key={`${title}-${index}`}>{item}</li>)
         ) : (
-          <li className="text-zinc-500">None yet.</li>
+          <li id={`${listDomId}-empty-state`} className="text-zinc-500">None yet.</li>
         )}
       </ul>
     </div>
@@ -854,24 +990,27 @@ function DirectorPromptControls({
   latestSummary: Record<string, unknown> | null;
 }) {
   return (
-    <section className="border border-zinc-800 bg-zinc-950/50 p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-medium uppercase text-zinc-300">Prompt guidance</h3>
+    <section id="prompt-guidance-panel" className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
+      <div id="prompt-guidance-header" className="flex items-start justify-between gap-4">
+        <div id="prompt-guidance-title-block">
+          <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-300">
+            Prompt guidance
+          </h3>
           <p className="mt-2 text-xs leading-5 text-zinc-500">
             Editable text sections for the next Game Master turn. These guide style and behavior without changing the output schema.
           </p>
         </div>
         <button
+          id="prompt-guidance-reset-button"
           type="button"
           onClick={() => onChange(DEFAULT_PROMPT_GUIDANCE)}
-          className="shrink-0 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+          className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
         >
           Reset
         </button>
       </div>
 
-      <div className="mt-4 space-y-4">
+      <div id="prompt-guidance-fields" className="mt-4 space-y-4">
         <PromptGuidanceTextarea
           label="Style"
           value={value.style}
@@ -889,9 +1028,9 @@ function DirectorPromptControls({
         />
       </div>
 
-      <div className="mt-5 border-t border-zinc-800 pt-4">
+      <div id="last-game-master-summary" className="mt-5 border-t border-zinc-800 pt-4">
         <h4 className="text-xs font-medium uppercase text-zinc-500">Last Game Master summary</h4>
-        <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5">
+        <dl id="last-game-master-summary-fields" className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5">
           {latestSummary ? (
             <>
               <dt className="text-zinc-500">Beat</dt>
@@ -918,7 +1057,7 @@ function DirectorPromptControls({
               </dd>
             </>
           ) : (
-            <dd className="col-span-2 text-zinc-500">No Game Master turn yet.</dd>
+            <dd id="last-game-master-summary-empty-state" className="col-span-2 text-zinc-500">No Game Master turn yet.</dd>
           )}
         </dl>
       </div>
@@ -935,11 +1074,11 @@ function PromptGuidanceTextarea({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const id = `director-${label.toLowerCase().replaceAll(" ", "-")}`;
+  const id = `director-${domId(label)}`;
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div id={`${id}-field`}>
+      <div id={`${id}-field-header`} className="mb-2 flex items-center justify-between gap-3">
         <label htmlFor={id} className="text-xs font-medium text-zinc-400">
           {label}
         </label>
@@ -951,17 +1090,19 @@ function PromptGuidanceTextarea({
         maxLength={1200}
         rows={3}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-20 w-full resize-y border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-cyan-300"
+        className="min-h-20 w-full resize-y rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
       />
     </div>
   );
 }
 
 function DebugJson({ title, value }: { title: string; value: unknown }) {
+  const jsonDomId = `debug-json-${domId(title)}`;
+
   return (
-    <div>
+    <div id={jsonDomId}>
       <h3 className="text-sm font-medium uppercase text-zinc-400">{title}</h3>
-      <pre className="mt-3 max-h-80 overflow-auto border border-zinc-800 bg-zinc-950 p-3 text-xs leading-5 text-zinc-300">
+      <pre id={`${jsonDomId}-content`} className="mt-3 max-h-80 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-3 text-xs leading-5 text-zinc-300">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
@@ -1060,6 +1201,16 @@ function buildTurnSequenceById(turns: unknown[]) {
   }
 
   return sequenceById;
+}
+
+function domId(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "unknown";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
