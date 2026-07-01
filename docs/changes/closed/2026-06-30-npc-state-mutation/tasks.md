@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Current state: reviewed; ready for commit and normal integration path when Taylor authorizes it
-- Last completed action: `/sdd-review` completed with no blocking or required findings; fixed one stale README sentence during review and reran `npm run ci:required`
-- Next action: commit the change when authorized, then proceed with the normal non-production integration path
-- Active branch/ref: `change/npc-state-mutation`
+- Current state: merged and ready to close
+- Last completed action: committed source branch `dcb5fac`, merged into `develop` with merge commit `3cf0363`, moved this change folder to `docs/changes/closed/2026-06-30-npc-state-mutation/`, and prepared closeout commit after Taylor authorized close and merge
+- Next action: commit closeout on `develop`
+- Active branch/ref: `develop`
 - Branch note: branch preflight classified this as a planned product/runtime change. Implementation branch `change/npc-state-mutation` was created from `develop`; target branch remains `develop`. Planning/docs are allowed here and implementation edits are branch-policy compliant.
 - Expected dirty files: NPC state mutation implementation, docs, tests, playtest script, and `docs/changes/2026-06-30-npc-state-mutation/`
 - Known unrelated dirty files: `docs/ci-cd.md` already has an unstaged frontmatter-only modification and should not be swept into this change unless Taylor confirms it belongs here.
@@ -66,9 +66,9 @@
 - [x] 5.2 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit Taylor-approved review waiver.
 - [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
-- [ ] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
-- [ ] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
+- [x] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [x] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -84,6 +84,8 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-30 | Debug NPC tab cleanup | main | `src/app/world-client.tsx`, `docs/changes/2026-06-30-npc-state-mutation/tasks.md` | Changed NPC override fields to show current effective values directly in editable textareas with compact source/override metadata and character counts, matching the Prompt tab interaction pattern more closely | uncommitted |
 | 2026-06-30 | Short-output truncation cleanup | main | `.env.local`, `README.md`, `src/lib/director/prompt.ts`, `src/lib/director/output.ts`, `src/lib/director/director.test.ts` | Raised local max tokens to 250, tightened prompt guidance toward complete 1-2 paragraph beats, and trimmed incomplete trailing prose fragments before persistence/display | uncommitted |
 | 2026-06-30 | SDD review | main | `README.md`, change artifacts, Epic truth, code diff, security/docs/changelog/branch gates | Local review found one stale README sentence and fixed it; no `review.md` created because no blocking or required findings remain | uncommitted |
+| 2026-06-30 | Source branch commit | main | reviewed source branch diff | Committed the reviewed implementation on `change/npc-state-mutation` | `dcb5fac` |
+| 2026-06-30 | Merge to integration | main | `develop` | Merged `change/npc-state-mutation` into `develop` after Taylor authorized close and merge | `3cf0363` |
 
 ## Verification Ledger
 
@@ -130,7 +132,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending Taylor
+- Status: Taylor confirmed
 - App URL / route: local Lorecraft app root, usually `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel world, persistent mode, debug logging enabled with `npm run dev:debug`
 - Steps for Taylor:
@@ -185,7 +187,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Review record: clean review recorded in this ledger on 2026-06-30; no `review.md` created
 - `review.md` findings resolved: not applicable; no `review.md` findings
 - Planning updates resolved: no unresolved planning updates
-- Manual UI confirmation status: pending Taylor
-- PR / merge state: not started; source branch has uncommitted reviewed changes and should be committed before integration
+- Manual UI confirmation status: Taylor confirmed through playtest feedback and close/merge authorization
+- PR / merge state: merged locally into `develop` with merge commit `3cf0363`; no remote PR created or pushed
 - Deferred scope accepted: yes
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
