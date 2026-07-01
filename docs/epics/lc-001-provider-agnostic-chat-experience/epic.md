@@ -1231,6 +1231,7 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 - `scripts/llm-fixture-server.mjs` provides the deterministic OpenAI-compatible chat completions fixture for story-generation and NPC-state extraction calls.
 - `scripts/e2e-next-server.mjs` builds and runs the Next app on the E2E test port with signal handling for clean Playwright shutdown.
 - `tests/e2e/lorecraft-playtest.spec.ts` drives the browser through seeding/reset, narrative input, pending state, persisted reload state, debug drawer toggling, turn evidence, and reset reuse.
+- `src/app/world-client.tsx` distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E.
 - `vitest.config.ts` keeps Playwright specs out of the Vitest unit-test suite.
 - `package.json` exposes `npm run e2e`, `npm run e2e:install`, fixture, Convex, and Next startup scripts while leaving `npm run ci:required` unchanged.
 
@@ -1241,6 +1242,7 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 - `npm run e2e:install` installed the local Chromium browser for Playwright.
 - `npm run e2e` passed after adding deterministic fixture provider, split Convex/Next server startup, and browser assertions for seed/reset, Enter submission, pending state, persisted reload state, debug drawer toggling, Game Master call evidence, and reset reuse.
 - `npm run ci:required` passed after excluding Playwright specs from Vitest unit-test discovery.
+- During `/sdd-review`, `npm run e2e` initially reproduced a seed-button race against persisted local Convex state; after adding the default-world loading state, `npm run ci:required` and `npm run e2e` passed.
 
 ### Verification Gaps
 
