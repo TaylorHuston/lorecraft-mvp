@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: `/sdd-apply` remediation is implemented and verified in the working tree; `npm run e2e`, `npm run ci:required`, and `git diff --check` pass after adding NPC debug parity E2E coverage and location-save flushing.
-- Last completed action: reran deterministic browser E2E and the required CI gate after enabling raw request storage for the E2E app server.
-- Next action: commit the intended implementation/remediation state, record the final commit ref, then run a fresh `/sdd-review`.
+- Current state: `/sdd-apply` remediation is implemented, verified, and committed in `85a67d3`.
+- Last completed action: committed the intended implementation/remediation state after `npm run e2e`, `npm run ci:required`, and `git diff --check` passed.
+- Next action: run a fresh `/sdd-review` against the committed branch.
 - Active branch/ref: `change/lightweight-location-objects`
 - Expected dirty files: `docs/changes/2026-06-30-lightweight-location-objects/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `convex/world.ts`, `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, tests, docs, `package.json`, `CHANGELOG.md`
-- Known blockers: broad uncommitted app/source changes prevent merge readiness until committed; Taylor manual UI confirmation remains pending
+- Known blockers: Taylor manual UI confirmation remains pending
 
 ## Task Checklist
 
@@ -102,9 +102,9 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-30 | Discovery | main orchestrator; delegated explorer/test-engineer started; specialist routing: Convex guidelines, Next route/UI surfaces, SDD branch policy | change artifacts, Epic, `convex/world.ts`, `src/lib/director/*`, `src/app/world-client.tsx`, tests | Confirmed no schema rename is needed; implementation should reuse `rooms`, actor `roomId`, existing NPC card/extraction patterns, and `stateDiffs.moveActor`. | uncommitted |
 | 2026-06-30 | `LC-001-S12 R1-R4` implementation | main orchestrator; subagent discovery/test strategy incorporated; Convex guidelines | `convex/world.ts`, `src/lib/director/*`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, fixture, E2E, docs | Implemented Location Cards, Known Locations, bounded actor movement extraction/validation/persistence, debug Locations tab edit/create, actor-location reset, docs, and changelog. | uncommitted |
 | 2026-06-30 | Delegated review remediation | main orchestrator; delegated artifact, test, and security reviewers | `convex/world.ts`, `package.json`, `src/lib/director/output.ts`, `src/lib/director/director.test.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, docs | Addressed stale docs, production-exposed debug location writes, weak NPC movement confirmation, reset-location ambiguity, unknown-destination E2E gap, and fresh-seed/session reset E2E gap. | uncommitted |
-| 2026-07-01 | Formal `/sdd-review` remediation start | main orchestrator; delegated backend and frontend remediation agents | `review.md`, proposal/design/tasks/changelog, backend/frontend remediation pending | Accepted canonical NPC debug parity and tavern seed content into the active change scope; started fixing public debug/write exposure, reset/save races, and stale debug UI evidence. | commit pending |
-| 2026-07-01 | Formal `/sdd-review` remediation | main orchestrator; Pascal backend agent; Hubble frontend agent; Convex and Next route-handler guidance | `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `package.json`, docs, Epic, tests | Removed persistent debug env writes, added local-only debug/Director guardrails plus server-write token path, capped debug-created rows, made blank NPC facts clear canonical facts, fixed NPC autosave reset/submit races, renamed state evidence, added disclosure buttons/live regions, and reconciled artifacts. | commit pending |
-| 2026-07-01 | Post-review deterministic remediation | main orchestrator | `src/app/world-client.tsx`, `playwright.config.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, `convex/world.ts`, tasks/review/Epic docs | Added active location-save flushing before submit/seed/reset, deterministic NPC debug edit/create/reset E2E assertions, raw request storage in the E2E app server so prompt-context assertions are inspectable, and local Convex server-write fallback for the isolated E2E deployment. | commit pending |
+| 2026-07-01 | Formal `/sdd-review` remediation start | main orchestrator; delegated backend and frontend remediation agents | `review.md`, proposal/design/tasks/changelog, backend/frontend remediation pending | Accepted canonical NPC debug parity and tavern seed content into the active change scope; started fixing public debug/write exposure, reset/save races, and stale debug UI evidence. | `85a67d3` |
+| 2026-07-01 | Formal `/sdd-review` remediation | main orchestrator; Pascal backend agent; Hubble frontend agent; Convex and Next route-handler guidance | `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `package.json`, docs, Epic, tests | Removed persistent debug env writes, added local-only debug/Director guardrails plus server-write token path, capped debug-created rows, made blank NPC facts clear canonical facts, fixed NPC autosave reset/submit races, renamed state evidence, added disclosure buttons/live regions, and reconciled artifacts. | `85a67d3` |
+| 2026-07-01 | Post-review deterministic remediation | main orchestrator | `src/app/world-client.tsx`, `playwright.config.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, `convex/world.ts`, tasks/review/Epic docs | Added active location-save flushing before submit/seed/reset, deterministic NPC debug edit/create/reset E2E assertions, raw request storage in the E2E app server so prompt-context assertions are inspectable, and local Convex server-write fallback for the isolated E2E deployment. | `85a67d3` |
 
 ## Verification Ledger
 
@@ -193,7 +193,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Changelog current: yes
 - `sdd-review` verdict: changes requested; remediation applied and pending fresh review
 - Review record: `docs/changes/2026-06-30-lightweight-location-objects/review.md`
-- `review.md` findings resolved: yes in working tree; fresh review still required after commit
+- `review.md` findings resolved: yes in committed branch; fresh review still required
 - Planning updates resolved: no unresolved planning blockers
 - Manual UI confirmation status: pending user
 - PR / merge state: not started
