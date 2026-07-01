@@ -124,6 +124,30 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Vestry.",
     );
+    await expect(page.locator("#debug-list-state-changes-items")).toContainText(
+      "Mira: moved to Vestry.",
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "The vestry smells of old paper, damp wool, and fresh sealing wax.",
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "Bell Annex",
+    );
+
+    const annexInput = page.locator("#director-input");
+    await annexInput.fill("I go to the bell annex.");
+    await annexInput.press("Enter");
+    await expect(page.locator("#story-stream")).toContainText("I go to the bell annex.", {
+      timeout: 60_000,
+    });
+    await expect(page.locator("#story-stream")).toContainText("enter the Bell Annex");
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText(
+      "Stormbound Chapel / Bell Annex",
+    );
+    await expect(page.locator("#debug-list-state-changes-items")).toContainText(
+      "Taylor: moved to Bell Annex.",
+    );
 
     const blockedTravelInput = page.locator("#director-input");
     await blockedTravelInput.fill("I go to the bell tower.");
@@ -134,7 +158,10 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#story-stream")).toContainText("destination remains out of reach");
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-scene-items")).toContainText(
-      "Stormbound Chapel / Vestry",
+      "Stormbound Chapel / Bell Annex",
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "Actor move destination is unknown.",
     );
     await page.locator("#debug-tab-locations").click();
     await expect(page.locator("#location-card-bell-tower")).toHaveCount(0);

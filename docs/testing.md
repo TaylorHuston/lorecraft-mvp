@@ -40,7 +40,7 @@ npm run build
 
 The E2E app server enables `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1` so deterministic tests can inspect the exact prompt context persisted in local `directorCalls.rawRequest`. This is local fixture evidence only; do not treat raw prompt persistence as safe for shared deployments.
 
-The E2E path is local-only and destructive against local test state. Confirm configured ports are free before assuming failures are app regressions.
+The E2E path is local-only and destructive against local test state. Confirm configured ports are free before assuming failures are app regressions. In particular, `npm run dev:debug` also uses the local Convex port `3210`; stop that server before running E2E, then restart it afterward if you need the playtest app left running.
 
 ## Manual Verification
 

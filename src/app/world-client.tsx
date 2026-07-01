@@ -736,38 +736,60 @@ export function WorldClient() {
             <div id="debug-panel-content" className="mt-6 space-y-6">
               <DebugTabs value={debugTab} onChange={setDebugTab} />
               {debugTab === "prompt" ? (
-                <DirectorPromptControls
-                  value={promptGuidance}
-                  onChange={setPromptGuidance}
-                  latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
-                />
+                <div
+                  id={debugTabPanelId("prompt")}
+                  role="tabpanel"
+                  aria-labelledby={debugTabId("prompt")}
+                >
+                  <DirectorPromptControls
+                    value={promptGuidance}
+                    onChange={setPromptGuidance}
+                    latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
+                  />
+                </div>
               ) : null}
               {debugTab === "npcs" ? (
-                <NpcDebugPanel
-                  actors={buildNpcDebugActors(snapshot.locations)}
-                  facts={snapshot.facts}
-                  drafts={npcDrafts}
-                  saveStatus={npcSaveStatus}
-                  collapsedNpcKeys={collapsedNpcKeys}
-                  savingNpcKey={savingNpcKey}
-                  onAdd={addNpc}
-                  onChange={updateNpcDraft}
-                  onToggleCollapsed={toggleNpcCollapsed}
-                  onReset={resetNpcDebugActor}
-                />
+                <div
+                  id={debugTabPanelId("npcs")}
+                  role="tabpanel"
+                  aria-labelledby={debugTabId("npcs")}
+                >
+                  <NpcDebugPanel
+                    actors={buildNpcDebugActors(snapshot.locations)}
+                    facts={snapshot.facts}
+                    drafts={npcDrafts}
+                    saveStatus={npcSaveStatus}
+                    collapsedNpcKeys={collapsedNpcKeys}
+                    savingNpcKey={savingNpcKey}
+                    onAdd={addNpc}
+                    onChange={updateNpcDraft}
+                    onToggleCollapsed={toggleNpcCollapsed}
+                    onReset={resetNpcDebugActor}
+                  />
+                </div>
               ) : null}
               {debugTab === "locations" ? (
-                <LocationDebugPanel
-                  locations={snapshot.locations}
-                  saveStatus={locationSaveStatus}
-                  newLocation={newLocation}
-                  onNewLocationChange={setNewLocation}
-                  onSave={saveLocation}
-                  onCreate={handleCreateLocation}
-                />
+                <div
+                  id={debugTabPanelId("locations")}
+                  role="tabpanel"
+                  aria-labelledby={debugTabId("locations")}
+                >
+                  <LocationDebugPanel
+                    locations={snapshot.locations}
+                    saveStatus={locationSaveStatus}
+                    newLocation={newLocation}
+                    onNewLocationChange={setNewLocation}
+                    onSave={saveLocation}
+                    onCreate={handleCreateLocation}
+                  />
+                </div>
               ) : null}
               {debugTab === "state" ? (
-                <>
+                <div
+                  id={debugTabPanelId("state")}
+                  role="tabpanel"
+                  aria-labelledby={debugTabId("state")}
+                >
                   <DebugList
                     title="Scene"
                     items={[
@@ -801,7 +823,7 @@ export function WorldClient() {
                   <DebugJson title="Turns" value={snapshot.turns} />
                   <DebugJson title="Game Master calls" value={snapshot.directorCalls} />
                   <DebugJson title="State diffs" value={snapshot.diffs} />
-                </>
+                </div>
               ) : null}
             </div>
           ) : (
@@ -933,15 +955,53 @@ function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: Deb
     { value: "locations", label: "Locations" },
     { value: "state", label: "State" },
   ];
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: DebugTab) => {
+    const currentIndex = tabs.findIndex((item) => item.value === tab);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const lastIndex = tabs.length - 1;
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex].value;
+    onChange(nextTab);
+    document.getElementById(debugTabId(nextTab))?.focus();
+  };
 
   return (
-    <div id="debug-tabs" className="grid grid-cols-4 rounded-md border border-zinc-800 text-xs uppercase">
+    <div
+      id="debug-tabs"
+      role="tablist"
+      aria-label="Debug sections"
+      className="grid grid-cols-4 rounded-md border border-zinc-800 text-xs uppercase"
+    >
       {tabs.map((tab) => (
         <button
-          id={`debug-tab-${tab.value}`}
+          id={debugTabId(tab.value)}
           key={tab.value}
+          role="tab"
           type="button"
+          aria-selected={value === tab.value}
+          aria-controls={debugTabPanelId(tab.value)}
+          tabIndex={value === tab.value ? 0 : -1}
           onClick={() => onChange(tab.value)}
+          onKeyDown={(event) => handleKeyDown(event, tab.value)}
           className={`px-3 py-2 ${
             value === tab.value
               ? "bg-amber-300 text-zinc-950"
@@ -953,6 +1013,14 @@ function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: Deb
       ))}
     </div>
   );
+}
+
+function debugTabId(tab: DebugTab) {
+  return `debug-tab-${tab}`;
+}
+
+function debugTabPanelId(tab: DebugTab) {
+  return `debug-tab-panel-${tab}`;
 }
 
 function DebugSectionHeader({
@@ -1286,7 +1354,7 @@ function LocationDebugPanel({
 
       {locations.map((location) => (
         <LocationCardEditor
-          key={`${location.key}-${location.name}-${location.description}`}
+          key={location._id}
           location={location}
           saveStatus={saveStatus[location.key] ?? "idle"}
           onSave={onSave}
@@ -1318,17 +1386,9 @@ function LocationCardEditor({
     description: string,
   ) => Promise<boolean>;
 }) {
-  const [name, setName] = useState(location.name);
-  const [description, setDescription] = useState(location.description);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const locationDomId = `location-card-${domId(location.key)}`;
   const fieldsId = `${locationDomId}-fields`;
-
-  function saveIfChanged() {
-    if (name !== location.name || description !== location.description) {
-      void onSave(location._id, location.key, name, description);
-    }
-  }
 
   return (
     <DebugCard id={locationDomId}>
@@ -1367,24 +1427,69 @@ function LocationCardEditor({
         </div>
       </div>
       {!isCollapsed ? (
-        <div id={fieldsId} className="mt-4 space-y-4">
-          <LocationInput
-            id={`${locationDomId}-name`}
-            label="Name"
-            value={name}
-            onChange={setName}
-            onBlur={saveIfChanged}
-          />
-          <LocationTextarea
-            id={`${locationDomId}-description`}
-            label="Description"
-            value={description}
-            onChange={setDescription}
-            onBlur={saveIfChanged}
-          />
-        </div>
+        <LocationCardFields
+          key={`${location._id}-${location.name}-${location.description}`}
+          fieldsId={fieldsId}
+          locationDomId={locationDomId}
+          locationId={location._id}
+          locationKey={location.key}
+          name={location.name}
+          description={location.description}
+          onSave={onSave}
+        />
       ) : null}
     </DebugCard>
+  );
+}
+
+function LocationCardFields({
+  fieldsId,
+  locationDomId,
+  locationId,
+  locationKey,
+  name: canonicalName,
+  description: canonicalDescription,
+  onSave,
+}: {
+  fieldsId: string;
+  locationDomId: string;
+  locationId: Id<"rooms">;
+  locationKey: string;
+  name: string;
+  description: string;
+  onSave: (
+    locationId: Id<"rooms">,
+    locationKey: string,
+    name: string,
+    description: string,
+  ) => Promise<boolean>;
+}) {
+  const [name, setName] = useState(canonicalName);
+  const [description, setDescription] = useState(canonicalDescription);
+
+  function saveIfChanged() {
+    if (name !== canonicalName || description !== canonicalDescription) {
+      void onSave(locationId, locationKey, name, description);
+    }
+  }
+
+  return (
+    <div id={fieldsId} className="mt-4 space-y-4">
+      <LocationInput
+        id={`${locationDomId}-name`}
+        label="Name"
+        value={name}
+        onChange={setName}
+        onBlur={saveIfChanged}
+      />
+      <LocationTextarea
+        id={`${locationDomId}-description`}
+        label="Description"
+        value={description}
+        onChange={setDescription}
+        onBlur={saveIfChanged}
+      />
+    </div>
   );
 }
 

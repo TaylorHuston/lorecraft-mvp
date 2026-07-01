@@ -1042,7 +1042,7 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 - `npx convex codegen` passed after adding location context, debug-gated location write actions, and movement persistence functions.
 - `npx convex codegen` passed after local-only debug write guard, server-write token, and debug snapshot remediation.
 - `npm run ci:required` passed on 2026-07-01 after review remediation.
-- `npm run e2e` passed on 2026-07-01 after review remediation, including debug location edit/create/reset behavior, accepted movement, rejected unknown-location travel, and reset restoration.
+- `npm run e2e` passed on 2026-07-01 after review remediation, including debug location edit/create/reset behavior, edited Location Card prompt evidence, debug-created Bell Annex as a valid movement target, present NPC movement to the Vestry, accepted player movement, rejected unknown-location travel with inspectable ignored reason, and reset restoration.
 - `npm run ci:required` passed on 2026-07-01 after final post-review remediation, covering lint, 40 Vitest tests, typecheck, and Next build.
 
 ### Verification Gaps
