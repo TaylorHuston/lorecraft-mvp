@@ -35,12 +35,12 @@ Optional local tuning variables:
 
 ```bash
 LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=200
+LLM_MAX_TOKENS=250
 LLM_TOP_P=0.9
 LLM_REASONING_EFFORT=none
 ```
 
-Unset optional values use safe defaults. `LLM_MAX_TOKENS=200` keeps local turns short and interactive; raise it only when testing longer descriptive beats. `LLM_REASONING_EFFORT=none` is useful for local Ollama Gemma playtests where some models otherwise return reasoning text with empty assistant content. The app currently supports the OpenAI-compatible subset above and records a compact generation-settings summary in Game Master debug metadata.
+Unset optional values use safe defaults. `LLM_MAX_TOKENS=250` keeps local turns short while reducing mid-sentence truncation during action-heavy beats; raise it only when testing longer descriptive beats. `LLM_REASONING_EFFORT=none` is useful for local Ollama Gemma playtests where some models otherwise return reasoning text with empty assistant content. The app currently supports the OpenAI-compatible subset above and records a compact generation-settings summary in Game Master debug metadata.
 
 To compare local models against the same latest logged Game Master prompt:
 
@@ -68,7 +68,7 @@ http://localhost:3000
 
 `npm run dev:debug` currently enables all local Game Master diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, and persisted provider request messages in `directorCalls.rawRequest`.
 
-Each recorded Game Master turn attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, accepted/ignored updates, response length metadata, raw request, raw response, and timing data. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include prompt guidance, player text, model output, and in persistent mode hidden NPC knowledge, so keep it local/debug-only.
+Each recorded Game Master story attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, response length metadata, raw request, raw response, and timing data. Persistent mode can also write a `director.turn.extraction` record for the post-narration NPC-state extractor, including accepted/ignored updates and extraction timing. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include prompt guidance, player text, model output, and in persistent mode hidden NPC knowledge, so keep it local/debug-only.
 
 Persistent Game Master mode is the default. To compare story-only prose generation without canonical world mutation, start the app with transcript mode:
 
@@ -76,7 +76,7 @@ Persistent Game Master mode is the default. To compare story-only prose generati
 LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug
 ```
 
-Transcript mode still persists turns, player input, Game Master narrations, Game Master debug calls, and local logs. Its prompt is built from the canonical opening seed plus the transcript only; it does not include current room state, present actors, exits, object state, NPC facts, hidden NPC knowledge, or a scene-beat classifier. It does not apply NPC fact changes, LLM-authored world events, or LLM-authored state diffs from the Game Master response.
+Transcript mode still persists turns, player input, Game Master narrations, Game Master debug calls, and local logs. Its prompt is built from the canonical opening seed plus the transcript only; it does not include current room state, present actors, exits, object state, NPC facts, hidden NPC knowledge, or a scene-beat classifier. It does not run NPC-state extraction and does not apply NPC fact changes, LLM-authored world events, or LLM-authored state diffs from the Game Master response.
 
 The demo world is intentionally resettable seed data for now. Seeding Stormbound Chapel deletes the current deterministic demo world and recreates it, so use the seed/reset workflow when you want to test the initial world setup from scratch.
 
@@ -86,7 +86,7 @@ Run the repeatable local Game Master smoke playtest against a running dev server
 npm run playtest:director
 ```
 
-The script seeds a fresh demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Game Master debug metadata. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
+The script seeds a fresh demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Game Master debug metadata. In persistent mode it expects both `story_generation` and `npc_state_extraction` Game Master call records for each turn. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
 
 When the app is running in transcript mode, run the no-mutation smoke check:
 
@@ -103,6 +103,8 @@ npm run playtest:director:transcript
 - `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
 - `src/app/providers.tsx` wires the Convex React provider into the App Router root.
 
+Persistent story generation remains plain prose. NPC `mood`, `status`, and `memory` can be updated only by the separate post-narration extractor after Convex validates the actor, field, value, and scene boundary.
+
 The persistence strategy is documented in [`docs/persistence-system.md`](docs/persistence-system.md). The canonical object and field reference is [`docs/data-model.md`](docs/data-model.md). Update them when canonical state, Game Master mutation authority, feed reconstruction, reset behavior, or object semantics change.
 
 Try narrative input such as:
@@ -111,7 +113,7 @@ Try narrative input such as:
 I ask Mira what she knows about the storm.
 ```
 
-Direct questions to present NPCs derive a required scene beat so the Game Master is prompted to let that NPC make a meaningful response or choice. Current-scene NPC profiles are rendered into card-like prompt context, including Mira's description, background, persona, voice, mood, status, memory, and private knowledge. Game Master-returned NPC updates are ignored for this read-only NPC context test.
+Direct questions to present NPCs derive a required scene beat so the Game Master is prompted to let that NPC make a meaningful response or choice. Current-scene NPC profiles are rendered into card-like prompt context, including Mira's description, background, persona, voice, mood, status, memory, and private knowledge. Persistent mode now applies only validated post-narration extractor updates for current-scene NPC `mood`, `status`, and `memory`.
 
 The seeded chapel currently includes Mira and Brother Alden so local playtesting can compare how the Game Master handles multiple NPCs in the same scene.
 

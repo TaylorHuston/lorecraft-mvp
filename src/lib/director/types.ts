@@ -93,10 +93,12 @@ export type DirectorMessage = {
 
 export type DirectorMode = "persistent" | "transcript";
 export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
+export type DirectorCallRole = "story_generation" | "npc_state_extraction";
 export type SceneBeatSource = "engine" | "llm" | "fallback";
 
 export type DirectorRequestSummary = {
   directorMode: DirectorMode;
+  callRole?: DirectorCallRole;
   outputContract: DirectorOutputContract;
   worldName: string;
   roomKey: string;

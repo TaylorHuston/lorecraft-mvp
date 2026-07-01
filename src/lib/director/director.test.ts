@@ -16,6 +16,7 @@ import {
 import { applyNpcDebugOverrides } from "./npc-profiles";
 import {
   buildDirectorRequest,
+  buildNpcStateExtractionRequest,
   buildTranscriptDirectorRequest,
   deriveRequiredSceneBeat,
 } from "./prompt";
@@ -23,6 +24,7 @@ import { rawDirectorRequestForStorage, shouldStoreRawDirectorRequest } from "./r
 import {
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
+  parseNpcStateExtractionOutput,
   parsePlainProseDirectorOutput,
   validateNpcUpdates,
 } from "./output";
@@ -257,6 +259,7 @@ describe("Director request construction", () => {
     expect(request.messages).toHaveLength(2);
     expect(request.requestSummary).toMatchObject({
       directorMode: "persistent",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       worldName: "Stormbound Chapel",
       roomKey: "chapel",
@@ -269,9 +272,9 @@ describe("Director request construction", () => {
         kind: "direct_npc_question",
         targetActorKey: "mira",
         expectsNpcResponse: true,
-        allowsNpcUpdates: false,
+        allowsNpcUpdates: true,
       },
-      npcMutationMode: "read_only",
+      npcMutationMode: "bounded_updates",
       generationSettings: {
         temperature: 0.4,
         maxTokens: 700,
@@ -320,12 +323,82 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("npcProfiles");
     expect(userMessage?.content).not.toContain("hiddenNpcKnowledge");
     expect(userMessage?.content).not.toContain("mutableFacts");
+    expect(userMessage?.content).not.toContain("npcUpdates");
     expect(userMessage?.content).not.toContain("Return JSON");
+    expect(userMessage?.content).not.toContain("read-only for this turn");
     expect(userMessage?.content.length).toBeLessThan(5000);
     expect(systemMessage?.content).toContain("Continue the scene in present tense");
     expect(systemMessage?.content).toContain("NPC cards are canonical");
     expect(systemMessage?.content).toContain("Return only player-facing story prose");
     expect(systemMessage?.content).not.toContain("strict JSON");
+  });
+
+  it("builds a JSON-only NPC state extraction request from the completed story beat", () => {
+    const storyRequest = buildDirectorRequest(context, "I ask Mira about the storm.", {
+      generationSettings: {
+        temperature: 0.4,
+        maxTokens: 100,
+        responseFormat: "text",
+      },
+    });
+    const request = buildNpcStateExtractionRequest(
+      context,
+      "I ask Mira about the storm.",
+      "Mira's hand tightens around the pew. \"The bell rang at midnight,\" she says.",
+      {
+        generationSettings: {
+          temperature: 0.2,
+          maxTokens: 100,
+          responseFormat: "text",
+        },
+        requiredSceneBeat: {
+          ...storyRequest.requestSummary.requiredSceneBeat,
+          instruction: "",
+        },
+      },
+    );
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary).toMatchObject({
+      directorMode: "persistent",
+      callRole: "npc_state_extraction",
+      outputContract: "json_npc_updates",
+      worldName: "Stormbound Chapel",
+      roomKey: "chapel",
+      recentFeedCount: 12,
+      actorKeys: ["taylor", "mira"],
+      npcFactKeys: ["mood", "status", "memory"],
+      npcProfileKeys: ["mira"],
+      readOnlyKnowledgeKeys: ["mira.knowledge"],
+      requiredSceneBeat: {
+        kind: "direct_npc_question",
+        targetActorKey: "mira",
+        expectsNpcResponse: true,
+        allowsNpcUpdates: true,
+      },
+      npcMutationMode: "bounded_updates",
+      generationSettings: {
+        temperature: 0.2,
+        maxTokens: 100,
+        responseFormat: "json_object",
+      },
+    });
+    expect(request.requestSummary.promptComponentKeys).toEqual([
+      "extractionInstructions",
+      "npcCards",
+      "recentStory",
+      "currentInput",
+      "gameMasterNarration",
+      "output",
+    ]);
+    expect(systemMessage?.content).toContain("Return only a JSON object");
+    expect(userMessage?.content).toContain("Allowed update fields: mood, status, memory");
+    expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
+    expect(userMessage?.content).toContain("> I ask Mira about the storm.");
+    expect(userMessage?.content).toContain("Mira's hand tightens around the pew");
+    expect(userMessage?.content).toContain('{"npcUpdates":[]}');
+    expect(userMessage?.content).toContain("Do not update description, background, persona");
   });
 
   it("applies debug NPC overrides to persistent prompt context without changing transcript mode", () => {
@@ -430,17 +503,22 @@ describe("Director request construction", () => {
 
     expect(request.requestSummary).toMatchObject({
       directorMode: "transcript",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       roomKey: "transcript",
       actorKeys: [],
       npcFactKeys: [],
       readOnlyKnowledgeKeys: [],
+      requiredSceneBeat: {
+        allowsNpcUpdates: false,
+      },
       recentFeedCount: 2,
       generationSettings: {
         temperature: 0.7,
         responseFormat: "text",
       },
     });
+    expect(request.requestSummary.npcMutationMode).toBeUndefined();
     expect(systemMessage?.content).toContain("Do not return JSON");
     expect(systemMessage?.content).toContain("Recent story is the live continuity");
     expect(systemMessage?.content).toContain("Resolve the current player input first");
@@ -848,6 +926,65 @@ describe("Director output parsing", () => {
         narration: "Mira says, 'Enough to be afraid.'",
         npcUpdates: [],
       },
+    });
+  });
+
+  it("trims an incomplete trailing prose fragment without changing the raw response", () => {
+    const result = parsePlainProseDirectorOutput(
+      "Mira runs toward the aisle. Brother Alden drops beside the altar. She scram",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        narration: "Mira runs toward the aisle. Brother Alden drops beside the altar.",
+        npcUpdates: [],
+      },
+    });
+  });
+
+  it("accepts NPC state extraction JSON without requiring narration", () => {
+    const result = parseNpcStateExtractionOutput(
+      JSON.stringify({
+        npcUpdates: [
+          {
+            actorKey: "mira",
+            reason: "Mira answered Taylor's question with new trust.",
+            changes: {
+              mood: "guarded but willing to answer",
+              memory: "Mira told Taylor the chapel bell rang at midnight.",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      npcUpdates: [
+        {
+          actorKey: "mira",
+          reason: "Mira answered Taylor's question with new trust.",
+          changes: {
+            mood: "guarded but willing to answer",
+            memory: "Mira told Taylor the chapel bell rang at midnight.",
+          },
+        },
+      ],
+    });
+  });
+
+  it("accepts an empty NPC state extraction result", () => {
+    expect(parseNpcStateExtractionOutput('{"npcUpdates":[]}')).toEqual({
+      ok: true,
+      npcUpdates: [],
+    });
+  });
+
+  it("rejects malformed NPC state extraction JSON", () => {
+    expect(parseNpcStateExtractionOutput("Mira seems different.")).toEqual({
+      ok: false,
+      error: "NPC state extractor response was not valid JSON.",
     });
   });
 

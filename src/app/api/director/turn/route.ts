@@ -3,9 +3,14 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { writeDirectorDebugLog } from "@/lib/director/debug-log";
 import { readDirectorMode } from "@/lib/director/mode";
-import { buildDirectorRequest, buildTranscriptDirectorRequest } from "@/lib/director/prompt";
+import {
+  buildDirectorRequest,
+  buildNpcStateExtractionRequest,
+  buildTranscriptDirectorRequest,
+} from "@/lib/director/prompt";
 import {
   applySceneBeatPersistenceBoundary,
+  parseNpcStateExtractionOutput,
   parsePlainProseDirectorOutput,
   validateNpcUpdates,
 } from "@/lib/director/output";
@@ -268,16 +273,6 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: parsed.error }, 422);
   }
 
-  const validated =
-    directorMode === "transcript"
-      ? { acceptedUpdates: [], ignoredUpdates: [] }
-      : applySceneBeatPersistenceBoundary(
-          validateNpcUpdates(
-            parsed.output.npcUpdates,
-            (persistentContext ?? (context as unknown as DirectorContext)).actors,
-          ),
-          directorRequest.requestSummary.requiredSceneBeat,
-        );
   await convex.mutation(api.world.completeDirectorTurn, {
     worldId,
     turnId: recorded.turnId,
@@ -289,10 +284,10 @@ export async function POST(request: Request) {
     rawResponse: rawOutput,
     parsedResponse: parsed.output,
     status: "success",
-    acceptedUpdates: validated.acceptedUpdates,
-    ignoredUpdates: validated.ignoredUpdates,
+    acceptedUpdates: [],
+    ignoredUpdates: [],
     narration: parsed.output.narration,
-    applyWorldMutations: directorMode === "persistent",
+    applyWorldMutations: false,
   });
   await logDirectorTurn({
     event: "director.turn.unit",
@@ -310,10 +305,180 @@ export async function POST(request: Request) {
     rawResponse: rawOutput,
     parsedResponse: parsed.output,
     narration: parsed.output.narration,
-    acceptedUpdates: validated.acceptedUpdates,
-    ignoredUpdates: validated.ignoredUpdates,
+    acceptedUpdates: [],
+    ignoredUpdates: [],
     timingsMs: {
       provider: elapsedSince(providerStartedAt),
+      total: elapsedSince(startedAt),
+    },
+  });
+
+  if (directorMode === "transcript" || !persistentContext) {
+    return json<TurnResponse>({
+      ok: true,
+      narration: parsed.output.narration,
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+    });
+  }
+
+  const extractionGenerationSettings = {
+    ...configResult.config.generationSettings,
+    responseFormat: "json_object" as const,
+  };
+  const extractionRequest = buildNpcStateExtractionRequest(
+    persistentContext,
+    input,
+    parsed.output.narration,
+    {
+      generationSettings: extractionGenerationSettings,
+      promptGuidance: bodyResult.body.promptGuidance,
+      requiredSceneBeat: {
+        ...directorRequest.requestSummary.requiredSceneBeat,
+        instruction: "",
+      },
+      sceneBeatSource: directorRequest.requestSummary.sceneBeatSource,
+      sceneBeatReason: directorRequest.requestSummary.sceneBeatReason,
+    },
+  );
+  const extractionRawRequest = rawDirectorRequestForStorage(extractionRequest.messages);
+  const extractionStartedAt = performance.now();
+
+  let extractionRawOutput: string;
+  try {
+    extractionRawOutput = await requestOpenAICompatibleChat({
+      config: { ...configResult.config, generationSettings: extractionGenerationSettings },
+      messages: extractionRequest.messages,
+    });
+  } catch (error) {
+    const providerError = normalizeProviderError(error);
+    await convex.mutation(api.world.recordNpcStateExtraction, {
+      worldId,
+      turnId: recorded.turnId,
+      commandId: recorded.commandId,
+      provider,
+      model: configResult.config.model,
+      requestSummary: extractionRequest.requestSummary,
+      ...(extractionRawRequest !== undefined ? { rawRequest: extractionRawRequest } : {}),
+      rawResponse: providerError.rawResponse ?? "",
+      status: "provider_error",
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+      error: providerError.message,
+    });
+    await logDirectorTurn({
+      event: "director.turn.extraction",
+      stage: "provider_request",
+      worldId,
+      turnId: recorded.turnId,
+      commandId: recorded.commandId,
+      playerInput: input,
+      provider,
+      model: configResult.config.model,
+      requestSummary: extractionRequest.requestSummary,
+      rawRequest: extractionRequest.messages,
+      status: "provider_error",
+      httpStatus: 200,
+      error: providerError.message,
+      rawResponse: providerError.rawResponse,
+      acceptedUpdateCount: 0,
+      ignoredUpdateCount: 0,
+      timingsMs: {
+        provider: elapsedSince(extractionStartedAt),
+        total: elapsedSince(startedAt),
+      },
+    });
+    return json<TurnResponse>({
+      ok: true,
+      narration: parsed.output.narration,
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+    });
+  }
+
+  const extractionParsed = parseNpcStateExtractionOutput(extractionRawOutput);
+  if (!extractionParsed.ok) {
+    await convex.mutation(api.world.recordNpcStateExtraction, {
+      worldId,
+      turnId: recorded.turnId,
+      commandId: recorded.commandId,
+      provider,
+      model: configResult.config.model,
+      requestSummary: extractionRequest.requestSummary,
+      ...(extractionRawRequest !== undefined ? { rawRequest: extractionRawRequest } : {}),
+      rawResponse: extractionRawOutput,
+      status: "invalid_output",
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+      error: extractionParsed.error,
+    });
+    await logDirectorTurn({
+      event: "director.turn.extraction",
+      stage: "parse_extraction_output",
+      worldId,
+      turnId: recorded.turnId,
+      commandId: recorded.commandId,
+      playerInput: input,
+      provider,
+      model: configResult.config.model,
+      requestSummary: extractionRequest.requestSummary,
+      rawRequest: extractionRequest.messages,
+      status: "invalid_output",
+      httpStatus: 200,
+      error: extractionParsed.error,
+      rawResponse: extractionRawOutput,
+      acceptedUpdateCount: 0,
+      ignoredUpdateCount: 0,
+      timingsMs: {
+        provider: elapsedSince(extractionStartedAt),
+        total: elapsedSince(startedAt),
+      },
+    });
+    return json<TurnResponse>({
+      ok: true,
+      narration: parsed.output.narration,
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+    });
+  }
+
+  const extractionValidated = applySceneBeatPersistenceBoundary(
+    validateNpcUpdates(extractionParsed.npcUpdates, persistentContext.actors),
+    extractionRequest.requestSummary.requiredSceneBeat,
+  );
+  await convex.mutation(api.world.recordNpcStateExtraction, {
+    worldId,
+    turnId: recorded.turnId,
+    commandId: recorded.commandId,
+    provider,
+    model: configResult.config.model,
+    requestSummary: extractionRequest.requestSummary,
+    ...(extractionRawRequest !== undefined ? { rawRequest: extractionRawRequest } : {}),
+    rawResponse: extractionRawOutput,
+    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
+    status: "success",
+    acceptedUpdates: extractionValidated.acceptedUpdates,
+    ignoredUpdates: extractionValidated.ignoredUpdates,
+  });
+  await logDirectorTurn({
+    event: "director.turn.extraction",
+    stage: "complete_extraction",
+    worldId,
+    turnId: recorded.turnId,
+    commandId: recorded.commandId,
+    playerInput: input,
+    provider,
+    model: configResult.config.model,
+    requestSummary: extractionRequest.requestSummary,
+    rawRequest: extractionRequest.messages,
+    status: "success",
+    httpStatus: 200,
+    rawResponse: extractionRawOutput,
+    parsedResponse: { npcUpdates: extractionParsed.npcUpdates },
+    acceptedUpdates: extractionValidated.acceptedUpdates,
+    ignoredUpdates: extractionValidated.ignoredUpdates,
+    timingsMs: {
+      provider: elapsedSince(extractionStartedAt),
       total: elapsedSince(startedAt),
     },
   });
@@ -321,8 +486,8 @@ export async function POST(request: Request) {
   return json<TurnResponse>({
     ok: true,
     narration: parsed.output.narration,
-    acceptedUpdates: validated.acceptedUpdates,
-    ignoredUpdates: validated.ignoredUpdates,
+    acceptedUpdates: extractionValidated.acceptedUpdates,
+    ignoredUpdates: extractionValidated.ignoredUpdates,
   });
 }
 

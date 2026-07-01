@@ -722,26 +722,26 @@ function NpcDebugPanel({
               {!isCollapsed ? (
                 <div className="mt-4 space-y-4">
                   <NpcOverrideTextarea
+                    actorKey={npc.key}
                     label="Name"
-                    currentValue={npc.name}
-                    value={override.name ?? ""}
-                    placeholder={npc.name}
+                    meta={override.name !== undefined ? "override" : "canonical"}
+                    value={override.name ?? npc.name}
                     onChange={(name) => onChange(npc.key, { ...override, name })}
                   />
                   <NpcOverrideTextarea
+                    actorKey={npc.key}
                     label="Description"
-                    currentValue={npc.description}
-                    value={override.description ?? ""}
-                    placeholder={npc.description}
+                    meta={override.description !== undefined ? "override" : "canonical"}
+                    value={override.description ?? npc.description}
                     onChange={(description) => onChange(npc.key, { ...override, description })}
                   />
                   {actorFacts.map((fact) => (
                     <NpcOverrideTextarea
                       key={fact.key}
-                      label={`${fact.key} (${fact.source})`}
-                      currentValue={String(fact.value ?? "")}
-                      value={overrideFacts[fact.key] ?? ""}
-                      placeholder={String(fact.value ?? "")}
+                      actorKey={npc.key}
+                      label={fact.key}
+                      meta={overrideFacts[fact.key] !== undefined ? "override" : fact.source}
+                      value={overrideFacts[fact.key] ?? String(fact.value ?? "")}
                       onChange={(value) =>
                         onChange(npc.key, {
                           ...override,
@@ -794,32 +794,32 @@ function npcOverrideStatusLabel(status: NpcOverrideSaveStatus, hasOverride: bool
 }
 
 function NpcOverrideTextarea({
+  actorKey,
   label,
-  currentValue,
+  meta,
   value,
-  placeholder,
   onChange,
 }: {
+  actorKey: string;
   label: string;
-  currentValue: string;
+  meta: string;
   value: string;
-  placeholder: string;
   onChange: (value: string) => void;
 }) {
-  const id = `npc-override-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
+  const id = `npc-override-${actorKey}-${label}`.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
 
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-xs font-medium text-zinc-400">
-        {label}
-      </label>
-      <p className="mb-2 border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs leading-5 text-zinc-300">
-        {currentValue || "No current value."}
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+          {label}
+          <span className="ml-2 font-normal text-zinc-600">{meta}</span>
+        </label>
+        <span className="text-xs tabular-nums text-zinc-600">{value.length}/1200</span>
+      </div>
       <textarea
         id={id}
         value={value}
-        placeholder={placeholder}
         rows={3}
         maxLength={1200}
         onChange={(event) => onChange(event.target.value)}

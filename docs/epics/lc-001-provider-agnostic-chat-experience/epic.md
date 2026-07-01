@@ -990,3 +990,143 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting NPC values and 
 
 - Taylor manual browser confirmation remains pending.
 - Local LLM playtest of `Look at Mira` with raw request inspection remains pending.
+
+### Superseded Boundary Note
+
+`LC-001-S9` established read-only NPC Cards as the first safe context step. `LC-001-S10` keeps story-generation output read-only and reintroduces validated NPC mutation through a separate post-narration extractor.
+
+## Story LC-001-S10: Extracted NPC State Mutation
+
+As a developer-playtester, I want meaningful NPC characteristics to mutate through a separate validated extraction pass, so that the world can remember story consequences without making the creative Game Master response carry persistence decisions.
+
+### Requirement R1: Post-Narration Extraction Pass
+
+The system SHALL run NPC state extraction separately from player-facing story generation in persistent mode.
+
+#### Scenario R1-S1: Successful story turn triggers extraction
+
+- WHEN a persistent-mode Game Master turn returns valid non-empty narration
+- THEN the backend stores the narration as player-facing story prose
+- AND it builds a separate structured NPC-state extraction request from the current player input, the stored narration, current-scene NPC Cards, and bounded recent story
+
+#### Scenario R1-S2: Story generation remains plain prose
+
+- WHEN the backend builds the main persistent-mode story request
+- THEN the output contract remains player-facing plain prose
+- AND the story prompt does not ask the model to return `npcUpdates`, state diffs, or machine-readable mutation proposals
+
+#### Scenario R1-S3: Transcript mode does not extract NPC state
+
+- WHEN the application runs in transcript mode
+- AND a story turn succeeds
+- THEN no NPC-state extractor runs
+- AND no accepted NPC fact changes, LLM state diffs, or LLM-authored state events are recorded
+
+### Requirement R2: Bounded NPC Characteristic Updates
+
+The system SHALL accept only validated current-scene NPC updates for `mood`, `status`, and `memory`.
+
+#### Scenario R2-S1: Meaningful attitude change
+
+- WHEN the extractor proposes a non-empty `mood` update for a current-scene NPC with a human-readable reason
+- THEN the backend validates the actor and field
+- AND persists the accepted `mood` fact with source `llm`
+
+#### Scenario R2-S2: Durable current circumstance
+
+- WHEN the story establishes an ongoing NPC circumstance that should remain true after the immediate beat
+- AND the extractor proposes a `status` update for that current-scene NPC
+- THEN the backend persists the accepted `status` fact
+- AND records the update in the turn-scoped state diff
+
+#### Scenario R2-S3: Rolling player-interaction memory
+
+- WHEN the interaction meaningfully changes what an NPC should remember about the player later
+- AND the extractor proposes a `memory` rewrite
+- THEN the backend persists the accepted `memory` fact
+- AND the value remains capped at 500 characters through validation
+
+#### Scenario R2-S4: Ephemeral beat produces no update
+
+- WHEN the narration contains only a short-term gesture, stumble, glance, flinch, hesitation, or other one-frame reaction
+- THEN the extractor may return no NPC update
+- AND existing NPC facts remain unchanged
+
+#### Scenario R2-S5: Read-only NPC card fields are rejected
+
+- WHEN the extractor proposes changes to `description`, `background`, `persona`, `voice`, `knowledge`, relationships, locations, or any other non-allowlisted field
+- THEN the backend ignores those fields
+- AND records why they were ignored in debug-visible evidence
+
+#### Scenario R2-S6: Unknown or offscreen NPC is rejected
+
+- WHEN the extractor proposes an update for an unknown NPC or an NPC not currently in the scene
+- THEN the backend ignores that update
+- AND no fact, state diff, or state event is written for that update
+
+### Requirement R3: Turn-Scoped Persistence And Debug Evidence
+
+The system SHALL persist accepted NPC updates as canonical state and make all extractor decisions inspectable by turn.
+
+#### Scenario R3-S1: Accepted extraction update persists canonical state
+
+- WHEN one or more NPC fact changes are accepted for a turn
+- THEN Convex updates the actor-scoped facts
+- AND writes a `stateDiffs` row tied to the same turn and command
+
+#### Scenario R3-S2: Accepted update summary is specific enough to inspect
+
+- WHEN an accepted update creates debug-visible event or state-diff evidence
+- THEN the evidence identifies the affected NPC and changed field keys
+- AND it does not expose hidden private knowledge as player-facing metadata
+
+#### Scenario R3-S3: Extractor failure does not fake state
+
+- WHEN story narration succeeds but the extraction provider call fails or returns invalid output
+- THEN the story turn remains succeeded
+- AND no fake NPC update, state diff, or LLM-authored state event is recorded
+- AND debug records show the extractor failure
+
+#### Scenario R3-S4: No-update extraction remains inspectable
+
+- WHEN the extractor returns no updates
+- THEN no facts change
+- AND debug records show that extraction ran and produced no accepted updates
+
+### Requirement R4: Provider-Neutral Extractor Contract
+
+The system SHALL use the existing provider-neutral backend boundary for NPC state extraction.
+
+#### Scenario R4-S1: Extractor uses configured OpenAI-compatible provider
+
+- WHEN `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` are configured
+- THEN the extractor uses the same provider adapter path as story generation
+- AND the UI does not depend on provider-specific SDKs or model APIs
+
+#### Scenario R4-S2: Extractor request is identifiable
+
+- WHEN a Game Master call or local log records the extraction request
+- THEN the request summary identifies it as NPC-state extraction
+- AND includes compact metadata such as output contract, actor keys, allowed update keys, model, and provider without logging secrets
+
+### Implemented By
+
+- `src/lib/director/prompt.ts` keeps persistent story generation plain-prose and adds `buildNpcStateExtractionRequest` for a second JSON-only extractor request using final narration, current input, current-scene NPC Cards, recent story, and the `mood` / `status` / `memory` allowlist.
+- `src/lib/director/output.ts` adds `parseNpcStateExtractionOutput` while reusing existing NPC update validation, actor allowlisting, field allowlisting, memory caps, and scene-beat persistence boundaries.
+- `src/app/api/director/turn/route.ts` runs extraction only after successful persistent narration, records story and extraction calls with `requestSummary.callRole`, skips extraction in transcript mode, and treats extractor failure as a debug-visible persistence miss rather than a failed story turn.
+- `convex/world.ts` adds `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records.
+- `scripts/director-playtest.mjs` verifies persistent mode now records both story-generation and NPC-state-extraction calls for each tested turn.
+
+### Verified By
+
+- `npm run test -- src/lib/director/director.test.ts` passed with coverage for story prompt shape, extraction prompt shape, extractor output parsing, NPC update validation, memory caps, read-only field rejection, unknown/offscreen actor rejection, and scene-beat suppression.
+- `npx convex codegen` passed after adding `recordNpcStateExtraction`.
+- `npm run typecheck` passed after wiring the route and Convex mutation.
+- `npm run ci:required` passed after implementation and documentation updates.
+- `npm run dev:debug` plus `npm run playtest:director` passed in persistent mode, producing `story_generation` and `npc_state_extraction` records for both a direct Mira question and a trivial jump.
+- Latest local log inspection showed the direct Mira question accepted one bounded `memory` update and the trivial jump returned `{"npcUpdates":[]}`.
+- Convex snapshot inspection of the latest playtest world showed Mira's actor-scoped `memory` fact updated with `source: "llm"` and one turn-scoped state diff/event for the accepted extraction.
+
+### Verification Gaps
+
+- Taylor manual browser confirmation remains pending.

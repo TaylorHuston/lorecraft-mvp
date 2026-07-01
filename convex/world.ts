@@ -4,6 +4,12 @@ import type { Id } from "./_generated/dataModel";
 
 type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
+type AcceptedNpcUpdateForWrite = {
+  actorKey: string;
+  actorName: string;
+  reason: string;
+  changes: Array<{ key: "mood" | "status" | "memory"; value: string }>;
+};
 
 const WORLD_SLUG = "stormbound-chapel-default";
 const DEMO_RESET_ROW_LIMIT = 500;
@@ -175,6 +181,74 @@ async function setFact(
     value: args.value,
     source: args.source,
   });
+}
+
+async function applyAcceptedNpcUpdates(
+  ctx: MutationCtx,
+  args: {
+    worldId: Id<"worlds">;
+    turnId: Id<"turns">;
+    commandId: Id<"commands">;
+    acceptedUpdates: AcceptedNpcUpdateForWrite[];
+  },
+) {
+  let changedFacts = 0;
+  const operations: Array<
+    | {
+        op: "setFact";
+        subjectType: string;
+        subjectId: string;
+        key: string;
+        value: FactValue;
+      }
+    | { op: "appendEvent"; text: string }
+  > = [];
+
+  for (const update of args.acceptedUpdates) {
+    const subjectId = actorSubjectId(update.actorKey);
+    for (const change of update.changes) {
+      await setFact(ctx, {
+        worldId: args.worldId,
+        subjectType: "actor",
+        subjectId,
+        key: change.key,
+        value: change.value,
+        source: "llm",
+        overwrite: true,
+      });
+      changedFacts += 1;
+      operations.push({
+        op: "setFact",
+        subjectType: "actor",
+        subjectId,
+        key: change.key,
+        value: change.value,
+      });
+    }
+
+    const changedKeys = update.changes.map((change) => change.key).join(", ");
+    const eventText = `${update.actorName}'s ${changedKeys} changed after the exchange.`;
+    await ctx.db.insert("events", {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      text: eventText,
+      source: "llm",
+    });
+    operations.push({ op: "appendEvent", text: eventText });
+  }
+
+  if (operations.length > 0) {
+    await ctx.db.insert("stateDiffs", {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      source: "llm",
+      operations,
+    });
+  }
+
+  return changedFacts;
 }
 
 async function deleteActorFactByKey(
@@ -971,64 +1045,74 @@ export const completeDirectorTurn = mutation({
       return { directorCallId, narrationId, changedFacts: 0 };
     }
 
-    let changedFacts = 0;
-    const operations: Array<
-      | {
-          op: "setFact";
-          subjectType: string;
-          subjectId: string;
-          key: string;
-          value: FactValue;
-        }
-      | { op: "appendEvent"; text: string }
-    > = [];
-
-    for (const update of args.acceptedUpdates) {
-      const subjectId = actorSubjectId(update.actorKey);
-      for (const change of update.changes) {
-        await setFact(ctx, {
-          worldId: args.worldId,
-          subjectType: "actor",
-          subjectId,
-          key: change.key,
-          value: change.value,
-          source: "llm",
-          overwrite: true,
-        });
-        changedFacts += 1;
-        operations.push({
-          op: "setFact",
-          subjectType: "actor",
-          subjectId,
-          key: change.key,
-          value: change.value,
-        });
-      }
-
-      const eventText = `${update.actorName}'s state changed after the exchange.`;
-      await ctx.db.insert("events", {
-        worldId: args.worldId,
-        turnId: args.turnId,
-        commandId: args.commandId,
-        text: eventText,
-        source: "llm",
-      });
-      operations.push({ op: "appendEvent", text: eventText });
-    }
-
-    if (operations.length > 0) {
-      await ctx.db.insert("stateDiffs", {
-        worldId: args.worldId,
-        turnId: args.turnId,
-        commandId: args.commandId,
-        source: "llm",
-        operations,
-      });
-    }
+    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      acceptedUpdates: args.acceptedUpdates,
+    });
 
     await ctx.db.patch(args.turnId, { status: "succeeded", completedAt: Date.now() });
 
     return { directorCallId, narrationId, changedFacts };
+  },
+});
+
+export const recordNpcStateExtraction = mutation({
+  args: {
+    worldId: v.id("worlds"),
+    turnId: v.id("turns"),
+    commandId: v.id("commands"),
+    provider: v.string(),
+    model: v.string(),
+    requestSummary: v.any(),
+    rawRequest: v.optional(v.any()),
+    rawResponse: v.optional(v.string()),
+    parsedResponse: v.optional(v.any()),
+    status: directorStatus,
+    acceptedUpdates: v.array(acceptedNpcUpdate),
+    ignoredUpdates: v.array(ignoredNpcUpdate),
+    error: v.optional(v.string()),
+  },
+  returns: v.object({
+    directorCallId: v.id("directorCalls"),
+    changedFacts: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const turn = await ctx.db.get(args.turnId);
+    if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
+      throw new Error("Turn, world, and command do not match.");
+    }
+
+    const directorCall = {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      provider: args.provider,
+      model: args.model,
+      requestSummary: args.requestSummary,
+      status: args.status,
+      acceptedUpdates: args.acceptedUpdates,
+      ignoredUpdates: args.ignoredUpdates,
+      ...(args.rawRequest !== undefined ? { rawRequest: args.rawRequest } : {}),
+      ...(args.rawResponse !== undefined ? { rawResponse: args.rawResponse } : {}),
+      ...(args.parsedResponse !== undefined ? { parsedResponse: args.parsedResponse } : {}),
+      ...(args.error !== undefined ? { error: args.error } : {}),
+    };
+    const directorCallId = await ctx.db.insert("directorCalls", directorCall);
+
+    if (args.status !== "success") {
+      return { directorCallId, changedFacts: 0 };
+    }
+
+    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
+      worldId: args.worldId,
+      turnId: args.turnId,
+      commandId: args.commandId,
+      acceptedUpdates: args.acceptedUpdates,
+    });
+
+    return { directorCallId, changedFacts };
   },
 });
 

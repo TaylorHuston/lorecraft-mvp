@@ -6,6 +6,11 @@ The format is based on Keep a Changelog 1.1.0.
 
 ## [Unreleased]
 
+### Added
+
+- Post-narration NPC state extraction for persistent mode, with bounded validated updates for NPC `mood`, `status`, and `memory`.
+- Game Master call roles in debug metadata so story generation and NPC-state extraction can be inspected separately for the same turn.
+
 ## [0.1.0] - 2026-06-30
 
 Initial Lorecraft MVP release: a local-first Next.js and Convex prototype for testing a narrative Game Master, persistent story feed, scoped turns, debug visibility, transcript mode, and read-only NPC context.

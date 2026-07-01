@@ -96,32 +96,49 @@ function assertSnapshot(snapshot) {
     fail("Convex snapshot was missing after playtest.");
   }
 
-  const calls = snapshot.directorCalls.slice(0, 2);
-  if (calls.length < 2) {
-    fail(`Expected at least 2 Game Master calls in snapshot, found ${calls.length}.`);
+  const calls = snapshot.directorCalls.slice(0, 4);
+  if (calls.length < 4) {
+    fail(`Expected at least 4 Game Master calls in snapshot, found ${calls.length}.`);
   }
 
-  const plainActionCall = calls[0];
-  const directQuestionCall = calls[1];
-  assertSceneBeat(plainActionCall.requestSummary, {
+  const plainActionStoryCall = findCall(calls, "story_generation", "trivial_player_action");
+  const plainActionExtractionCall = findCall(calls, "npc_state_extraction", "trivial_player_action");
+  const directQuestionStoryCall = findCall(calls, "story_generation", "direct_npc_question");
+  const directQuestionExtractionCall = findCall(calls, "npc_state_extraction", "direct_npc_question");
+
+  assertSceneBeat(plainActionStoryCall.requestSummary, {
     kind: "trivial_player_action",
     expectsNpcResponse: false,
     allowsNpcUpdates: false,
   });
-  assertSceneBeat(directQuestionCall.requestSummary, {
+  assertSceneBeat(plainActionExtractionCall.requestSummary, {
+    kind: "trivial_player_action",
+    expectsNpcResponse: false,
+    allowsNpcUpdates: false,
+  });
+  assertSceneBeat(directQuestionStoryCall.requestSummary, {
     kind: "direct_npc_question",
     expectsNpcResponse: true,
-    allowsNpcUpdates: false,
+    allowsNpcUpdates: true,
+    targetActorKey: "mira",
+  });
+  assertSceneBeat(directQuestionExtractionCall.requestSummary, {
+    kind: "direct_npc_question",
+    expectsNpcResponse: true,
+    allowsNpcUpdates: true,
     targetActorKey: "mira",
   });
 
-  for (const call of calls) {
+  for (const call of [plainActionStoryCall, directQuestionStoryCall]) {
     const summary = call.requestSummary;
+    if (summary.callRole !== "story_generation") {
+      fail(`Expected story_generation callRole. Got ${JSON.stringify(summary.callRole)}.`);
+    }
     if (summary.outputContract !== "plain_prose") {
       fail(`Expected outputContract to be plain_prose. Got ${JSON.stringify(summary.outputContract)}.`);
     }
-    if (summary.npcMutationMode !== "read_only") {
-      fail(`Expected npcMutationMode to be read_only. Got ${JSON.stringify(summary.npcMutationMode)}.`);
+    if (summary.npcMutationMode !== "bounded_updates") {
+      fail(`Expected npcMutationMode to be bounded_updates. Got ${JSON.stringify(summary.npcMutationMode)}.`);
     }
     assertArrayIncludes(summary.promptComponentKeys, "npcCards", "promptComponentKeys");
     assertArrayIncludes(summary.promptComponentKeys, "currentInput", "promptComponentKeys");
@@ -131,6 +148,37 @@ function assertSnapshot(snapshot) {
       fail("Expected generationSettings.responseFormat to be text in Game Master request summary.");
     }
   }
+
+  for (const call of [plainActionExtractionCall, directQuestionExtractionCall]) {
+    const summary = call.requestSummary;
+    if (summary.callRole !== "npc_state_extraction") {
+      fail(`Expected npc_state_extraction callRole. Got ${JSON.stringify(summary.callRole)}.`);
+    }
+    if (summary.outputContract !== "json_npc_updates") {
+      fail(`Expected extraction outputContract to be json_npc_updates. Got ${JSON.stringify(summary.outputContract)}.`);
+    }
+    if (summary.npcMutationMode !== "bounded_updates") {
+      fail(`Expected extraction npcMutationMode to be bounded_updates. Got ${JSON.stringify(summary.npcMutationMode)}.`);
+    }
+    assertArrayIncludes(summary.promptComponentKeys, "npcCards", "promptComponentKeys");
+    assertArrayIncludes(summary.promptComponentKeys, "currentInput", "promptComponentKeys");
+    assertArrayIncludes(summary.npcProfileKeys, "mira", "npcProfileKeys");
+    if (summary.generationSettings?.responseFormat !== "json_object") {
+      fail("Expected generationSettings.responseFormat to be json_object in NPC extraction request summary.");
+    }
+  }
+}
+
+function findCall(calls, callRole, sceneBeatKind) {
+  const found = calls.find(
+    (call) =>
+      call.requestSummary?.callRole === callRole &&
+      call.requestSummary?.requiredSceneBeat?.kind === sceneBeatKind,
+  );
+  if (!found) {
+    fail(`Expected to find ${callRole} call for ${sceneBeatKind}.`);
+  }
+  return found;
 }
 
 function assertSceneBeat(summary, expected) {

@@ -1,3 +1,6 @@
+---
+modified: 2026-06-30
+---
 # Data Model
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
@@ -297,9 +300,11 @@ Strategy:
 
 - Game Master calls are diagnostics, not canonical game state.
 - They explain provider failures, invalid JSON, accepted updates, and ignored updates.
+- A persistent turn can have two Game Master calls: `story_generation` for the plain-prose narration and `npc_state_extraction` for bounded NPC fact extraction.
 - Do not use this table as the source of truth for what the world remembers.
-- Current request summaries include compact prompt/debug metadata such as `directorMode`, `outputContract`, prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
-- In current story-generation mode, `acceptedUpdates` and `ignoredUpdates` are empty and `parsedResponse` is normalized to a narration with no `npcUpdates`.
+- Current request summaries include compact prompt/debug metadata such as `directorMode`, `callRole`, `outputContract`, prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+- Story-generation calls use `outputContract: "plain_prose"` and do not carry accepted NPC updates.
+- NPC-state extraction calls use `outputContract: "json_npc_updates"` and may carry accepted or ignored updates for `mood`, `status`, and `memory`.
 - `rawRequest` is omitted by default and only stored when local raw request debug storage is explicitly enabled. It can contain hidden NPC knowledge, prompt guidance, and player text, so it is diagnostic evidence rather than canonical game state.
 
 ## Game Master Prompt Context
@@ -309,12 +314,13 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 | Component | Source | Meaning |
 |---|---|---|
 | `promptGuidance` | Debug UI request input | Per-turn text guidance for style, NPC behavior, and persistence strategy during playtesting. |
-| `aiInstructions` | Editable backend configuration plus per-turn guidance | Story-first behavior, dialogue allowance, read-only persistence boundary, and current playtest guidance. |
+| `aiInstructions` | Editable backend configuration plus per-turn guidance | Story-first behavior, dialogue allowance, post-narration persistence boundary, and current playtest guidance. |
 | `world` | Derived from world, room, exit, object, and player rows | Current world, room, baseline scene description, visible exits, visible objects, and player identity. |
 | `npcCards` | Rendered from current-scene NPC profiles and temporary debug overrides | Card-like story memory the Game Master should treat as canonical NPC context. |
 | `recentStory` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
 | `currentInput` | Current request body | The player's narrative intent for this turn. |
-| `output` | Backend output contract | Current story generation asks for player-facing prose only. |
+| `gameMasterNarration` | Completed story-generation call | Extractor-only input containing the player-facing narration to inspect for durable NPC changes. |
+| `output` | Backend output contract | Story generation asks for player-facing prose only; NPC extraction asks for JSON `npcUpdates` only. |
 
 Strategy:
 

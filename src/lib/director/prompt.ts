@@ -67,6 +67,7 @@ export function buildDirectorRequest(
     ],
     requestSummary: {
       directorMode: "persistent",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       worldName: context.world.name,
       roomKey: context.room.key,
@@ -78,7 +79,7 @@ export function buildDirectorRequest(
       ),
       npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
       ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
-      npcMutationMode: "read_only",
+      npcMutationMode: "bounded_updates",
       readOnlyKnowledgeKeys: prompt.readOnlyKnowledgeKeys,
       requiredSceneBeat: {
         kind: prompt.requiredSceneBeat.kind,
@@ -91,6 +92,85 @@ export function buildDirectorRequest(
       sceneBeatSource: options.sceneBeatSource ?? "engine",
       ...(options.sceneBeatReason ? { sceneBeatReason: options.sceneBeatReason } : {}),
       promptComponentKeys: prompt.promptSectionKeys,
+      ...(prompt.promptGuidanceKeys.length > 0 ? { promptGuidanceKeys: prompt.promptGuidanceKeys } : {}),
+      ...(generationSettings ? { generationSettings } : {}),
+    },
+  };
+}
+
+export function buildNpcStateExtractionRequest(
+  context: DirectorContext,
+  playerInput: string,
+  narration: string,
+  options: {
+    generationSettings?: DirectorGenerationSettingsSummary;
+    promptGuidance?: DirectorPromptGuidance;
+    requiredSceneBeat?: RequiredSceneBeat;
+    sceneBeatSource?: SceneBeatSource;
+    sceneBeatReason?: string;
+  } = {},
+): DirectorRequest {
+  const prompt = buildPromptComponents(context, playerInput, {
+    promptGuidance: options.promptGuidance,
+    requiredSceneBeat: options.requiredSceneBeat,
+  });
+  const generationSettings = options.generationSettings
+    ? { ...options.generationSettings, responseFormat: "json_object" as const }
+    : undefined;
+  const userPrompt = buildNpcStateExtractionUserPrompt({
+    npcCards: prompt.components.npcCards,
+    recentFeed: prompt.components.recentFeed,
+    playerInput,
+    narration,
+    requiredSceneBeat: prompt.requiredSceneBeat,
+  });
+
+  return {
+    messages: [
+      {
+        role: "system",
+        content: [
+          "You extract bounded NPC state updates from a completed Lorecraft story beat.",
+          "Return only a JSON object. Do not write story prose.",
+          "Only propose durable changes for present NPCs and only when the current input and narration clearly changed durable state.",
+        ].join("\n"),
+      },
+      { role: "user", content: userPrompt },
+    ],
+    requestSummary: {
+      directorMode: "persistent",
+      callRole: "npc_state_extraction",
+      outputContract: "json_npc_updates",
+      worldName: context.world.name,
+      roomKey: context.room.key,
+      playerInputLength: playerInput.length,
+      recentFeedCount: prompt.recentFeed.length,
+      actorKeys: context.actors.map((actor) => actor.key),
+      npcFactKeys: NPC_FACT_KEYS.filter((key) =>
+        context.actors.some((actor) => actor.facts.some((fact) => fact.key === key)),
+      ),
+      npcProfileKeys: prompt.npcProfiles.map((profile) => profile.key),
+      ...(prompt.npcOverrideKeys.length > 0 ? { npcOverrideKeys: prompt.npcOverrideKeys } : {}),
+      npcMutationMode: "bounded_updates",
+      readOnlyKnowledgeKeys: prompt.readOnlyKnowledgeKeys,
+      requiredSceneBeat: {
+        kind: prompt.requiredSceneBeat.kind,
+        ...(prompt.requiredSceneBeat.targetActorKey
+          ? { targetActorKey: prompt.requiredSceneBeat.targetActorKey }
+          : {}),
+        expectsNpcResponse: prompt.requiredSceneBeat.expectsNpcResponse,
+        allowsNpcUpdates: prompt.requiredSceneBeat.allowsNpcUpdates,
+      },
+      sceneBeatSource: options.sceneBeatSource ?? "engine",
+      ...(options.sceneBeatReason ? { sceneBeatReason: options.sceneBeatReason } : {}),
+      promptComponentKeys: [
+        "extractionInstructions",
+        "npcCards",
+        "recentStory",
+        "currentInput",
+        "gameMasterNarration",
+        "output",
+      ],
       ...(prompt.promptGuidanceKeys.length > 0 ? { promptGuidanceKeys: prompt.promptGuidanceKeys } : {}),
       ...(generationSettings ? { generationSettings } : {}),
     },
@@ -136,6 +216,7 @@ export function buildTranscriptDirectorRequest(
     ],
     requestSummary: {
       directorMode: "transcript",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       worldName: context.world.name,
       roomKey: "transcript",
@@ -247,9 +328,7 @@ function buildPromptComponents(
   },
 ) {
   const recentFeed = context.recentFeed.slice(-RECENT_FEED_LIMIT);
-  const requiredSceneBeat = toReadOnlySceneBeat(
-    options.requiredSceneBeat ?? deriveRequiredSceneBeat(context, playerInput),
-  );
+  const requiredSceneBeat = options.requiredSceneBeat ?? deriveRequiredSceneBeat(context, playerInput);
   const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const lastAction = {
     rawInput: playerInput,
@@ -395,11 +474,12 @@ function buildPersistentAiInstructions({
   const lines = [
     "Continue and advance the story like it never ended.",
     "Use present tense, second person, concrete sensory detail, and lifelike dialogue.",
-    "Write one complete short story beat, usually 1-3 paragraphs.",
+    "Write one complete short story beat, usually 1-2 paragraphs.",
+    "Prefer complete sentences and a clean stopping point over extra detail.",
     "Resolve Current Input before advancing; do not merely restate it.",
     "Stop after resolving the current input; do not continue into the player's next action.",
     "Treat NPC Cards as canonical story memory, including descriptions, personality, voice, current status, memory, and private knowledge.",
-    "Keep fleeting gestures and reactions in narration. NPC state is read-only for this turn.",
+    "Keep fleeting gestures and reactions in narration. Durable NPC state is evaluated separately after this prose.",
   ];
 
   for (const line of promptGuidanceLines(promptGuidance)) {
@@ -445,6 +525,42 @@ function buildPersistentUserPrompt(components: {
   ]);
 }
 
+function buildNpcStateExtractionUserPrompt(components: {
+  npcCards: PromptNpcCard[];
+  recentFeed: PromptFeedEntry[];
+  playerInput: string;
+  narration: string;
+  requiredSceneBeat: RequiredSceneBeat;
+}) {
+  const instructions = [
+    `Allowed update fields: ${NPC_FACT_KEYS.join(", ")}.`,
+    "Use mood for the NPC's current emotional posture.",
+    "Use status for durable current condition or situation that should affect later narration.",
+    "Use memory for a compact rolling summary of meaningful direct interactions with the player.",
+    "Do not update description, background, persona, voice, knowledge, location, inventory, health, or rules-like stats.",
+    "Do not update for momentary gestures, incidental movement, eye contact, posture, tone, or obvious reactions that the recent story already covers.",
+    "Do not invent hidden consequences. If no durable NPC state changed, return an empty npcUpdates array.",
+  ];
+
+  if (!components.requiredSceneBeat.allowsNpcUpdates) {
+    instructions.push(
+      "The required scene beat is not eligible for durable NPC updates; return an empty npcUpdates array unless the narration shows an unavoidable durable consequence.",
+    );
+  }
+
+  return buildSectionedPrompt([
+    ["Extraction Instructions", bulletList(instructions)],
+    ["NPC Cards", formatNpcCards(components.npcCards)],
+    ["Recent Story", formatRecentStory(components.recentFeed)],
+    ["Current Input", `> ${components.playerInput}`],
+    ["Game Master Narration", components.narration],
+    [
+      "Output",
+      'Return exactly one JSON object shaped like {"npcUpdates":[{"actorKey":"mira","reason":"brief human-readable reason","changes":{"mood":"new mood","status":"new status","memory":"updated compact memory"}}]}. Use {"npcUpdates":[]} when nothing durable changed.',
+    ],
+  ]);
+}
+
 function persistentPromptSectionKeys() {
   return ["aiInstructions", "world", "npcCards", "recentStory", "currentInput", "output"];
 }
@@ -463,6 +579,8 @@ function buildTranscriptUserPrompt(components: {
   const instructions = [
     "Continue and advance the story like it never ended.",
     "Use present tense, second person, concrete sensory detail, and lifelike dialogue.",
+    "Write one complete short story beat, usually 1-2 paragraphs.",
+    "Prefer complete sentences and a clean stopping point over extra detail.",
     "Resolve Current Input before advancing; do not merely restate it.",
     "Use Recent Story as live continuity. The World Seed is only the opening premise.",
     components.sceneDirective,
@@ -591,14 +709,6 @@ function buildConversationFocus(
     source: directTarget ? "currentTurn" : "recentFeed",
     instruction:
       "Use this only for ambiguous follow-up dialogue. Explicit names in currentTurn always win.",
-  };
-}
-
-function toReadOnlySceneBeat(sceneBeat: RequiredSceneBeat): RequiredSceneBeat {
-  return {
-    ...sceneBeat,
-    allowsNpcUpdates: false,
-    instruction: `${sceneBeat.instruction} NPC profiles and facts are read-only in this mode; keep changes in narration. Durable mutation extraction is a separate future step.`,
   };
 }
 
