@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: fresh delegated `/sdd-review` passed after safe review remediation
-- Last completed action: delegated `/sdd-review` found one remaining E2E base-URL isolation gap; the config/docs were tightened and verification passed
-- Next action: Taylor may authorize PR, merge, or closeout when ready
-- Active branch/ref: `change/end-to-end-testing`
-- Branch note: branch policy compliant for planned test/config/runtime implementation; target branch is `develop`
+- Current state: closed after local merge to `develop`
+- Last completed action: merged `change/end-to-end-testing` into `develop` and closed this change folder
+- Next action: no action required for this change; use `/sdd-release` later for promotion to `main`
+- Active branch/ref: `develop`
+- Branch note: implementation branch `change/end-to-end-testing` was locally merged into `develop`
 - Expected dirty files: none in the app repo after review remediation is committed
 - Known blockers: none
 
@@ -71,8 +71,8 @@
 - [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
-- [ ] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus Taylor authorization allow it.
+- [x] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -88,6 +88,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-06-30 | Review remediation | main with `sdd-review` | `src/app/world-client.tsx`, LC-001 Epic, change review artifacts | Fixed default-world loading race exposed by review E2E rerun; seed-empty state no longer appears while Convex is still loading the default world | review-fix commit |
 | 2026-07-01 | Delegated review remediation | main with delegated `sdd-review` passes | `playwright.config.ts`, `tests/e2e/lorecraft-playtest.spec.ts`, README, LC-001 Epic, change artifacts | Added loopback-only E2E base URL guard, E2E port validation, no-reuse Convex startup, accepted NPC extraction assertion, and stale artifact cleanup | review-fix commit |
 | 2026-07-01 | Fresh delegated review remediation | main with delegated `sdd-review` passes | `playwright.config.ts`, README, change artifacts, `docs/ci-cd.md` metadata | Tightened `LORECRAFT_E2E_BASE_URL` to the configured E2E app origin/port, documented the constraint, and resolved app-repo dirty state for integration readiness | review-fix commit |
+| 2026-07-01 | Merge and closeout | main with Taylor authorization | `develop`, change folder | Merged `change/end-to-end-testing` into `develop` and closed the active change folder | merge `09c73fd` |
 
 ## Verification Ledger
 
@@ -126,6 +127,8 @@ Record proof as it happens.
 | 2026-07-01 | Fresh review rerun: `lsof -nP -iTCP:3101 -iTCP:3102 -iTCP:3210 -sTCP:LISTEN` | E2E fixture, Convex, and Next test ports were not left listening after successful rerun | passed |
 | 2026-07-01 | Fresh review rerun: `git merge-tree --write-tree develop change/end-to-end-testing` | Source branch can merge cleanly into `develop` without performing the merge | passed |
 | 2026-07-01 | Fresh review rerun: `npm audit --omit=dev` | Production dependency audit after dependency addition | failed: existing Next/PostCSS moderate advisory; `npm audit fix --force` would install incompatible Next 9.3.3, so no automated fix applied |
+| 2026-07-01 | Closeout pre-merge: `npm run ci:required` | Required gate immediately before local integration | passed |
+| 2026-07-01 | Closeout merge: `git merge --no-ff change/end-to-end-testing` | Local integration into `develop` | passed: merge commit `09c73fd` |
 
 ## Manual Feedback
 
@@ -180,7 +183,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 ### Apply Readiness
 
 - Status: ready
-- Reason: implementation is complete, deterministic E2E and required CI pass, delegated review is clean after safe remediation, and remaining work is Taylor-authorized PR/merge/closeout.
+- Reason: implementation is complete, deterministic E2E and required CI pass, delegated review is clean after safe remediation, and closeout is complete.
 
 ## Closeout
 
@@ -190,10 +193,10 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Verified By maps current: yes
 - Changelog current: yes
 - `sdd-review` verdict: ready
-- Review record: `docs/changes/2026-06-30-end-to-end-testing/review.md`
+- Review record: `docs/changes/closed/2026-06-30-end-to-end-testing/review.md`
 - `review.md` findings resolved: yes
 - Planning updates resolved: yes
 - Manual UI confirmation status: pending Taylor
-- PR / merge state: not requested
+- PR / merge state: locally merged into `develop` with merge commit `09c73fd`; no remote PR requested
 - Deferred scope accepted: visual regression, cross-browser matrix, required real-model/provider E2E, hosted branch-protection E2E, load/concurrency/rollback/mobile testing remain deferred
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
