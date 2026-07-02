@@ -6,7 +6,23 @@ The format is based on Keep a Changelog 1.1.0.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-07-01
+## [0.2.0] - 2026-07-01
+
+Second MVP release focused on turning the initial chat spike into a more inspectable persistent-world playtest loop, with deterministic browser coverage, bounded state extraction, and lightweight location state.
+
+### Added
+
+- Lightweight Location Cards, debug location editing, and bounded actor movement to existing canonical locations.
+- Canonical debug NPC editing parity with Location editing, including debug-created NPCs, seeded tavern NPCs, and resettable NPC debug state.
+- Deterministic Playwright E2E coverage for the Lorecraft playtest loop using a local OpenAI-compatible fixture provider.
+- Post-narration NPC state extraction for persistent mode, with bounded validated updates for NPC `mood`, `status`, and `memory`.
+- Game Master call roles in debug metadata so story generation and NPC-state extraction can be inspected separately for the same turn.
+
+### Changed
+
+- LC-001 Epic documentation now uses the current canonical Epic template and scenario-mapped verification style.
+
+## [0.1.0] - 2026-06-30
 
 Initial Lorecraft MVP release: a local-first Next.js and Convex prototype for testing a narrative Game Master, persistent story feed, scoped turns, debug visibility, transcript mode, and read-only NPC context.
 
@@ -24,8 +40,3 @@ Initial Lorecraft MVP release: a local-first Next.js and Convex prototype for te
 - Compact sectioned Game Master prompts that split creative story generation from future structured state extraction.
 - Local smoke playtest scripts and same-prompt model benchmarking for comparing available local storytelling models.
 - Project documentation for persistence strategy, canonical data model, CI/CD policy, and the long-term TTRPG-style Game Master direction.
-- Lightweight Location Cards, debug location editing, and bounded actor movement to existing canonical locations.
-- Canonical debug NPC editing parity with Location editing, including debug-created NPCs, seeded tavern NPCs, and resettable NPC debug state.
-- Deterministic Playwright E2E coverage for the Lorecraft playtest loop using a local OpenAI-compatible fixture provider.
-- Post-narration NPC state extraction for persistent mode, with bounded validated updates for NPC `mood`, `status`, and `memory`.
-- Game Master call roles in debug metadata so story generation and NPC-state extraction can be inspected separately for the same turn.
