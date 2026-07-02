@@ -21,6 +21,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
 
     await page.reload();
+    await continueFirstAdventure(page);
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
 
@@ -63,6 +64,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#story-stream")).toContainText(playerText);
 
     await page.reload();
+    await continueFirstAdventure(page);
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
@@ -227,15 +229,17 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await page.waitForFunction(() =>
     Boolean(
       document.querySelector("#director-input") ??
+        document.querySelector("#adventure-landing") ??
         document.querySelector("#seed-world-button") ??
         document.querySelector("#fresh-seed-button"),
     ),
   );
 
-  const emptySeedButton = page.locator("#seed-world-button");
-  if (await emptySeedButton.isVisible()) {
-    await emptySeedButton.click();
-  } else {
+  if (await page.locator("#adventure-landing").isVisible()) {
+    await page.locator("#fresh-seed-button").click();
+  } else if (await page.locator("#seed-world-button").isVisible()) {
+    await page.locator("#seed-world-button").click();
+  } else if (await page.locator("#fresh-seed-button").isVisible()) {
     await page.locator("#fresh-seed-button").click();
   }
 
@@ -243,6 +247,12 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function continueFirstAdventure(page: import("@playwright/test").Page) {
+  await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+  await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
+  await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
 }
 
 async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {

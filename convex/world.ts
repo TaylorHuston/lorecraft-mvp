@@ -357,6 +357,15 @@ const adventureCreateResult = v.union(
   v.object({ ok: v.literal(true), adventureId: v.id("adventures") }),
   v.object({ ok: v.literal(false), error: v.string() }),
 );
+const adventureListItem = v.object({
+  _id: v.id("adventures"),
+  name: v.string(),
+  worldName: v.string(),
+  sourceVersionNumber: v.number(),
+  currentLocationName: v.optional(v.string()),
+  turnCount: v.number(),
+  lastPlayedAt: v.number(),
+});
 const worldVersionCreateResult = v.union(
   v.object({ ok: v.literal(true), worldVersionId: v.id("worldVersions") }),
   v.object({ ok: v.literal(false), error: v.string() }),
@@ -376,6 +385,15 @@ function objectSubjectId(objectId: Id<"worldObjects">) {
 
 function roomSubjectId(roomKey: string) {
   return `room:${roomKey}`;
+}
+
+function slugify(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
 }
 
 function buildStormboundBaseline(): AdventureBaseline {
@@ -511,6 +529,88 @@ async function createAdventureFromBaseline(
     baseline: args.baseline,
   });
   return adventureId;
+}
+
+async function ensureDemoWorldVersion(ctx: MutationCtx) {
+  const existingWorld = await ctx.db
+    .query("worlds")
+    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .unique();
+
+  if (existingWorld?.currentWorldVersionId) {
+    const existingVersion = await ctx.db.get(existingWorld.currentWorldVersionId);
+    if (existingVersion) {
+      return {
+        worldId: existingWorld._id,
+        worldVersionId: existingVersion._id,
+        baseline: existingVersion.baseline as AdventureBaseline,
+      };
+    }
+  }
+
+  const baseline = buildStormboundBaseline();
+  const worldId =
+    existingWorld?._id ??
+    (await ctx.db.insert("worlds", {
+      slug: WORLD_SLUG,
+      name: baseline.world.name,
+      description: baseline.world.description,
+    }));
+
+  const latest = await ctx.db
+    .query("worldVersions")
+    .withIndex("by_worldId_and_versionNumber", (q) => q.eq("worldId", worldId))
+    .order("desc")
+    .take(1);
+  if (latest[0]) {
+    await ctx.db.patch(worldId, { currentWorldVersionId: latest[0]._id });
+    return {
+      worldId,
+      worldVersionId: latest[0]._id,
+      baseline: latest[0].baseline as AdventureBaseline,
+    };
+  }
+
+  const worldVersionId = await ctx.db.insert("worldVersions", {
+    worldId,
+    versionNumber: 1,
+    name: baseline.world.name,
+    description: baseline.world.description,
+    baseline,
+  });
+  await ctx.db.patch(worldId, { currentWorldVersionId: worldVersionId });
+
+  return { worldId, worldVersionId, baseline };
+}
+
+async function nextAdventureIdentity(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  preferredName?: string,
+) {
+  const adventures = await ctx.db
+    .query("adventures")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(100);
+  const ordinal = adventures.length + 1;
+  const name = preferredName?.trim().slice(0, 120) || `Stormbound Chapel Adventure ${ordinal}`;
+  const baseSlug = slugify(name) || `stormbound-chapel-adventure-${ordinal}`;
+
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
+    const existing = await ctx.db
+      .query("adventures")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!existing) {
+      return { name, slug };
+    }
+  }
+
+  return {
+    name,
+    slug: `${baseSlug}-${adventures.length + 101}`,
+  };
 }
 
 async function copyBaselineRuntimeRows(
@@ -882,6 +982,75 @@ export const getDefaultAdventure = query({
       .withIndex("by_slug", (q) => q.eq("slug", DEFAULT_ADVENTURE_SLUG))
       .unique();
     return adventure?._id ?? null;
+  },
+});
+
+export const listAdventures = query({
+  args: {},
+  returns: v.array(adventureListItem),
+  handler: async (ctx) => {
+    const world = await ctx.db
+      .query("worlds")
+      .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+      .unique();
+    if (!world) {
+      return [];
+    }
+
+    const adventures = await ctx.db
+      .query("adventures")
+      .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+      .take(50);
+
+    const items = await Promise.all(
+      adventures.map(async (adventure) => {
+        const sourceVersion = await ctx.db.get(adventure.worldVersionId);
+        const player = adventure.currentPlayerActorId
+          ? await ctx.db.get(adventure.currentPlayerActorId)
+          : null;
+        const currentRoom = player ? await ctx.db.get(player.roomId) : null;
+        const latestTurn = await ctx.db
+          .query("turns")
+          .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+            q.eq("adventureId", adventure._id),
+          )
+          .order("desc")
+          .take(1);
+        const turnCount = latestTurn[0]?.sequenceNumber ?? 0;
+
+        return {
+          _id: adventure._id,
+          name: adventure.name,
+          worldName: world.name,
+          sourceVersionNumber: sourceVersion?.versionNumber ?? 0,
+          currentLocationName: currentRoom?.name,
+          turnCount,
+          lastPlayedAt: latestTurn[0]?.completedAt ?? latestTurn[0]?._creationTime ?? adventure._creationTime,
+        };
+      }),
+    );
+
+    return items.sort((left, right) => right.lastPlayedAt - left.lastPlayedAt);
+  },
+});
+
+export const createAdventure = mutation({
+  args: {
+    name: v.optional(v.string()),
+  },
+  returns: adventureCreateResult,
+  handler: async (ctx, args) => {
+    const { worldId, worldVersionId, baseline } = await ensureDemoWorldVersion(ctx);
+    const identity = await nextAdventureIdentity(ctx, worldId, args.name);
+    const adventureId = await createAdventureFromBaseline(ctx, {
+      slug: identity.slug,
+      name: identity.name,
+      worldId,
+      worldVersionId,
+      baseline,
+    });
+
+    return { ok: true as const, adventureId };
   },
 });
 

@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete; deterministic gates and E2E passed; commit pending
-- Last completed action: `npm run lint`, `npm run ci:required`, and `npm run e2e` passed after correcting the reset E2E expectation for restored WorldVersion opening narration
-- Next action: final drift check, commit, then hand off to `sdd-review`
+- Current state: manual feedback implementation complete; dev server running; feedback slice commit pending
+- Last completed action: `npm run ci:required` and `npm run e2e` passed after adding the Adventure startup screen
+- Next action: commit feedback slice, then hand off to `sdd-review`
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/api/director/turn/route.test.ts`, `src/app/world-client.tsx`, `scripts/*playtest*.mjs`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/epics/lc-002-world-adventure-model/epic.md`, this change folder, docs/changelog files
 - Known blockers: none identified
@@ -89,6 +89,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-01 | Adventure seed/copy/reset runtime | main | `convex/world.ts`, `convex/schema.ts` | Added Stormbound Chapel baseline WorldVersion creation, default Adventure creation, Adventure-owned runtime copy, WorldVersion isolation helpers, and selected-Adventure reset to source version. | c8add34 |
 | 2026-07-01 | Adventure-scoped Game Master flow | main | `src/app/api/director/turn/route.ts`, `src/lib/director/*`, `src/app/world-client.tsx` | Route, prompt/log/error contracts, debug UI, reset/debug edits, scripts, and snapshots now use `adventureId` and expose source WorldVersion context. | c8add34 |
 | 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | c8add34 |
+| 2026-07-02 | Manual feedback: Adventure startup screen | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | First app access now shows a lightweight Adventure screen to continue previous Adventures, create a new Adventure from the current WorldVersion, or reset the demo world; opening an Adventure remains required before the debug drawer/story input appears. | d61235a |
 
 ## Verification Ledger
 
@@ -108,6 +109,12 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-01 | `npm run ci:required` | deterministic required gate | Lint, full unit tests, typecheck, and production build pass. | passed |
 | 2026-07-01 | First `npm run e2e` after Adventure reset | deterministic browser E2E | Revealed stale E2E expectation that Reset Session should empty the story feed. New model restores source WorldVersion opening narration instead. | failed as expected after model change |
 | 2026-07-01 | `npm run e2e` after assertion update | deterministic browser E2E | Browser seeds default Adventure, submits turns, verifies debug Adventure/source-version evidence, edits NPC/location state, travels, rejects unknown travel, resets selected Adventure, and verifies source-version opening/location/NPC restoration. | passed |
+| 2026-07-02 | `npm run typecheck` | deterministic automated gate | TypeScript accepts the new Adventure list/create client and Convex function contracts. | passed |
+| 2026-07-02 | `npm run lint` | deterministic automated gate | ESLint accepts the Adventure landing UI and Convex helpers. | passed |
+| 2026-07-02 | `npm run test -- src/app/api/director/turn/route.test.ts src/lib/director/director.test.ts` | focused automated tests | Existing Game Master route/director contracts still pass after startup selection changed. | passed |
+| 2026-07-02 | Browser smoke against running `npm run dev:debug` | manual/browser automation smoke | Startup screen listed existing Adventures; New Adventure created `Stormbound Chapel Adventure 2`; the story stream opened with source-version opening narration; Back returned to the Adventure list. | passed |
+| 2026-07-02 | `npm run ci:required` | deterministic required gate | Lint, full unit tests, typecheck, and production build pass after the Adventure startup screen. | passed |
+| 2026-07-02 | `npm run e2e` | deterministic browser E2E | Full deterministic playtest passes after updating reload behavior to continue from the Adventure landing screen. | passed |
 
 ## Manual Feedback
 
@@ -116,6 +123,7 @@ Record the user's manual testing feedback after implementation starts.
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
 | 2026-07-01 | Frozen copies; World updates should not break an existing story. | accepted architecture constraint | Captured in accepted ADR and this proposal. | incorporated |
+| 2026-07-02 | On first access, the app should show a page to continue previous Adventures or create a new one. | accepted UX requirement | Added lightweight Adventure landing screen; updated LC-002 and docs so Adventure selection is no longer deferred or contradicted by "no management screen" wording. | incorporated |
 
 ## Planning Updates
 
@@ -130,9 +138,9 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Status: pending Taylor
 - App URL / route: `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel WorldVersion and default Adventure
-- Steps for the user: open the app, confirm it lands in a playable Adventure without a management screen, submit at least one turn, inspect debug Adventure/source version identity, reset the Adventure
+- Steps for the user: open the app, confirm it lands on the Adventure screen, continue an existing Adventure or create a new one, submit at least one turn, inspect debug Adventure/source version identity, reset the Adventure
 - Expected result: the story loop works as before, but reset/debug wording and state identity make clear that play happens inside an Adventure copied from a WorldVersion
-- Feedback that would change artifacts: need for an Adventure picker, visible World/Adventure labels, different reset wording, or stronger migration/preservation requirements
+- Feedback that would change artifacts: stronger Adventure naming, visible World/Adventure labels, different reset wording, or stronger migration/preservation requirements
 
 ## Blockers / Open Questions
 
@@ -152,6 +160,6 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - `review.md` findings resolved: not applicable until review runs.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
-- PR / merge state: implementation committed on `change/world-adventure-model`; no PR/merge yet.
-- Deferred scope accepted: Adventure picker, World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
+- PR / merge state: initial implementation committed on `change/world-adventure-model`; manual feedback slice pending commit; no PR/merge yet.
+- Deferred scope accepted: polished World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
 - Change moved to `docs/changes/closed/`: no; pending review and closeout authorization.

@@ -12,6 +12,7 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
 - Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
 - Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
+- Startup Adventure screen for continuing existing local Adventures or creating a new Adventure from the current WorldVersion.
 - Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
 - Location Cards with current-location context, known destination context, debug editing, and bounded movement.
@@ -40,7 +41,7 @@ This repo does not currently include:
 - Multiplayer.
 - Combat, HP, inventory, stats, quests, rulesets, or dice systems.
 - A polished World Builder.
-- User-facing Adventure picker or polished reusable World Builder.
+- Polished reusable World Builder.
 - Marketplace, billing, creator tools, or public hosting.
 
 Remote/shared deployments are not production-ready. The current route guardrails are prototype safety checks, not a replacement for real authentication, ownership checks, rate limiting, or production operations.

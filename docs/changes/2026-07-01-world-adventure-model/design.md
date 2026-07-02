@@ -11,7 +11,7 @@ That model is intentionally temporary. The accepted ADR [World Templates Create 
 **Goals:**
 
 - Introduce World, WorldVersion, and Adventure as distinct product/data concepts.
-- Keep the default Stormbound Chapel playtest simple: seed a WorldVersion and create or resume a default local Adventure.
+- Keep the Stormbound Chapel playtest simple: seed a WorldVersion, list local Adventures, continue an existing Adventure, or create a new Adventure copy.
 - Scope mutable runtime state to Adventure identity.
 - Prove existing Adventures do not change when their source World gets a new version.
 - Preserve the current Game Master story loop, debug panel, NPC Cards, Location Cards, state extraction, movement validation, turns, and deterministic E2E path under the new identity model.
@@ -20,7 +20,7 @@ That model is intentionally temporary. The accepted ADR [World Templates Create 
 **Non-Goals:**
 
 - User accounts, auth, ownership, sharing, publishing, or permissions.
-- A polished Adventure picker or public World Builder.
+- A polished public World Builder.
 - Dynamic World patching into existing Adventures.
 - Branching adventures, save slots, manual snapshots, or rollback.
 - Multiplayer or shared live worlds.
@@ -50,8 +50,8 @@ The system SHALL create an Adventure from a selected WorldVersion by copying bas
 
 - WHEN the local demo world is seeded or repaired
 - THEN the system creates an authored Stormbound Chapel WorldVersion
-- AND the system creates or resumes a default local Adventure from that version
-- AND the player can begin play without choosing from a management screen
+- AND the system creates or resumes local Adventures from that version
+- AND the player can continue an existing Adventure or create a new one from the startup screen
 
 ###### Scenario R1-S2: Adventure records source identity
 
@@ -65,7 +65,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 
 ###### Scenario R2-S1: Copied baseline is playable
 
-- WHEN the default Adventure is opened
+- WHEN an Adventure is opened
 - THEN the Game Master context includes Adventure-owned locations, NPCs, facts, objects, and recent story
 - AND no runtime prompt context is read from mutable World template rows
 
@@ -262,7 +262,7 @@ See `docs/epics/lc-002-world-adventure-model/epic.md` Story S4.
 - User impact: Clearer reset/resume behavior and foundation for future World Builder flows.
 - Implementation complexity: Highest of the immediate options.
 - Reversibility: Reasonable during MVP because local seeded data is disposable.
-- Client surfaces: Current browser can still open the default Adventure; future clients can target Adventure APIs.
+- Client surfaces: Current browser can list Adventures, create a new Adventure, and open the selected Adventure; future clients can target Adventure APIs.
 - API / contract shape: Route and Convex contracts should identify the selected Adventure for play and optionally source World/Version for debug context.
 - Frontend/backend boundary: Strong; backend owns copy/reset/isolation while UI presents the current story.
 - Data / schema impact: Meaningful schema migration from `worldId` runtime ownership to `adventureId`.
@@ -275,7 +275,7 @@ See `docs/epics/lc-002-world-adventure-model/epic.md` Story S4.
 
 Use Option 3: introduce explicit `WorldVersion` and `Adventure` concepts and move mutable runtime ownership to `adventureId`.
 
-Implementation should keep the player-facing MVP simple. On local seed/repair, the app should create the Stormbound Chapel World, create an initial immutable WorldVersion, and create or resume a default Adventure from that version. The current play UI can continue to open the default Adventure automatically; a polished Adventure picker is deferred.
+Implementation should keep the player-facing MVP simple. On local seed/repair, the app should create the Stormbound Chapel World, create an initial immutable WorldVersion, and create or resume Adventures from that version. The current play UI should start on a lightweight Adventure screen where a playtester can continue an existing Adventure or create a new one.
 
 Convex should own copy and reset behavior. The route, prompt builder, debug panel, and E2E path should request and render current Adventure context. Source World and WorldVersion should appear as debug context, not runtime truth. Existing provider and extraction behavior should remain unchanged except that it reads and writes Adventure-scoped state.
 
@@ -344,7 +344,7 @@ This approach matches the accepted ADR and makes the key product invariant testa
 
 - Use a new `LC-002` Epic rather than stretching `LC-001`.
 - Implement WorldVersion now instead of postponing it behind an ambiguous Adventure-only metadata layer.
-- Keep the first player-facing path as one automatically selected default Adventure.
+- Keep the first player-facing path as a lightweight Adventure selection screen, not a polished save-slot system.
 - Treat this as a user-facing changelog entry because reset/resume semantics and debug state identity will change.
 
 ## Risks / Trade-Offs

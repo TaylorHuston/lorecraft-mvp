@@ -64,7 +64,7 @@ An Adventure is a playable copy created from one WorldVersion.
 
 Strategy:
 
-- The default app opens the seeded Stormbound Chapel Adventure automatically.
+- The default app opens an Adventure landing screen where the player can continue an existing Adventure or create a new one from the current WorldVersion.
 - Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
 - Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
 

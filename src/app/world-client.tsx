@@ -52,6 +52,15 @@ type NpcPendingSave = {
   saveVersion: number;
 };
 type LocationSaveStatus = "idle" | "saving" | "saved" | "error";
+type AdventureListItem = {
+  _id: Id<"adventures">;
+  name: string;
+  worldName: string;
+  sourceVersionNumber: number;
+  currentLocationName?: string;
+  turnCount: number;
+  lastPlayedAt: number;
+};
 
 const NPC_PROFILE_FACT_KEYS = [
   "background",
@@ -72,8 +81,9 @@ const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
 };
 
 export function WorldClient() {
-  const defaultAdventureId = useQuery(api.world.getDefaultAdventure);
+  const adventures = useQuery(api.world.listAdventures);
   const seedWorld = useMutation(api.world.seedDemoWorld);
+  const createAdventure = useMutation(api.world.createAdventure);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const updateLocation = useAction(api.world.updateLocation);
   const createLocation = useAction(api.world.createLocation);
@@ -86,6 +96,7 @@ export function WorldClient() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(false);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
@@ -112,13 +123,14 @@ export function WorldClient() {
   const locationActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
   const nextDebugNpcOrdinal = useRef(1);
 
-  const adventureId = selectedAdventureId ?? defaultAdventureId ?? null;
-  const isLoadingDefaultAdventure =
-    selectedAdventureId === null && defaultAdventureId === undefined;
+  const adventureId = selectedAdventureId;
+  const isLoadingAdventures = selectedAdventureId === null && adventures === undefined;
   const snapshot = useQuery(api.world.getSnapshot, adventureId ? { adventureId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
-  const topBarWorldName = snapshot?.world.name ?? (adventureId ? "Loading world" : "No world");
+  const topBarWorldName = adventureId
+    ? (snapshot?.world.name ?? "Loading world")
+    : "Adventures";
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -160,6 +172,44 @@ export function WorldClient() {
     } finally {
       setIsSeeding(false);
     }
+  }
+
+  async function handleCreateAdventure() {
+    setError(null);
+    setNotice(null);
+    setIsCreatingAdventure(true);
+    try {
+      const result = await createAdventure({});
+      setSelectedAdventureId(result.adventureId);
+      resetLocalDraftState();
+    } catch (createError) {
+      setError(errorMessage(createError));
+    } finally {
+      setIsCreatingAdventure(false);
+    }
+  }
+
+  function handleSelectAdventure(nextAdventureId: Id<"adventures">) {
+    setError(null);
+    setNotice(null);
+    setSelectedAdventureId(nextAdventureId);
+    resetLocalDraftState();
+  }
+
+  async function handleReturnToAdventures() {
+    setError(null);
+    setNotice(null);
+    await flushQueuedNpcSaves();
+    await flushActiveLocationSaves();
+    setSelectedAdventureId(null);
+    resetLocalDraftState();
+  }
+
+  function resetLocalDraftState() {
+    setNpcDrafts({});
+    setNpcSaveStatus({});
+    setCollapsedNpcKeys({});
+    setLocationSaveStatus({});
   }
 
   async function handleReset() {
@@ -560,21 +610,35 @@ export function WorldClient() {
             <span className="px-2 text-zinc-600">-</span>
             <span className="truncate text-zinc-300">{topBarWorldName}</span>
           </div>
-          <button
-            id="debug-panel-toggle"
-            type="button"
-            onClick={() => setIsDebugPanelCollapsed((current) => !current)}
-            aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
-            aria-pressed={!isDebugPanelCollapsed}
-            className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
-              isDebugPanelCollapsed
-                ? "border-zinc-700"
-                : "border-amber-300/70 bg-amber-950/20 text-amber-200"
-            }`}
-            title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
-          >
-            <GearIcon />
-          </button>
+          <div id="top-bar-actions" className="flex items-center gap-2">
+            {adventureId ? (
+              <button
+                id="back-to-adventures-button"
+                type="button"
+                onClick={() => void handleReturnToAdventures()}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                Adventures
+              </button>
+            ) : null}
+            {adventureId ? (
+              <button
+                id="debug-panel-toggle"
+                type="button"
+                onClick={() => setIsDebugPanelCollapsed((current) => !current)}
+                aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+                aria-pressed={!isDebugPanelCollapsed}
+                className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
+                  isDebugPanelCollapsed
+                    ? "border-zinc-700"
+                    : "border-amber-300/70 bg-amber-950/20 text-amber-200"
+                }`}
+                title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+              >
+                <GearIcon />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
       <div
@@ -586,27 +650,17 @@ export function WorldClient() {
           className="flex h-[calc(100vh-3rem)] min-h-0 flex-col"
         >
           <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
-            {isLoadingDefaultAdventure ? (
-              <p id="default-adventure-loading-state" className="text-zinc-400">
-                Loading Adventure state...
-              </p>
-            ) : !adventureId ? (
-              <div
-                id="seed-world-empty-state"
-                className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4"
-              >
-                <p className="max-w-xl text-base leading-7 text-zinc-300">
-                  Seed a fresh demo Adventure to begin the playtest.
-                </p>
-                <button
-                  id="seed-world-button"
-                  type="button"
-                  onClick={handleSeed}
-                  className="rounded-md border border-amber-300 bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200"
-                >
-                  Seed Stormbound Chapel
-                </button>
-              </div>
+            {!adventureId ? (
+              <AdventureLanding
+                adventures={adventures ?? []}
+                isLoading={isLoadingAdventures}
+                isCreatingAdventure={isCreatingAdventure}
+                isSeeding={isSeeding}
+                error={error}
+                onCreateAdventure={() => void handleCreateAdventure()}
+                onSelectAdventure={handleSelectAdventure}
+                onResetWorld={() => void handleSeed()}
+              />
             ) : snapshot === undefined ? (
               <p id="adventure-loading-state" className="text-zinc-400">Loading Adventure state...</p>
             ) : snapshot === null ? (
@@ -708,16 +762,17 @@ export function WorldClient() {
           </div>
         </section>
 
-        <aside
-          id="debug-panel"
-          className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
-            isDebugPanelCollapsed
-              ? "pointer-events-none translate-x-full"
-              : "translate-x-0"
-          }`}
-          aria-hidden={isDebugPanelCollapsed}
-          inert={isDebugPanelCollapsed ? true : undefined}
-        >
+        {adventureId ? (
+          <aside
+            id="debug-panel"
+            className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
+              isDebugPanelCollapsed
+                ? "pointer-events-none translate-x-full"
+                : "translate-x-0"
+            }`}
+            aria-hidden={isDebugPanelCollapsed}
+            inert={isDebugPanelCollapsed ? true : undefined}
+          >
           <div
             id="debug-panel-header"
             className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col"
@@ -850,9 +905,126 @@ export function WorldClient() {
               Seed a world to inspect state.
             </p>
           )}
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </main>
+  );
+}
+
+function AdventureLanding({
+  adventures,
+  isLoading,
+  isCreatingAdventure,
+  isSeeding,
+  error,
+  onCreateAdventure,
+  onSelectAdventure,
+  onResetWorld,
+}: {
+  adventures: AdventureListItem[];
+  isLoading: boolean;
+  isCreatingAdventure: boolean;
+  isSeeding: boolean;
+  error: string | null;
+  onCreateAdventure: () => void;
+  onSelectAdventure: (adventureId: Id<"adventures">) => void;
+  onResetWorld: () => void;
+}) {
+  return (
+    <section
+      id="adventure-landing"
+      className="mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 flex-col justify-center px-5 py-8 sm:px-8"
+    >
+      <div id="adventure-landing-header" className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-zinc-100">Adventures</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-500">
+            Continue a saved playtest or start a fresh copy of the current WorldVersion.
+          </p>
+        </div>
+        <div id="adventure-landing-actions" className="flex flex-wrap gap-2">
+          <button
+            id="create-adventure-button"
+            type="button"
+            onClick={onCreateAdventure}
+            disabled={isCreatingAdventure || isSeeding}
+            className="rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCreatingAdventure ? "Creating" : "New Adventure"}
+          </button>
+          <button
+            id="fresh-seed-button"
+            type="button"
+            onClick={onResetWorld}
+            disabled={isCreatingAdventure || isSeeding}
+            className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSeeding ? "Resetting" : "Reset World"}
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <p id="adventure-landing-error" role="alert" className="mb-4 text-sm text-rose-300">
+          {error}
+        </p>
+      ) : null}
+
+      {isLoading ? (
+        <p id="adventure-list-loading-state" className="text-sm text-zinc-500">
+          Loading Adventures...
+        </p>
+      ) : adventures.length > 0 ? (
+        <div id="adventure-list" className="grid gap-3">
+          {adventures.map((adventure) => (
+            <article
+              id={`adventure-card-${adventure._id}`}
+              key={adventure._id}
+              className="grid gap-4 rounded-md bg-zinc-900/80 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center"
+            >
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-medium text-zinc-100">{adventure.name}</h2>
+                <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-zinc-500">
+                  <div>
+                    <dt className="sr-only">World</dt>
+                    <dd>{adventure.worldName}</dd>
+                  </div>
+                  <div>
+                    <dt className="sr-only">Source WorldVersion</dt>
+                    <dd>WorldVersion v{adventure.sourceVersionNumber}</dd>
+                  </div>
+                  <div>
+                    <dt className="sr-only">Current location</dt>
+                    <dd>{adventure.currentLocationName ?? "Unknown location"}</dd>
+                  </div>
+                  <div>
+                    <dt className="sr-only">Turns</dt>
+                    <dd>{adventure.turnCount} turns</dd>
+                  </div>
+                  <div>
+                    <dt className="sr-only">Last played</dt>
+                    <dd>{formatAdventureTimestamp(adventure.lastPlayedAt)}</dd>
+                  </div>
+                </dl>
+              </div>
+              <button
+                id={`continue-adventure-${adventure._id}`}
+                type="button"
+                onClick={() => onSelectAdventure(adventure._id)}
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+              >
+                Continue
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div id="adventure-list-empty-state" className="rounded-md bg-zinc-900/70 px-4 py-5">
+          <p className="text-sm leading-6 text-zinc-400">No Adventures yet.</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1979,6 +2151,15 @@ function domId(value: string) {
     .replace(/^-+|-+$/g, "");
 
   return normalized || "unknown";
+}
+
+function formatAdventureTimestamp(timestamp: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
