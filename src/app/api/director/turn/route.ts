@@ -99,6 +99,21 @@ export async function POST(request: Request) {
   const convex = convexResult.client;
   const directorMode = modeResult.mode;
   const serverWriteToken = process.env.LORECRAFT_SERVER_WRITE_TOKEN?.trim() || undefined;
+  if (convexResult.requiresServerWriteToken && !serverWriteToken) {
+    const error = "LORECRAFT_SERVER_WRITE_TOKEN is required when Game Master turns use a remote Convex deployment.";
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "server_write_token",
+      worldId,
+      requestSummary: {
+        directorMode,
+      },
+      error,
+      httpStatus: 503,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
+    return json<TurnResponse>({ ok: false, error }, 503);
+  }
   const serverWriteArgs = serverWriteToken ? { serverWriteToken } : {};
 
   let context:
@@ -657,7 +672,11 @@ function createConvexClient() {
       error: "NEXT_PUBLIC_CONVEX_URL is not configured, so the Game Master cannot persist turns.",
     };
   }
-  return { ok: true as const, client: new ConvexHttpClient(convexUrl) };
+  return {
+    ok: true as const,
+    client: new ConvexHttpClient(convexUrl),
+    requiresServerWriteToken: !isLocalUrl(convexUrl),
+  };
 }
 
 function normalizeProviderError(error: unknown) {

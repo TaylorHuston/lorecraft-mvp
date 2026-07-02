@@ -540,10 +540,11 @@ async function restoreSeededNpc(
     return 0;
   }
 
-  if (!actor.key) {
-    await ctx.db.patch(actor._id, { key: args.key });
-  }
-  await ctx.db.patch(actor._id, { description: args.description });
+  await ctx.db.patch(actor._id, {
+    key: args.key,
+    name: args.name,
+    description: args.description,
+  });
 
   for (const key of args.legacyFactKeys ?? []) {
     await deleteActorFactByKey(ctx, args.worldId, args.key, key);

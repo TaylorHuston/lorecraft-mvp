@@ -71,6 +71,21 @@ describe("Game Master turn route preflight", () => {
     expect(mocks.mutation).not.toHaveBeenCalled();
   });
 
+  it("returns setup failure before context load when remote Convex lacks a server write token", async () => {
+    process.env.NEXT_PUBLIC_CONVEX_URL = "https://lorecraft.example.convex.cloud";
+    delete process.env.LORECRAFT_SERVER_WRITE_TOKEN;
+
+    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "LORECRAFT_SERVER_WRITE_TOKEN is required when Game Master turns use a remote Convex deployment.",
+    });
+    expect(response.status).toBe(503);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.mutation).not.toHaveBeenCalled();
+  });
+
   it("records successful no-update extraction without mutating state", async () => {
     configureLlmEnv();
     mocks.query.mockResolvedValueOnce(persistentContext());

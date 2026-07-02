@@ -940,6 +940,13 @@ describe("Actor movement validation", () => {
       "I go to the vestry.",
       "The chapel floor creaks under your first step.",
     );
+    const destinationMentionWithoutArrival = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You remain in the chapel, looking toward the vestry door.",
+    );
 
     expect(noTarget.acceptedMoves).toEqual([]);
     expect(noTarget.ignoredMoves).toMatchObject([
@@ -952,6 +959,9 @@ describe("Actor movement validation", () => {
       { actorKey: "taylor", toLocationKey: "vestry", reason: "Player input did not clearly attempt travel to this location." },
     ]);
     expect(noArrival.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Game Master narration did not confirm arrival at this location." },
+    ]);
+    expect(destinationMentionWithoutArrival.ignoredMoves).toMatchObject([
       { actorKey: "taylor", toLocationKey: "vestry", reason: "Game Master narration did not confirm arrival at this location." },
     ]);
   });

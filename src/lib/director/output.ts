@@ -411,7 +411,7 @@ function narrationConfirmsArrival(narration: string, location: DirectorKnownLoca
     return false;
   }
 
-  return /\b(reach|reaches|reached|arrive|arrives|arrived|enter|enters|entered|inside|in|into|step|steps|stepped|cross|crosses|crossed)\b/.test(
+  return /\b(reach|reaches|reached|arrive|arrives|arrived|enter|enters|entered|inside|into|step|steps|stepped|cross|crosses|crossed)\b/.test(
     normalizedNarration,
   );
 }

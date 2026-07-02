@@ -108,8 +108,8 @@ export function WorldClient() {
   const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const npcSaveVersions = useRef<Record<string, number>>({});
   const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
-  const npcActiveSaves = useRef<Record<string, Promise<boolean>>>({});
-  const locationActiveSaves = useRef<Record<string, Promise<boolean>>>({});
+  const npcActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
+  const locationActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
   const nextDebugNpcOrdinal = useRef(1);
 
   const worldId = selectedWorldId ?? defaultWorldId ?? null;
@@ -326,9 +326,17 @@ export function WorldClient() {
       pendingSave.payload,
       pendingSave.saveVersion,
     );
-    npcActiveSaves.current[pendingSave.actor.key] = savePromise;
+    npcActiveSaves.current[pendingSave.actor.key] = [
+      ...(npcActiveSaves.current[pendingSave.actor.key] ?? []),
+      savePromise,
+    ];
     void savePromise.finally(() => {
-      if (npcActiveSaves.current[pendingSave.actor.key] === savePromise) {
+      const remainingSaves = (npcActiveSaves.current[pendingSave.actor.key] ?? []).filter(
+        (activeSave) => activeSave !== savePromise,
+      );
+      if (remainingSaves.length > 0) {
+        npcActiveSaves.current[pendingSave.actor.key] = remainingSaves;
+      } else {
         delete npcActiveSaves.current[pendingSave.actor.key];
       }
     });
@@ -343,7 +351,7 @@ export function WorldClient() {
       delete npcPendingSaves.current[pendingSave.actor.key];
       return startPersistNpc(pendingSave);
     });
-    const activeSaves = Object.values(npcActiveSaves.current);
+    const activeSaves = Object.values(npcActiveSaves.current).flat();
     const results = await Promise.all([...flushedSaves, ...activeSaves]);
     return results.every(Boolean);
   }
@@ -363,7 +371,7 @@ export function WorldClient() {
       npcSaveVersions.current[actorKey] = (npcSaveVersions.current[actorKey] ?? 0) + 1;
     }
 
-    await Promise.allSettled(Object.values(npcActiveSaves.current));
+    await Promise.allSettled(Object.values(npcActiveSaves.current).flat());
   }
 
   async function persistNpc(
@@ -448,9 +456,17 @@ export function WorldClient() {
 
     setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saving" }));
     const savePromise = persistLocation(worldId, locationId, locationKey, name, description);
-    locationActiveSaves.current[locationKey] = savePromise;
+    locationActiveSaves.current[locationKey] = [
+      ...(locationActiveSaves.current[locationKey] ?? []),
+      savePromise,
+    ];
     void savePromise.finally(() => {
-      if (locationActiveSaves.current[locationKey] === savePromise) {
+      const remainingSaves = (locationActiveSaves.current[locationKey] ?? []).filter(
+        (activeSave) => activeSave !== savePromise,
+      );
+      if (remainingSaves.length > 0) {
+        locationActiveSaves.current[locationKey] = remainingSaves;
+      } else {
         delete locationActiveSaves.current[locationKey];
       }
     });
@@ -489,7 +505,7 @@ export function WorldClient() {
   }
 
   async function flushActiveLocationSaves() {
-    const activeSaves = Object.values(locationActiveSaves.current);
+    const activeSaves = Object.values(locationActiveSaves.current).flat();
     if (activeSaves.length === 0) {
       return true;
     }
@@ -1428,7 +1444,7 @@ function LocationCardEditor({
       </div>
       {!isCollapsed ? (
         <LocationCardFields
-          key={`${location._id}-${location.name}-${location.description}`}
+          key={location._id}
           fieldsId={fieldsId}
           locationDomId={locationDomId}
           locationId={location._id}
@@ -1464,10 +1480,24 @@ function LocationCardFields({
     description: string,
   ) => Promise<boolean>;
 }) {
-  const [name, setName] = useState(canonicalName);
-  const [description, setDescription] = useState(canonicalDescription);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (nameRef.current) {
+      nameRef.current.value = canonicalName;
+    }
+  }, [canonicalName]);
+
+  useEffect(() => {
+    if (descriptionRef.current) {
+      descriptionRef.current.value = canonicalDescription;
+    }
+  }, [canonicalDescription]);
 
   function saveIfChanged() {
+    const name = nameRef.current?.value ?? canonicalName;
+    const description = descriptionRef.current?.value ?? canonicalDescription;
     if (name !== canonicalName || description !== canonicalDescription) {
       void onSave(locationId, locationKey, name, description);
     }
@@ -1475,20 +1505,31 @@ function LocationCardFields({
 
   return (
     <div id={fieldsId} className="mt-4 space-y-4">
-      <LocationInput
-        id={`${locationDomId}-name`}
-        label="Name"
-        value={name}
-        onChange={setName}
-        onBlur={saveIfChanged}
-      />
-      <LocationTextarea
-        id={`${locationDomId}-description`}
-        label="Description"
-        value={description}
-        onChange={setDescription}
-        onBlur={saveIfChanged}
-      />
+      <div id={`${locationDomId}-name-field`}>
+        <label htmlFor={`${locationDomId}-name`} className="text-xs font-medium text-zinc-400">
+          Name
+        </label>
+        <input
+          id={`${locationDomId}-name`}
+          ref={nameRef}
+          defaultValue={canonicalName}
+          onBlur={saveIfChanged}
+          className="mt-1 w-full rounded-sm bg-zinc-950/80 px-3 py-2 text-sm text-zinc-200 outline-none ring-1 ring-zinc-700 transition focus:ring-cyan-500/60"
+        />
+      </div>
+      <div id={`${locationDomId}-description-field`}>
+        <label htmlFor={`${locationDomId}-description`} className="text-xs font-medium text-zinc-400">
+          Description
+        </label>
+        <textarea
+          id={`${locationDomId}-description`}
+          ref={descriptionRef}
+          defaultValue={canonicalDescription}
+          onBlur={saveIfChanged}
+          rows={4}
+          className="mt-1 w-full resize-none rounded-sm bg-zinc-950/80 px-3 py-2 text-sm leading-5 text-zinc-200 outline-none ring-1 ring-zinc-700 transition focus:ring-cyan-500/60"
+        />
+      </div>
     </div>
   );
 }
