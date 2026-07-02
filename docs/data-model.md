@@ -64,9 +64,10 @@ An Adventure is a playable copy created from one WorldVersion.
 
 Strategy:
 
-- The default app opens a World container screen for Stormbound Chapel at `/`. The container lists local Adventures with turn count and last played date, and lets the player continue an existing Adventure or create a new one from the current WorldVersion. Each opened Adventure has its own URL at `/adventures/<id>`.
+- The default app opens a World container screen for Stormbound Chapel at `/`. The container lists local Adventures with turn count and last played date, and lets the player continue, create, or delete local Adventures. Each opened Adventure has its own URL at `/adventures/<id>`.
 - Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
 - Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
+- Delete Adventure removes that Adventure and its Adventure-owned runtime rows. It does not delete the source World or WorldVersion.
 
 ## Room / Location
 

@@ -90,6 +90,7 @@ export function WorldClient({
   const adventures = useQuery(api.world.listAdventures);
   const seedWorld = useMutation(api.world.seedDemoWorld);
   const createAdventure = useMutation(api.world.createAdventure);
+  const deleteAdventure = useMutation(api.world.deleteAdventure);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const updateLocation = useAction(api.world.updateLocation);
   const createLocation = useAction(api.world.createLocation);
@@ -105,6 +106,7 @@ export function WorldClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
+  const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
@@ -205,6 +207,31 @@ export function WorldClient({
     setSelectedAdventureId(nextAdventureId);
     router.push(`/adventures/${nextAdventureId}`);
     resetLocalDraftState();
+  }
+
+  async function handleDeleteAdventure(adventure: AdventureListItem) {
+    const confirmed = window.confirm(
+      `Delete "${adventure.name}"? This removes this Adventure's turns, memories, and debug edits. The source World is not changed.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setDeletingAdventureId(adventure._id);
+    try {
+      const result = await deleteAdventure({ adventureId: adventure._id });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setNotice(`Deleted ${adventure.name}.`);
+    } catch (deleteError) {
+      setError(errorMessage(deleteError));
+    } finally {
+      setDeletingAdventureId(null);
+    }
   }
 
   async function handleReturnToAdventures() {
@@ -667,9 +694,12 @@ export function WorldClient({
                 adventures={adventures ?? []}
                 isLoading={isLoadingAdventures}
                 isCreatingAdventure={isCreatingAdventure}
+                deletingAdventureId={deletingAdventureId}
                 error={error}
+                notice={notice}
                 onCreateAdventure={() => void handleCreateAdventure()}
                 onSelectAdventure={handleSelectAdventure}
+                onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}
               />
             ) : snapshot === undefined ? (
               <p id="adventure-loading-state" className="text-zinc-400">Loading Adventure state...</p>
@@ -927,16 +957,22 @@ function AdventureLanding({
   adventures,
   isLoading,
   isCreatingAdventure,
+  deletingAdventureId,
   error,
+  notice,
   onCreateAdventure,
   onSelectAdventure,
+  onDeleteAdventure,
 }: {
   adventures: AdventureListItem[];
   isLoading: boolean;
   isCreatingAdventure: boolean;
+  deletingAdventureId: Id<"adventures"> | null;
   error: string | null;
+  notice: string | null;
   onCreateAdventure: () => void;
   onSelectAdventure: (adventureId: Id<"adventures">) => void;
+  onDeleteAdventure: (adventure: AdventureListItem) => void;
 }) {
   const worldName = adventures[0]?.worldName ?? "Stormbound Chapel";
 
@@ -962,7 +998,7 @@ function AdventureLanding({
             id="create-adventure-button"
             type="button"
             onClick={onCreateAdventure}
-            disabled={isCreatingAdventure}
+            disabled={isCreatingAdventure || deletingAdventureId !== null}
             className="rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreatingAdventure ? "Creating" : "New Adventure"}
@@ -973,6 +1009,11 @@ function AdventureLanding({
       {error ? (
         <p id="adventure-landing-error" role="alert" className="mb-4 text-sm text-rose-300">
           {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p id="adventure-landing-notice" className="mb-4 text-sm text-emerald-300/80">
+          {notice}
         </p>
       ) : null}
 
@@ -1006,14 +1047,26 @@ function AdventureLanding({
                   </div>
                 </dl>
               </div>
-              <button
-                id={`continue-adventure-${adventure._id}`}
-                type="button"
-                onClick={() => onSelectAdventure(adventure._id)}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
-              >
-                Continue
-              </button>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button
+                  id={`continue-adventure-${adventure._id}`}
+                  type="button"
+                  onClick={() => onSelectAdventure(adventure._id)}
+                  disabled={deletingAdventureId === adventure._id}
+                  className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continue
+                </button>
+                <button
+                  id={`delete-adventure-${adventure._id}`}
+                  type="button"
+                  onClick={() => onDeleteAdventure(adventure)}
+                  disabled={deletingAdventureId !== null}
+                  className="rounded-md border border-rose-900/70 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAdventureId === adventure._id ? "Deleting" : "Delete"}
+                </button>
+              </div>
             </article>
           ))}
           </div>

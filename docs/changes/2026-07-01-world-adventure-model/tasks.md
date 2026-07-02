@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: debug-panel default refinement committed; dev server running; ready for `sdd-review`
-- Last completed action: committed debug-panel collapsed-by-default behavior and verified with CI, E2E, and browser smoke
+- Current state: Adventure deletion refinement committed; dev server running; ready for `sdd-review`
+- Last completed action: committed home-screen Adventure deletion after focused checks, E2E, required CI, and live browser smoke
 - Next action: run `sdd-review`
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: none in app repo
@@ -89,9 +89,10 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-01 | Adventure seed/copy/reset runtime | main | `convex/world.ts`, `convex/schema.ts` | Added Stormbound Chapel baseline WorldVersion creation, default Adventure creation, Adventure-owned runtime copy, WorldVersion isolation helpers, and selected-Adventure reset to source version. | c8add34 |
 | 2026-07-01 | Adventure-scoped Game Master flow | main | `src/app/api/director/turn/route.ts`, `src/lib/director/*`, `src/app/world-client.tsx` | Route, prompt/log/error contracts, debug UI, reset/debug edits, scripts, and snapshots now use `adventureId` and expose source WorldVersion context. | c8add34 |
 | 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | c8add34 |
-| 2026-07-02 | Manual feedback: Adventure startup screen | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | First app access now shows a lightweight World container screen for Stormbound Chapel, with Adventures listed inside by turn count and last played date; opening an Adventure remains required before the debug drawer/story input appears. | d61235a, ceb661f |
-| 2026-07-02 | Manual feedback: Adventure URLs | main after Taylor feedback | `src/app/adventures/[adventureId]/page.tsx`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | Each Adventure now opens at `/adventures/<id>`; Continue, New Adventure, Reset World, reload, and direct URL loading preserve Adventure identity. | d15dc71 |
-| 2026-07-02 | Manual feedback: collapsed debug panel | main after Taylor feedback | `src/app/world-client.tsx`, E2E | Entering an Adventure now starts with the debug panel collapsed; E2E opens it explicitly before debug assertions. | 3c8feb0 |
+| 2026-07-02 | Manual feedback: Adventure startup screen | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | First app access now shows a lightweight World container screen for Stormbound Chapel, with Adventures listed inside by turn count and last played date; opening an Adventure remains required before the debug drawer/story input appears. | 747a1c8, efe2272 |
+| 2026-07-02 | Manual feedback: Adventure URLs | main after Taylor feedback | `src/app/adventures/[adventureId]/page.tsx`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | Each Adventure now opens at `/adventures/<id>`; Continue, New Adventure, Reset World, reload, and direct URL loading preserve Adventure identity. | 3c433bd |
+| 2026-07-02 | Manual feedback: collapsed debug panel | main after Taylor feedback | `src/app/world-client.tsx`, E2E | Entering an Adventure now starts with the debug panel collapsed; E2E opens it explicitly before debug assertions. | 7348518 |
+| 2026-07-02 | Manual feedback: delete Adventure from home | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, README, CHANGELOG, data/persistence docs, LC-002 Epic | World container rows now expose a confirmed Delete action that removes one local Adventure and its runtime rows without deleting the source WorldVersion. | committed |
 
 ## Verification Ledger
 
@@ -126,6 +127,10 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after Adventure URL refinement | manual/browser automation smoke | Clicking Continue from `/` navigated to `/adventures/kn70pv1ayan3rrzw8ms3hb493189sazj`; direct loading that URL reopened the Adventure story UI. | passed |
 | 2026-07-02 | `npm run lint`; `npm run typecheck`; `npm run e2e`; `npm run ci:required` after collapsed-debug refinement | deterministic automated gates | Lint, typecheck, deterministic browser E2E, and required CI pass after changing the default debug-panel state. | passed |
 | 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after collapsed-debug refinement | manual/browser automation smoke | Continuing an Adventure opened `/adventures/kn79z2rznr7a0vyp1a9dwwmyps89r0eb` with `#debug-panel` `aria-hidden=true` and `inert=true`. | passed |
+| 2026-07-02 | `npm run lint`; `npm run typecheck`; `npm run test -- src/app/api/director/turn/route.test.ts src/lib/director/director.test.ts` after Adventure deletion refinement | deterministic automated gates | Lint, TypeScript, and focused Game Master route/director tests pass after adding the delete mutation and landing UI. | passed |
+| 2026-07-02 | `npm run e2e` after Adventure deletion refinement | deterministic browser E2E | Full deterministic playtest passes; the test creates a temporary Adventure, returns to the World container, confirms Delete, verifies the row disappears, and sees the deletion notice. | passed |
+| 2026-07-02 | `npm run ci:required` after Adventure deletion refinement | deterministic required gate | Lint, full unit tests, typecheck, and production build pass after the delete flow. | passed |
+| 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after Adventure deletion refinement | manual/browser automation smoke | With one existing Adventure visible, created temporary Adventure `kn711ye5j9bg4bjnjhg689k56989ra5e`, deleted it from `/`, saw `Deleted Stormbound Chapel Adventure 2.`, and the list returned to one Adventure. | passed |
 
 ## Manual Feedback
 
@@ -138,6 +143,7 @@ Record the user's manual testing feedback after implementation starts.
 | 2026-07-02 | Stormbound Chapel should be the container; Adventures should be listed inside it with turn count and last played date. Reset World should not be on the home screen. | accepted UX refinement | Reworked the landing screen to a World container with Adventure rows and removed Reset World from the landing; reset remains in the open Adventure debug panel. | incorporated |
 | 2026-07-02 | Each Adventure should have its own URL; `/adventures/<id>` works fine. | accepted UX/routing refinement | Added an App Router route for `/adventures/[adventureId]`, route-driven Adventure opening, and E2E/direct-load coverage. | incorporated |
 | 2026-07-02 | The debug panel should be collapsed by default when entering an Adventure. | accepted UX refinement | Changed the initial debug-panel state to collapsed and updated E2E to explicitly open it before debug interactions. | incorporated |
+| 2026-07-02 | Let me delete an Adventure from the home screen. | accepted UX refinement | Added a confirmed Delete action per Adventure row on the World container and a Convex mutation that removes only that Adventure's runtime rows. | incorporated |
 
 ## Planning Updates
 
@@ -152,7 +158,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Status: pending Taylor
 - App URL / route: `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel WorldVersion and default Adventure
-- Steps for the user: open the app, confirm it lands on the Stormbound Chapel World container with Adventure rows, continue an existing Adventure or create a new one, confirm the browser URL is `/adventures/<id>`, reload that URL, submit at least one turn, inspect debug Adventure/source version identity, reset from the open Adventure debug panel
+- Steps for the user: open the app, confirm it lands on the Stormbound Chapel World container with Adventure rows, continue an existing Adventure or create a new one, confirm the browser URL is `/adventures/<id>`, reload that URL, submit at least one turn, inspect debug Adventure/source version identity, reset from the open Adventure debug panel, return home and delete a disposable Adventure
 - Expected result: the story loop works as before, but reset/debug wording and state identity make clear that play happens inside an Adventure copied from a WorldVersion
 - Feedback that would change artifacts: stronger Adventure naming, visible World/Adventure labels, different reset wording, or stronger migration/preservation requirements
 

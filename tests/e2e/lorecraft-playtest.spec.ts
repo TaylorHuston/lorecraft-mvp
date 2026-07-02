@@ -224,6 +224,29 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       timeout: 60_000,
     });
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+
+    await page.locator("#back-to-adventures-button").click();
+    await expect(page).toHaveURL("/");
+    await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+    await page.locator("#create-adventure-button").click();
+    await page.waitForURL(/\/adventures\/[^/]+$/);
+    const temporaryAdventureId = page.url().split("/").pop();
+    if (!temporaryAdventureId) {
+      throw new Error("Expected created Adventure URL to include an Adventure id.");
+    }
+    await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#back-to-adventures-button").click();
+    await expect(page).toHaveURL("/");
+    await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+    const temporaryAdventureCard = page.locator(`#adventure-card-${temporaryAdventureId}`);
+    await expect(temporaryAdventureCard).toBeVisible();
+    page.once("dialog", async (dialog) => {
+      expect(dialog.message()).toContain("Delete");
+      await dialog.accept();
+    });
+    await page.locator(`#delete-adventure-${temporaryAdventureId}`).click();
+    await expect(temporaryAdventureCard).toHaveCount(0);
+    await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
   });
 });
 

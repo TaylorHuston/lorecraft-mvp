@@ -357,6 +357,24 @@ const adventureCreateResult = v.union(
   v.object({ ok: v.literal(true), adventureId: v.id("adventures") }),
   v.object({ ok: v.literal(false), error: v.string() }),
 );
+const adventureDeleteResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    deletedAdventureId: v.id("adventures"),
+    deletedTurns: v.number(),
+    deletedCommands: v.number(),
+    deletedNarrations: v.number(),
+    deletedEvents: v.number(),
+    deletedStateDiffs: v.number(),
+    deletedDirectorCalls: v.number(),
+    deletedFacts: v.number(),
+    deletedObjects: v.number(),
+    deletedExits: v.number(),
+    deletedActors: v.number(),
+    deletedLocations: v.number(),
+  }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
 const adventureListItem = v.object({
   _id: v.id("adventures"),
   name: v.string(),
@@ -1051,6 +1069,47 @@ export const createAdventure = mutation({
     });
 
     return { ok: true as const, adventureId };
+  },
+});
+
+export const deleteAdventure = mutation({
+  args: { adventureId: v.id("adventures") },
+  returns: adventureDeleteResult,
+  handler: async (ctx, args) => {
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false as const, error: "Adventure could not be found." };
+    }
+
+    const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
+    const deletedEvents = await deleteEvents(ctx, args.adventureId);
+    const deletedStateDiffs = await deleteStateDiffs(ctx, args.adventureId);
+    const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.adventureId);
+    const deletedCommands = await deleteCommands(ctx, args.adventureId);
+    const deletedTurns = await deleteTurns(ctx, args.adventureId);
+    const deletedFacts = await deleteFacts(ctx, args.adventureId);
+    const deletedObjects = await deleteWorldObjects(ctx, args.adventureId);
+    const deletedExits = await deleteExits(ctx, args.adventureId);
+    const deletedActors = await deleteActors(ctx, args.adventureId);
+    const deletedLocations = await deleteRooms(ctx, args.adventureId);
+
+    await ctx.db.delete(args.adventureId);
+
+    return {
+      ok: true as const,
+      deletedAdventureId: args.adventureId,
+      deletedTurns,
+      deletedCommands,
+      deletedNarrations,
+      deletedEvents,
+      deletedStateDiffs,
+      deletedDirectorCalls,
+      deletedFacts,
+      deletedObjects,
+      deletedExits,
+      deletedActors,
+      deletedLocations,
+    };
   },
 });
 
