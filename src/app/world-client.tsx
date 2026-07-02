@@ -243,7 +243,7 @@ export function WorldClient() {
     event.preventDefault();
     const submittedInput = input.trim();
 
-    if (!adventureId || !submittedInput || isSubmitting) {
+    if (!adventureId || !submittedInput || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
       return;
     }
 
@@ -655,11 +655,9 @@ export function WorldClient() {
                 adventures={adventures ?? []}
                 isLoading={isLoadingAdventures}
                 isCreatingAdventure={isCreatingAdventure}
-                isSeeding={isSeeding}
                 error={error}
                 onCreateAdventure={() => void handleCreateAdventure()}
                 onSelectAdventure={handleSelectAdventure}
-                onResetWorld={() => void handleSeed()}
               />
             ) : snapshot === undefined ? (
               <p id="adventure-loading-state" className="text-zinc-400">Loading Adventure state...</p>
@@ -732,6 +730,7 @@ export function WorldClient() {
                         onKeyDown={handleInputKeyDown}
                         placeholder="Type your response..."
                         rows={2}
+                        disabled={isSeeding || isResetting || isCreatingAdventure}
                         className="mt-1 min-h-12 w-full resize-none bg-transparent text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
                       />
                     </>
@@ -916,21 +915,19 @@ function AdventureLanding({
   adventures,
   isLoading,
   isCreatingAdventure,
-  isSeeding,
   error,
   onCreateAdventure,
   onSelectAdventure,
-  onResetWorld,
 }: {
   adventures: AdventureListItem[];
   isLoading: boolean;
   isCreatingAdventure: boolean;
-  isSeeding: boolean;
   error: string | null;
   onCreateAdventure: () => void;
   onSelectAdventure: (adventureId: Id<"adventures">) => void;
-  onResetWorld: () => void;
 }) {
+  const worldName = adventures[0]?.worldName ?? "Stormbound Chapel";
+
   return (
     <section
       id="adventure-landing"
@@ -938,9 +935,14 @@ function AdventureLanding({
     >
       <div id="adventure-landing-header" className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">Adventures</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
+            World
+          </p>
+          <h1 id="world-container-title" className="mt-2 text-xl font-semibold text-zinc-100">
+            {worldName}
+          </h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-500">
-            Continue a saved playtest or start a fresh copy of the current WorldVersion.
+            Continue a saved Adventure or start a fresh copy of the current WorldVersion.
           </p>
         </div>
         <div id="adventure-landing-actions" className="flex flex-wrap gap-2">
@@ -948,19 +950,10 @@ function AdventureLanding({
             id="create-adventure-button"
             type="button"
             onClick={onCreateAdventure}
-            disabled={isCreatingAdventure || isSeeding}
+            disabled={isCreatingAdventure}
             className="rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreatingAdventure ? "Creating" : "New Adventure"}
-          </button>
-          <button
-            id="fresh-seed-button"
-            type="button"
-            onClick={onResetWorld}
-            disabled={isCreatingAdventure || isSeeding}
-            className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSeeding ? "Resetting" : "Reset World"}
           </button>
         </div>
       </div>
@@ -971,33 +964,26 @@ function AdventureLanding({
         </p>
       ) : null}
 
-      {isLoading ? (
-        <p id="adventure-list-loading-state" className="text-sm text-zinc-500">
-          Loading Adventures...
-        </p>
-      ) : adventures.length > 0 ? (
-        <div id="adventure-list" className="grid gap-3">
+      <div id="world-container" className="rounded-md bg-zinc-900/70">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <h2 className="text-sm font-medium text-zinc-200">Adventures</h2>
+          <span className="text-xs text-zinc-500">{adventures.length}</span>
+        </div>
+        {isLoading ? (
+          <p id="adventure-list-loading-state" className="px-4 py-5 text-sm text-zinc-500">
+            Loading Adventures...
+          </p>
+        ) : adventures.length > 0 ? (
+          <div id="adventure-list" className="divide-y divide-zinc-800">
           {adventures.map((adventure) => (
             <article
               id={`adventure-card-${adventure._id}`}
               key={adventure._id}
-              className="grid gap-4 rounded-md bg-zinc-900/80 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center"
+              className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="min-w-0">
                 <h2 className="truncate text-base font-medium text-zinc-100">{adventure.name}</h2>
                 <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-zinc-500">
-                  <div>
-                    <dt className="sr-only">World</dt>
-                    <dd>{adventure.worldName}</dd>
-                  </div>
-                  <div>
-                    <dt className="sr-only">Source WorldVersion</dt>
-                    <dd>WorldVersion v{adventure.sourceVersionNumber}</dd>
-                  </div>
-                  <div>
-                    <dt className="sr-only">Current location</dt>
-                    <dd>{adventure.currentLocationName ?? "Unknown location"}</dd>
-                  </div>
                   <div>
                     <dt className="sr-only">Turns</dt>
                     <dd>{adventure.turnCount} turns</dd>
@@ -1018,12 +1004,13 @@ function AdventureLanding({
               </button>
             </article>
           ))}
-        </div>
-      ) : (
-        <div id="adventure-list-empty-state" className="rounded-md bg-zinc-900/70 px-4 py-5">
+          </div>
+        ) : (
+        <div id="adventure-list-empty-state" className="px-4 py-5">
           <p className="text-sm leading-6 text-zinc-400">No Adventures yet.</p>
         </div>
       )}
+      </div>
     </section>
   );
 }

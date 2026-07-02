@@ -27,7 +27,7 @@ Playtesters can start and resume a Stormbound Chapel Adventure that mutates inde
 ## Current Scope
 
 - Seed the Stormbound Chapel World and immutable WorldVersion.
-- Create or resume local Adventures from that version through the startup Adventure screen.
+- Create or resume local Adventures from that version through a startup World container screen.
 - Scope mutable runtime rows, debug state, Game Master turns, feed reconstruction, NPC edits, location edits, actor movement, state diffs, and reset to the Adventure.
 - Keep source World and WorldVersion visible as debug/source context.
 
@@ -74,7 +74,8 @@ The system SHALL create an Adventure from a selected WorldVersion by copying bas
 - WHEN the local demo world is seeded or repaired
 - THEN the system creates an authored Stormbound Chapel WorldVersion
 - AND the system creates or resumes local Adventures from that version
-- AND the player can continue an existing Adventure or create a new one from the startup screen
+- AND the startup screen shows Stormbound Chapel as the World container
+- AND the player can continue an existing Adventure from that container or create a new one
 
 ###### Scenario R1-S2: Adventure records source identity
 
@@ -98,7 +99,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 |---|---|---|
 | `convex/schema.ts` | Defines `worldVersions`, `adventures`, source-version metadata, and Adventure-owned runtime row fields/indexes. | Recheck when WorldVersion/Adventure shape changes. |
 | `convex/world.ts` | Builds the Stormbound Chapel baseline, lists local Adventures, creates new Adventures from the current WorldVersion, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset behavior changes. |
-| `src/app/world-client.tsx` | Shows the startup Adventure screen, continues an existing Adventure, creates a new Adventure, and loads the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
+| `src/app/world-client.tsx` | Shows the startup World container screen, lists Adventures inside Stormbound Chapel, continues an existing Adventure, creates a new Adventure, and loads the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
 
 #### Verified By
 
@@ -106,7 +107,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 |---|---|---|---|
 | R1-S1, R1-S2, R2-S1 | `npm run convex:once`; `LORECRAFT_ENABLE_DEBUG_ROUTES=1 npx convex run world:seedDemoWorld`; `npx convex run world:getSnapshot '{\"adventureId\":\"kn7dej4650m780jyn93w55qhfn89rnxc\"}'` | Convex schema compiles, seed creates a default Adventure, snapshot exposes Adventure/source WorldVersion identity, and playable rows are copied into Adventure-owned state. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run test`; `npm run typecheck` | Type and unit coverage compile against the new Adventure context contract. | Passing |
-| R1-S1, R1-S2, R2-S1 | Browser smoke against `http://localhost:3000`: startup screen listed existing Adventures, New Adventure created `Stormbound Chapel Adventure 2`, the story stream opened with source-version opening narration, and Back returned to the Adventure list. | The player-facing startup flow supports continue/create and opens a copied playable Adventure. | Passing |
+| R1-S1, R1-S2, R2-S1 | Browser smoke against `http://localhost:3000`: startup screen showed Stormbound Chapel as the World container, listed existing Adventures by turns and last played date, New Adventure created `Stormbound Chapel Adventure 2`, the story stream opened with source-version opening narration, and Back returned to the World container. | The player-facing startup flow supports continue/create and opens a copied playable Adventure. | Passing |
 
 #### Verification Gaps
 

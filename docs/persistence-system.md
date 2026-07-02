@@ -123,7 +123,7 @@ For this MVP experiment, the Stormbound Chapel demo source is not durable produc
 
 Reset Session is narrower: it deletes the selected Adventure's mutable runtime rows and recopies that Adventure's original source WorldVersion. If the World has a newer current WorldVersion, Reset Session does not upgrade the Adventure to it.
 
-This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. The MVP has a lightweight local Adventure screen for continue/create. Polished World management, source patching, branching, and long-lived save files are deferred until the core story loop is worth preserving.
+This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. The MVP has a lightweight local World container screen that lists Adventures inside Stormbound Chapel for continue/create. Polished World management, source patching, branching, and long-lived save files are deferred until the core story loop is worth preserving.
 
 ### Transcript mode
 

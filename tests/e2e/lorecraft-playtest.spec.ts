@@ -230,20 +230,32 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     Boolean(
       document.querySelector("#director-input") ??
         document.querySelector("#adventure-landing") ??
-        document.querySelector("#seed-world-button") ??
-        document.querySelector("#fresh-seed-button"),
+        document.querySelector("#seed-world-button"),
     ),
   );
 
   if (await page.locator("#adventure-landing").isVisible()) {
-    await page.locator("#fresh-seed-button").click();
+    await expect(page.locator("#adventure-list-loading-state")).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    if (await page.locator("#adventure-list button[id^='continue-adventure-']").first().isVisible()) {
+      await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
+      await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+      await page.locator("#fresh-seed-button").click();
+      await expect(page.locator("#turn-notice-message")).toContainText(
+        "Fresh Stormbound Chapel world seeded.",
+        { timeout: 30_000 },
+      );
+    } else {
+      await page.locator("#create-adventure-button").click();
+    }
   } else if (await page.locator("#seed-world-button").isVisible()) {
     await page.locator("#seed-world-button").click();
-  } else if (await page.locator("#fresh-seed-button").isVisible()) {
-    await page.locator("#fresh-seed-button").click();
   }
 
   await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#director-input")).toBeEnabled({ timeout: 30_000 });
+  await expect(page.locator("#director-input")).toHaveValue("");
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
