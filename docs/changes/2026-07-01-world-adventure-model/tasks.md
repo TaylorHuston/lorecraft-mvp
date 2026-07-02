@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: Adventure URL refinement committed; dev server running; ready for `sdd-review`
-- Last completed action: committed `/adventures/<id>` route, verified direct Adventure URL loading, reran required CI and E2E
+- Current state: debug-panel default refinement committed; dev server running; ready for `sdd-review`
+- Last completed action: committed debug-panel collapsed-by-default behavior and verified with CI, E2E, and browser smoke
 - Next action: run `sdd-review`
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: none in app repo
@@ -91,6 +91,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | c8add34 |
 | 2026-07-02 | Manual feedback: Adventure startup screen | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | First app access now shows a lightweight World container screen for Stormbound Chapel, with Adventures listed inside by turn count and last played date; opening an Adventure remains required before the debug drawer/story input appears. | d61235a, ceb661f |
 | 2026-07-02 | Manual feedback: Adventure URLs | main after Taylor feedback | `src/app/adventures/[adventureId]/page.tsx`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | Each Adventure now opens at `/adventures/<id>`; Continue, New Adventure, Reset World, reload, and direct URL loading preserve Adventure identity. | d15dc71 |
+| 2026-07-02 | Manual feedback: collapsed debug panel | main after Taylor feedback | `src/app/world-client.tsx`, E2E | Entering an Adventure now starts with the debug panel collapsed; E2E opens it explicitly before debug assertions. | 3c8feb0 |
 
 ## Verification Ledger
 
@@ -123,6 +124,8 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | `npm run ci:required` after Adventure URL refinement | deterministic required gate | Lint, full unit tests, typecheck, and production build pass; Next build includes dynamic `/adventures/[adventureId]` route. | passed |
 | 2026-07-02 | `npm run e2e` after Adventure URL refinement | deterministic browser E2E | Full deterministic playtest passes with Continue/Create/Reset setup navigating to `/adventures/<id>` and reload preserving the selected Adventure. | passed |
 | 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after Adventure URL refinement | manual/browser automation smoke | Clicking Continue from `/` navigated to `/adventures/kn70pv1ayan3rrzw8ms3hb493189sazj`; direct loading that URL reopened the Adventure story UI. | passed |
+| 2026-07-02 | `npm run lint`; `npm run typecheck`; `npm run e2e`; `npm run ci:required` after collapsed-debug refinement | deterministic automated gates | Lint, typecheck, deterministic browser E2E, and required CI pass after changing the default debug-panel state. | passed |
+| 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after collapsed-debug refinement | manual/browser automation smoke | Continuing an Adventure opened `/adventures/kn79z2rznr7a0vyp1a9dwwmyps89r0eb` with `#debug-panel` `aria-hidden=true` and `inert=true`. | passed |
 
 ## Manual Feedback
 
@@ -134,6 +137,7 @@ Record the user's manual testing feedback after implementation starts.
 | 2026-07-02 | On first access, the app should show a page to continue previous Adventures or create a new one. | accepted UX requirement | Added lightweight Adventure landing screen; updated LC-002 and docs so Adventure selection is no longer deferred or contradicted by "no management screen" wording. | incorporated |
 | 2026-07-02 | Stormbound Chapel should be the container; Adventures should be listed inside it with turn count and last played date. Reset World should not be on the home screen. | accepted UX refinement | Reworked the landing screen to a World container with Adventure rows and removed Reset World from the landing; reset remains in the open Adventure debug panel. | incorporated |
 | 2026-07-02 | Each Adventure should have its own URL; `/adventures/<id>` works fine. | accepted UX/routing refinement | Added an App Router route for `/adventures/[adventureId]`, route-driven Adventure opening, and E2E/direct-load coverage. | incorporated |
+| 2026-07-02 | The debug panel should be collapsed by default when entering an Adventure. | accepted UX refinement | Changed the initial debug-panel state to collapsed and updated E2E to explicitly open it before debug interactions. | incorporated |
 
 ## Planning Updates
 

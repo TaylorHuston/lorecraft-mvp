@@ -24,13 +24,15 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.reload();
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+    await openDebugPanel(page);
 
     const debugPanel = page.locator("#debug-panel");
     const debugToggle = page.locator("#debug-panel-toggle");
+    await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
     await debugToggle.click();
     await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
     await expect(debugPanel).toHaveJSProperty("inert", true);
-    await debugToggle.click();
+    await openDebugPanel(page);
     await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 
     await page.locator("#debug-tab-state").click();
@@ -65,6 +67,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
 
     await page.reload();
     await expect(page.locator("#story-stream")).toContainText(playerText);
+    await openDebugPanel(page);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
       `Turn #2: failed - ${failureText}`,
@@ -241,6 +244,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
       await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
       await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+      await openDebugPanel(page);
       await page.locator("#fresh-seed-button").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     } else {
@@ -258,6 +262,13 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function openDebugPanel(page: import("@playwright/test").Page) {
+  const debugPanel = page.locator("#debug-panel");
+  await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
+  await page.locator("#debug-panel-toggle").click();
+  await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 }
 
 async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {

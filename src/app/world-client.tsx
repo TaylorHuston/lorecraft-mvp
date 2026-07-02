@@ -106,7 +106,7 @@ export function WorldClient({
   const [isSeeding, setIsSeeding] = useState(false);
   const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(false);
+  const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
   const [npcDrafts, setNpcDrafts] = useState<Record<string, NpcDebugDraft>>({});
   const [npcSaveStatus, setNpcSaveStatus] = useState<
