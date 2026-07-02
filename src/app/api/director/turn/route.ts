@@ -79,31 +79,15 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: modeResult.error }, 500);
   }
 
-  const configResult = readLlmConfig();
-  if (!configResult.ok) {
-    await logDirectorTurn({
-      event: "director.turn.rejected",
-      stage: "read_config",
-      worldId: bodyResult.body.worldId,
-      requestSummary: {
-        directorMode: modeResult.mode,
-      },
-      error: configResult.error,
-      httpStatus: 503,
-      timingsMs: { total: elapsedSince(startedAt) },
-    });
-    return json<TurnResponse>({ ok: false, error: configResult.error }, 503);
-  }
-
-  const provider = providerName(configResult.config.baseUrl);
   const convexResult = createConvexClient();
   if (!convexResult.ok) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "create_convex_client",
       worldId: bodyResult.body.worldId,
-      provider,
-      model: configResult.config.model,
+      requestSummary: {
+        directorMode: modeResult.mode,
+      },
       error: convexResult.error,
       httpStatus: 500,
       timingsMs: { total: elapsedSince(startedAt) },
@@ -131,8 +115,9 @@ export async function POST(request: Request) {
       event: "director.turn.rejected",
       stage: "load_context",
       worldId,
-      provider,
-      model: configResult.config.model,
+      requestSummary: {
+        directorMode,
+      },
       error: worldLoadError.logMessage,
       httpStatus: worldLoadError.httpStatus,
       timingsMs: { total: elapsedSince(startedAt) },
@@ -151,8 +136,9 @@ export async function POST(request: Request) {
       event: "director.turn.rejected",
       stage: "load_context",
       worldId,
-      provider,
-      model: configResult.config.model,
+      requestSummary: {
+        directorMode,
+      },
       error: "The selected world is missing required state.",
       httpStatus: 404,
       timingsMs: { total: elapsedSince(startedAt) },
@@ -167,6 +153,23 @@ export async function POST(request: Request) {
   }
 
   const persistentContext = directorMode === "persistent" ? (context as DirectorContext) : null;
+  const configResult = readLlmConfig();
+  if (!configResult.ok) {
+    await logDirectorTurn({
+      event: "director.turn.rejected",
+      stage: "read_config",
+      worldId,
+      requestSummary: {
+        directorMode,
+      },
+      error: configResult.error,
+      httpStatus: 503,
+      timingsMs: { total: elapsedSince(startedAt) },
+    });
+    return json<TurnResponse>({ ok: false, error: configResult.error }, 503);
+  }
+
+  const provider = providerName(configResult.config.baseUrl);
 
   const recorded = await convex.mutation(api.world.recordPlayerInput, {
     worldId,

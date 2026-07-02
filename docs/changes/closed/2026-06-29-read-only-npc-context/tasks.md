@@ -24,7 +24,7 @@
     - [x] Scenario R1-S1: NPC description grounds a look action.
     - [x] Scenario R1-S2: NPC context is structured separately from transcript.
   - [x] Requirement R2: Read-Only NPC Mutation Boundary.
-    - [x] Scenario R2-S1: Game Master returns an NPC update.
+    - [x] Scenario R2-S1: Story generation includes NPC update-like text.
     - [x] Scenario R2-S2: Existing NPC values remain unchanged after narration.
   - [x] Requirement R3: Debug NPC Inspection And Overrides.
     - [x] Scenario R3-S1: Debug panel shows NPC fields.

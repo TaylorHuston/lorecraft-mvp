@@ -8,6 +8,10 @@ Lorecraft needs a first playable AI Game Master loop where the player can intera
 
 This Epic keeps the MVP to one editable persistent world. The later target model is independent story/play-session instances generated from a world or template, so each story can mutate separately from canonical authored world data.
 
+## Story Order Note
+
+Story IDs are stable within this Epic and are more important than document order. `LC-001-S12` appears before `LC-001-S9` through `LC-001-S11` because location work was added as a topical insertion after those earlier Stories; future reconciliation should preserve IDs unless an explicit Story move is approved.
+
 ## Story LC-001-S1: Narrative Play Feed And Unified Input
 
 As a playtester, I want one narrative input and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
@@ -70,14 +74,12 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 
 ### Verified By
 
-- `npm run test` passed with focused Game Master request/output/provider tests.
-- `npm run lint` passed.
-- `npm run build` passed and included `/` plus dynamic `/api/director/turn`.
-- `npm run convex:once` passed.
-- Runtime `curl http://localhost:3000` under `npm run dev` returned the narrative UI HTML.
-- Runtime POST to `/api/director/turn` with local Ollama `llama3.1:8b` returned a persisted Game Master narration.
-- `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed player input, Game Master narration, and event feed entries ordered from persisted rows.
-- `npm run e2e` passed with browser assertions for seeded world readiness, narrative input submission, pending state, persisted reload, debug turn evidence, and reset reuse.
+- R1-S1 and R1-S2: `npm run e2e` proves the browser accepts one narrative input, submits it through the Game Master route, and does not require a separate command/chat mode choice.
+- R2-S1 and R2-S2: `npm run e2e` proves persisted player input, Game Master narration, turn evidence, and reset behavior survive reload and remain distinguishable in the story/debug surfaces.
+- R2-S1 and R2-S2: `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed persisted player input, Game Master narration, and event feed entries ordered from durable rows.
+- R3-S1: `npm run e2e` and browser verification prove pending state disables duplicate submission for the in-flight turn while keeping progress visible.
+- R3-S2: Seed/no-world browser flow in `npm run e2e` proves the app exposes a seed action before attempting play when no usable playtest state exists.
+- Supporting gates: `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface.
 
 ### Verification Gaps
 
@@ -164,12 +166,12 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 
 ### Verified By
 
-- `npm run test` passed, including bounded request construction, missing config, and OpenAI-compatible response extraction.
-- `npm run lint` passed.
-- `npm run build` passed.
-- `npm run convex:once` passed.
-- Runtime POST to `/api/director/turn` with `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` succeeded.
-- Post-turn Convex snapshot showed `provider`, `model`, compact `requestSummary`, raw response, parsed response, accepted updates, and feed rows persisted.
+- R1-S1 and R1-S2: `npm run e2e` exercises the browser-to-route turn submission path through the real backend route and fixture OpenAI-compatible provider without React importing provider SDKs or secrets.
+- R1-S2 and R3-S1/R3-S2: `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers bounded request construction, missing config handling, OpenAI-compatible response extraction, and no-mutation setup failure behavior.
+- R1-S4: `src/app/api/director/turn/route.test.ts` proves malformed `worldId` returns a structured `400` before LLM config is required and without recording player input.
+- R2-S1 and R2-S2: Runtime POST to `/api/director/turn` with `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` succeeded, proving the provider adapter contract against local Ollama.
+- R3-S1 and R3-S2: Game Master request construction tests prove each provider request is built from current persisted state and recent bounded feed context rather than provider-managed remote session state.
+- Supporting gates: `npm run ci:required` and `npm run convex:once` passed for the broader app surface.
 
 ### Verification Gaps
 
@@ -219,19 +221,19 @@ The system SHALL accept only bounded updates for NPCs currently in the scene.
 
 #### Scenario R3-S1: Mira is affected by the turn
 
-- WHEN the Game Master returns an update for `actorKey: "mira"` with a reason and valid changes
+- WHEN the post-narration extractor returns an update for `actorKey: "mira"` with a reason and valid changes
 - THEN the backend maps the key to the current-scene NPC actor
 - AND it persists accepted `mood`, `status`, and `memory` changes as facts
 
 #### Scenario R3-S2: NPC is not affected
 
 - WHEN Mira is not meaningfully affected by the player's turn
-- THEN the Game Master returns no update for Mira
+- THEN the post-narration extractor returns no update for Mira
 - AND existing facts remain unchanged
 
 #### Scenario R3-S3: Offscreen or unknown NPC update
 
-- WHEN the Game Master returns an update for an actor key that is unknown or not in the current scene
+- WHEN the post-narration extractor returns an update for an actor key that is unknown or not in the current scene
 - THEN the backend ignores that update
 - AND the debug panel can show why it was ignored
 
@@ -254,7 +256,7 @@ The system SHALL use NPC facts only for state that should matter after recent tr
 #### Scenario R4-S3: Durable interaction memory
 
 - WHEN the player interaction meaningfully changes what Mira should remember later
-- THEN the Game Master may rewrite Mira's `memory` as a compact rolling summary capped at 500 characters
+- THEN the post-narration extractor may propose a rewrite to Mira's `memory` as a compact rolling summary capped at 500 characters
 - AND the rewrite may preserve important older information, add new important information, and drop stale or low-importance details
 
 ### Requirement R5: Hidden State, Visible Behavior
@@ -282,12 +284,12 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 
 ### Verified By
 
-- `npm run test` passed, including malformed JSON rejection, partial NPC update acceptance, unknown actor ignoring, and 500-character memory cap.
-- `npm run build` passed.
-- `npm run convex:once` passed.
-- Runtime Ollama turn accepted `mira` updates for `mood`, `status`, and `memory`.
-- Post-turn Convex snapshot showed accepted Mira facts persisted under `actor:mira` with `source: "llm"` and state-diff `setFact` operations.
-- Post-reset Convex snapshot showed Mira baseline `mood`, `status`, and `memory` restored with `source: "seed"`.
+- R1-S1 and R1-S2: Seeded-world E2E/debug assertions and Convex snapshot checks prove Mira and Brother Alden exist with stable actor keys plus baseline `mood`, `status`, and `memory` facts.
+- R2-S1 and R2-S2: `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` proves non-empty plain-prose story output succeeds and empty/unusable output fails without fake narration or NPC state changes.
+- R3-S1 through R3-S3: Focused director tests prove bounded NPC update validation, partial valid-field acceptance, unknown/offscreen actor rejection, and ignored update evidence.
+- R4-S1 through R4-S3: Focused director tests prove ephemeral/no-update cases can leave facts unchanged, `memory` remains capped at 500 characters, and accepted durable updates persist through the extractor path.
+- R5-S1 and R5-S2: Prompt/debug tests and E2E debug-panel assertions prove hidden facts are supplied as Game Master guidance and shown plainly only in debug surfaces.
+- Supporting gates: `npm run ci:required`, `npm run convex:once`, and runtime local-Ollama playtests passed for the broader app surface.
 
 ### Verification Gaps
 
@@ -377,15 +379,11 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 ### Verified By
 
-- `npm run test` passed.
-- `npm run lint` passed.
-- `npm run build` passed.
-- `npm run convex:once` passed.
-- Runtime Ollama turn persisted a successful `directorCalls` record with raw output, parsed output, accepted updates, and no ignored updates.
-- `CONVEX_AGENT_MODE=anonymous npx convex run world:resetPlaytestWorld` returned `deletedCommands: 2`, `deletedGame MasterCalls: 1`, `deletedEvents: 2`, `deletedNarrations: 3`, `deletedStateDiffs: 1`, and `restoredFacts: 3`.
-- Post-reset Convex snapshot showed actors, exits, objects, room, and world preserved while feed, narrations, events, state diffs, and director calls were empty.
-- `npm run test` includes local debug log coverage proving JSONL writes are opt-in and raw LLM response text is omitted unless explicitly enabled.
-- `npm run build` passed with the Node.js Route Handler and local filesystem debug log module.
+- R1-S1 and R3-S1/R3-S2: `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers successful and failed Game Master/debug call persistence, accepted/ignored update metadata, and extractor debug records.
+- R1-S2: `src/app/api/director/turn/route.test.ts` proves provider errors and invalid extractor output are recorded as debug-visible extractor failures without faking state.
+- R2-S1 and R2-S2: Local debug log unit tests prove JSONL writes are opt-in, raw LLM response text is omitted unless explicitly enabled, and raw request text is gated separately.
+- R4-S1 and R4-S2: `npm run e2e` exercises Reset Session through the browser and proves the story surface returns to the empty seeded state while canonical debug state is restored.
+- Supporting gates: `npm run ci:required` passed for lint, unit tests, typecheck, and production build.
 
 ### Verification Gaps
 
@@ -470,17 +468,17 @@ The system SHALL keep empty, pending, and error states understandable without re
 
 ### Verified By
 
-- `npm run lint` passed.
-- `npm run build` passed.
-- Browser verification at `http://localhost:3000` showed the document body no longer scrolls at desktop height, the story pane uses independent overflow, the debug panel uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
-- Browser verification at `390x844` showed the continuation form remains in the first viewport, the story pane uses independent overflow, and the story pane settles at exact bottom with a long persisted feed.
-- Browser verification after manual typography feedback showed narration uses the app sans font at a reduced scale, without serif or italic styling, while desktop and narrow viewport bottom anchoring remains intact.
-- Browser verification with a page-local `fetch` stub showed Enter submits the narrative textarea, the textarea clears while pending, duplicate submission is rejected while the turn is in progress, and pending feedback appears as text without a submit button.
-- Browser verification with a page-local error `fetch` stub showed Game Master errors appear near the continuation input and the existing story remains readable.
+- R1-S1 through R1-S3: Browser verification and `npm run e2e` prove Game Master narration renders as primary prose, player input renders as authored action text, and world/debug events remain visually quieter than story text.
+- R2-S1 through R2-S3: Browser verification plus `npm run e2e` prove the story pane uses independent overflow, settles near the newest content, stays usable when the debug drawer is taller, and remains near the bottom after deterministic long-feed interactions.
+- R3-S1: `npm run e2e` proves Reset Session returns the story stream to the empty story state.
+- R3-S2: Browser verification with a page-local `fetch` stub proves Enter submits the textarea, the textarea clears while pending, duplicate submission is rejected during the in-flight turn, and pending feedback appears without a submit button.
+- R3-S3: Browser verification with a page-local error `fetch` stub and `npm run e2e` provider-failure coverage prove errors appear near the continuation input while the existing story remains readable.
+- Supporting gates: `npm run ci:required` passed for lint, unit tests, typecheck, and production build.
 
 ### Verification Gaps
 
-- Live empty-feed browser verification was not run because it would require clearing the current local playtest feed with rough reset. The empty-feed branch is implemented in `src/app/world-client.tsx` and remains a focused manual check before acceptance.
+- No unresolved implementation gap for this Story.
+- Taylor manual browser confirmation of the final polished visual design remains useful but is not blocking deterministic E2E coverage.
 
 ## Story LC-001-S6: Scoped Narrative Turns
 
@@ -565,18 +563,18 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 
 ### Verified By
 
-- `npm run test` passed, including turn-scoped feed metadata being omitted from the Game Master prompt and local debug log records retaining `turnId`.
-- `npm run lint` passed.
-- `npm run build` passed.
-- `npx convex codegen` passed, including schema/function validation and generated TypeScript bindings.
-- `curl -I --max-time 5 http://localhost:3000` returned `HTTP/1.1 200 OK` from the existing dev server.
-- `/th-review` passed as the local PR gate with no blocking or required findings.
-- `npm run lint` and `npm run build` passed after the story-stream turn-number UI follow-up.
+- R1-S1: `npm run e2e` proves a successful narrative turn creates visible turn-number evidence and persists player input plus Game Master narration.
+- R1-S2: `src/app/api/director/turn/route.test.ts` and `npm run e2e` prove provider-failed turns remain persisted as failed/debuggable without fake narration or accepted state changes.
+- R1-S3: Route tests prove pre-persistence malformed or missing-configuration failures do not record player input.
+- R2-S1 and R2-S2: `npm run e2e` proves reload preserves turn-scoped feed/debug evidence, including failed-turn status after reload.
+- R2-S3: Seed/reset flows leave seed rows outside player turns while narrative turns begin with the first persisted player intent.
+- R3-S1 through R3-S3: `npm run e2e`, focused director tests, `docs/data-model.md`, and `docs/persistence-system.md` prove rough reset clears turn history, accepted diffs remain turn-scoped audit records, and snapshot rollback remains deferred.
+- Supporting gates: `npm run ci:required`, `npx convex codegen`, and the prior local PR gate passed for the broader app surface.
 
 ### Verification Gaps
 
-- `npm run convex:once` could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
-- Runtime playtest verification of failed turns in the browser remains pending.
+- The historical Convex one-shot gate could not run during implementation because an existing local Convex backend was already running on port 3210; `npx convex codegen` was used for Convex validation instead.
+- No unresolved failed-turn browser gap remains for the deterministic fixture path; live-provider failed-turn behavior remains an empirical runtime concern.
 
 ## Story LC-001-S7: Active Game Master Guidance And Context Assembly
 
@@ -611,7 +609,7 @@ The system SHALL include relevant read-only knowledge facts in Game Master conte
 
 #### Scenario R2-S2: Read-only facts are not mutable output fields
 
-- WHEN the Game Master returns `npcUpdates`
+- WHEN the post-narration extractor proposes NPC updates
 - THEN validation still accepts only the bounded mutable NPC fields currently allowed by the MVP
 - AND read-only facts such as knowledge, secrets, occupation, or relationships are ignored if returned as attempted updates
 
@@ -746,14 +744,16 @@ The system SHALL make local Game Master logs inspectable by turn rather than by 
 
 ### Verified By
 
-- `npm run test` passed, including prompt component structure, debug prompt guidance inclusion, hidden read-only knowledge inclusion, direct-question scene-beat derivation, trivial-action scene-beat derivation, read-only fact rejection, trivial-action update suppression, generation setting request bodies, and raw request storage gating.
-- `npm run ci:required` passed after the initial implementation.
-- `npx convex codegen` passed after adding richer seeded read-only storm knowledge.
-- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced Mira dialogue for "I ask Mira what she knows about the storm."
-- Local route playtest with Ollama `llama3.1:8b` against `http://localhost:3100` produced no accepted durable updates for "I jump."
-- Local Convex snapshot showed `directorCalls.requestSummary` includes `promptComponentKeys`, `readOnlyKnowledgeKeys`, `requiredSceneBeat`, and `generationSettings`.
-- Final `npm run ci:required` passed after documentation and prompt refinements.
-- `npm run playtest:director` passed against local Convex/Next/Ollama after the script caught and the implementation fixed accepted Mira mood churn for "I jump."
+- R1-S1 and R1-S2: Focused director tests prove prompt component separation, editable prompt guidance inclusion, derived scene state/feed ownership, and no internal turn/command IDs in the recent feed prompt surface.
+- R2-S1 and R2-S2: Focused director tests prove hidden read-only NPC knowledge reaches the prompt and read-only fields are rejected if proposed as mutations by the extractor.
+- R3-S1 and R3-S2: Focused director tests prove direct-question and trivial-action scene-beat derivation.
+- R4-S1 and R4-S2: Local route playtest with Ollama `llama3.1:8b` produced Mira dialogue for a direct storm question, and focused prompt tests permit attributed dialogue in player-facing narration.
+- R5-S1 and R5-S2: `npm run playtest:director` and focused tests prove trivial actions can avoid accepted durable NPC churn while meaningful updates remain bounded to `mood`, `status`, and `memory`.
+- R6-S1 and R6-S2: Focused provider tests prove generation setting request bodies and compact generation-setting summaries.
+- R7-S1 and R7-S2: Focused director tests prove prompt guidance sections affect the next turn and are summarized in debug metadata.
+- R8-S1 and R8-S2: Focused raw-request tests prove exact request persistence is gated and omitted by default.
+- R9-S1 and R9-S2: Local debug-log tests prove one turn-unit record per recorded turn attempt and gated raw request/response artifacts.
+- Supporting gates: `npm run ci:required`, `npx convex codegen`, local Convex snapshot inspection, and local route playtests passed for the broader app surface.
 
 ### Verification Gaps
 
@@ -897,20 +897,17 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 
 ### Verified By
 
-- `npm run test` passed, including mode defaulting/validation, transcript prose prompt shape, plain-prose output parsing, and provider request body behavior.
-- Focused Game Master tests cover transcript prompt shape, seed/transcript-only context, mode aliasing, plain-prose parsing, and persistent-mode scene-beat behavior.
-- `npm run typecheck` passed after adding the Game Master mode and output-contract type split.
-- `npm run ci:required` passed after implementation and documentation updates.
-- `npx convex codegen` passed after adding the no-mutation completion argument.
-- `LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug` plus `npm run playtest:director:transcript` passed against local Convex/Next/Ollama, producing non-empty prose while preserving baseline Mira facts and creating no LLM state diffs or LLM world events.
-- After final review found and fixed contradictory nested prompt guidance, `npm run test`, `npm run typecheck`, `npm run ci:required`, and `npm run playtest:director:transcript` passed again.
-- `npm run dev:debug` plus `npm run playtest:director` passed in default persistent mode before the later plain-prose split; current persistent story generation now shares the plain-prose contract while structured JSON parsing remains available for future extraction.
-- After changing transcript mode to seed-plus-transcript context, `npm run ci:required` and `npm run playtest:director:transcript` passed; latest log inspection confirmed the raw prompt includes `worldSeed` and `transcript` while omitting `sceneState`, `visibleFacts`, `hiddenNpcKnowledge`, and `requiredSceneBeat`.
-- Fresh demo seeding verified through `npx convex codegen`, `npm run ci:required`, `npm run playtest:director:transcript`, and latest log inspection showing a new transcript turn with seed/transcript prompt components and zero accepted/ignored updates.
+- R1-S1 through R1-S3: Focused mode tests prove persistent mode remains default, transcript startup mode is selected by `LORECRAFT_DIRECTOR_MODE=transcript`, and invalid mode values are rejected before persistence.
+- R2-S1 through R2-S4: Focused director/provider tests prove transcript prompt shape, plain-prose parsing, empty prose failure, and seed/transcript-only context that excludes live world state.
+- R3-S1 through R3-S3: `npm run playtest:director:transcript` proves transcript turns persist commands, narrations, and debug records with `directorMode: "transcript"`, `outputContract: "plain_prose"`, empty accepted/ignored updates, and gated raw artifacts.
+- R4-S1 through R4-S3: Transcript smoke playtests and log inspection prove successful transcript turns preserve baseline NPC facts and create no LLM state diffs, LLM events, or live-world prompt context.
+- R5-S1 through R5-S3: Transcript and default persistent smoke playtests prove both modes can produce narration, only persistent mode may mutate canonical state, and demo seeding starts from the stable fresh seed.
+- Supporting gates: `npm run ci:required`, `npm run typecheck`, and `npx convex codegen` passed after transcript-mode implementation and review remediation.
 
 ### Verification Gaps
 
 - Taylor manual browser confirmation remains pending.
+- Transcript-mode browser reload/debug display is covered by persisted turn/debug architecture and focused route/unit tests, but a dedicated Playwright transcript-mode suite remains deferred until transcript mode becomes a regular browser testing target.
 
 ## Story LC-001-S12: Lightweight Location Cards And Movement
 
@@ -959,7 +956,7 @@ The system SHALL mutate actor locations only through validated post-narration ex
 #### Scenario R2-S3: Game Master cannot relocate actors autonomously
 
 - WHEN the narration independently relocates the scene without a clear player travel action
-- THEN the extractor returns no actor movement
+- THEN backend validation rejects or ignores any actor movement not grounded in clear player travel and narration-confirmed arrival
 - AND actor `roomId` values remain unchanged
 
 #### Scenario R2-S4: Unknown target location is unresolved
@@ -1036,18 +1033,16 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 
 ### Verified By
 
-- `npm run test -- src/lib/director/director.test.ts` passed with Location Card prompt context, transcript exclusion, state extraction parsing, accepted actor movement, rejected movement proposals, and silent NPC relocation rejection.
-- `npm run ci:required` passed, covering lint, full Vitest suite, typecheck, and production build.
-- `npm run e2e` passed with deterministic browser coverage for the debug `Locations` tab, location edit/create, accepted movement to the Vestry, rejected unknown bell-tower movement, Reset Session restoration of seeded locations, and turn/debug evidence.
-- `npx convex codegen` passed after adding location context, debug-gated location write actions, and movement persistence functions.
-- `npx convex codegen` passed after local-only debug write guard, server-write token, and debug snapshot remediation.
-- `npm run ci:required` passed on 2026-07-01 after review remediation.
-- `npm run e2e` passed on 2026-07-01 after review remediation, including debug location edit/create/reset behavior, edited Location Card prompt evidence, debug-created Bell Annex as a valid movement target, present NPC movement to the Vestry, accepted player movement, rejected unknown-location travel with inspectable ignored reason, and reset restoration.
-- `npm run ci:required` passed on 2026-07-01 after final post-review remediation, covering lint, 40 Vitest tests, typecheck, and Next build.
+- R1-S1 through R1-S3: Focused director tests prove Location Card prompt context, known-location context, and transcript-mode exclusion of live location cards.
+- R2-S1 through R2-S5: Focused director tests prove state extraction parsing, accepted player/NPC movement, rejected unknown/offscreen/autonomous movement, and path-link non-enforcement for existing locations.
+- R3-S1 through R3-S4: `npm run e2e` proves the debug `Locations` tab lists, edits, creates, and preserves stable keys for canonical locations.
+- R4-S1 through R4-S3: `npm run e2e` proves Reset Session restores seeded locations/actor positions, accepted movement creates turn-scoped debug evidence, and rejected unknown-location movement remains inspectable.
+- Supporting gates: `npm run ci:required` and `npx convex codegen` passed after location context, debug-gated writes, movement persistence, and review remediation.
 
 ### Verification Gaps
 
 - Taylor manual browser confirmation remains pending.
+- Live-provider movement judgment remains empirical; deterministic parser, validation, and E2E checks prove accepted and rejected movement contracts.
 
 ## Story LC-001-S9: Read-Only NPC Context
 
@@ -1069,20 +1064,20 @@ The system SHALL include current-scene NPC profiles in persistent Game Master re
 - THEN NPC profile data is represented as structured context owned by Convex canonical actor rows and actor facts
 - AND recent feed transcript remains separate supporting history
 
-### Requirement R2: Read-Only NPC Mutation Boundary
+### Requirement R2: Read-Only Story-Generation Mutation Boundary
 
-The system SHALL prevent Game Master output from mutating NPC state in this change.
+The system SHALL keep the player-facing Game Master story-generation response read-only with respect to NPC state. Later extractor Stories may propose bounded mutations through a separate validated pass.
 
-#### Scenario R2-S1: Game Master returns an NPC update
+#### Scenario R2-S1: Story generation returns NPC update-like text
 
-- WHEN the Game Master response includes a proposed NPC update
-- THEN the backend does not persist the NPC update
-- AND no NPC fact state diff or LLM-authored NPC state event is recorded for that update
+- WHEN the player-facing story-generation response includes prose that resembles an NPC update
+- THEN the backend does not parse that prose as a durable NPC mutation
+- AND any durable NPC fact change must come from a separate validated extractor pass
 
 #### Scenario R2-S2: Existing NPC values remain unchanged after narration
 
 - WHEN a successful persistent Game Master turn narrates an NPC-focused interaction
-- THEN persisted actor rows and actor-scoped facts remain unchanged unless a non-Game Master manual/debug path changes them
+- THEN persisted actor rows and actor-scoped facts remain unchanged unless a non-story-generation path changes them, such as debug editing or a later bounded extractor pass
 
 ### Requirement R3: Debug NPC Inspection And Editing
 
@@ -1123,20 +1118,16 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 
 ### Verified By
 
-- `npm run test -- src/lib/director/director.test.ts` passed, including persistent NPC profile prompt context, prompt priority/scene directive context, direct-NPC question targeting, canonical debug-created NPC context, transcript-mode exclusion, and bounded NPC update suppression.
-- `npm run test -- src/lib/director/director.test.ts` passed after refining the seeded NPC profile fields, including hidden `knowledge` context, scene directive `mustUse`, and read-only update rejection.
-- `npm run test -- src/lib/director/director.test.ts` passed after rendering NPC profiles as NPC Cards, including derived Garth follow-up targeting from recent addressed NPC context.
-- `npm run typecheck` passed after adding NPC profile and debug override types.
-- `npm run lint` passed after fixing the debug override fetch effect.
-- `npm run ci:required` passed, covering lint, full Vitest suite, typecheck, and Next build.
-- `npx convex codegen` passed after canonical NPC debug write/remediation updates.
-- `npm run ci:required` passed on 2026-07-01 after local-only debug write guards, NPC fact clearing, debug row caps, autosave reset/submit race fixes, and disclosure/live-region UI remediation.
-- `npm run e2e` passed on 2026-07-01 with deterministic coverage for canonical NPC debug parity: seeded NPC visibility, Mira description edit, knowledge clearing, debug-created current-location NPC, raw request context evidence, and Reset Session restoration/removal.
-- `npm run ci:required` passed on 2026-07-01 after final post-review remediation, covering lint, 40 Vitest tests, typecheck, and Next build.
+- R1-S1 and R1-S2: Focused director tests prove current-scene NPC profiles are rendered as NPC Cards, prioritized over recent-feed prose, and kept separate from transcript history.
+- R2-S1 and R2-S2: Focused director tests prove story-generation output remains read-only for NPC state while any durable mutation must come from a non-story-generation path.
+- R3-S1 through R3-S4: `npm run e2e` proves the debug `NPCs` tab shows seeded NPCs, saves Mira description edits, clears editable knowledge, creates a current-location NPC, and restores/removes debug-created NPC state on Reset Session.
+- R3-S2 and R3-S4: Focused director tests prove canonical debug-created NPC context and direct/recent addressed NPC targeting reach the next persistent Game Master request.
+- Supporting gates: `npm run ci:required`, `npm run typecheck`, `npm run lint`, and `npx convex codegen` passed after NPC profile/debug write remediation.
 
 ### Verification Gaps
 
 - Taylor manual browser confirmation remains pending.
+- Live-provider NPC-card adherence remains empirical; deterministic prompt, route, and E2E checks prove the context and validation boundary.
 
 ### Superseded Boundary Note
 
@@ -1266,17 +1257,17 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 
 ### Verified By
 
-- `npm run test -- src/lib/director/director.test.ts` passed with coverage for story prompt shape, extraction prompt shape, extractor output parsing, NPC update validation, memory caps, read-only field rejection, unknown/offscreen actor rejection, and scene-beat suppression.
-- `npx convex codegen` passed after adding `recordNpcStateExtraction`.
-- `npm run typecheck` passed after wiring the route and Convex mutation.
-- `npm run ci:required` passed after implementation and documentation updates.
-- `npm run dev:debug` plus `npm run playtest:director` passed in persistent mode, producing `story_generation` and `npc_state_extraction` records for both a direct Mira question and a trivial jump.
-- Latest local log inspection showed the direct Mira question accepted one bounded `memory` update and the trivial jump returned `{"npcUpdates":[]}`.
-- Convex snapshot inspection of the latest playtest world showed Mira's actor-scoped `memory` fact updated with `source: "llm"` and one turn-scoped state diff/event for the accepted extraction.
+- R1-S1 through R1-S3: Focused director tests prove persistent story generation remains plain prose, successful narration triggers a separate extraction request, and transcript mode skips NPC-state extraction.
+- R2-S1 through R2-S6: Focused director tests prove `mood`, `status`, and `memory` acceptance, 500-character memory cap, ephemeral no-update behavior, read-only field rejection, and unknown/offscreen actor rejection.
+- R3-S1 and R3-S2: Persistent playtest and Convex snapshot inspection prove accepted extractor updates persist actor facts and turn-scoped state diff/event evidence without exposing hidden knowledge as player-facing metadata.
+- R3-S3 and R3-S4: `src/app/api/director/turn/route.test.ts` proves extractor provider failure, invalid extractor output, and no-update extraction remain debug-visible while preserving successful story narration and not faking state.
+- R4-S1 and R4-S2: Focused route/provider tests prove the extractor uses the existing OpenAI-compatible provider path and records compact extraction request metadata without secrets.
+- Supporting gates: `npm run ci:required`, `npm run typecheck`, and `npx convex codegen` passed after extractor implementation and documentation updates.
 
 ### Verification Gaps
 
 - Taylor manual browser confirmation remains pending.
+- Live-provider extraction quality remains empirical; deterministic tests cover parser, validation, no-update, invalid-output, and provider-error contracts.
 
 ## Story LC-001-S11: End To End Playtest Verification
 
@@ -1384,13 +1375,12 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 
 ### Verified By
 
-- `npm run typecheck` passed after adding Playwright config and E2E tests.
-- `npm run lint` passed after adding Playwright config and E2E tests.
-- `npm run e2e:install` installed the local Chromium browser for Playwright.
-- `npm run e2e` passed after adding deterministic fixture provider, split Convex/Next server startup, and browser assertions for seed/reset, Enter submission, pending state, persisted reload state, debug drawer toggling, Game Master call evidence, accepted NPC memory extraction evidence, and reset reuse.
-- `npm run ci:required` passed after excluding Playwright specs from Vitest unit-test discovery.
-- During `/sdd-review`, `npm run e2e` initially reproduced a seed-button race against persisted local Convex state; after adding the default-world loading state, `npm run ci:required` and `npm run e2e` passed.
+- R1-S1 through R1-S3: `npm run e2e` passes with browser assertions for seed/reset, Enter submission, prompt clearing, duplicate-submit prevention while pending, story response display, persisted reload state, and turn-number evidence.
+- R2-S1 through R2-S3: `npm run e2e` passes with debug drawer toggling, persisted Game Master call evidence, failed-turn debug evidence after reload, and reset reuse.
+- R3-S1 through R3-S3: `scripts/llm-fixture-server.mjs` and `npm run e2e` prove the real backend provider adapter can use a deterministic OpenAI-compatible fixture for story generation, extraction output, and inspectable debug metadata without secrets.
+- R4-S1 through R4-S3: `npm run ci:required` remains the cheap required gate, `npm run e2e` remains the deterministic browser suite, and live-provider playtest scripts remain outside deterministic CI.
+- Supporting setup: `npm run e2e:install` installed the local Chromium browser for Playwright.
 
 ### Verification Gaps
 
-- Taylor manual browser confirmation remains pending.
+- Taylor manual browser confirmation remains pending for subjective visual/gameplay feel; deterministic browser coverage is in place for the current playtest loop.

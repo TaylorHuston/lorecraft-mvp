@@ -97,7 +97,7 @@ The system SHALL mutate actor locations only through validated post-narration ex
 ###### Scenario R2-S3: Game Master cannot relocate actors autonomously
 
 - WHEN the narration independently relocates the scene without a clear player travel action
-- THEN the extractor returns no actor movement
+- THEN backend validation rejects or ignores any actor movement not grounded in clear player travel and narration-confirmed arrival
 - AND actor `roomId` values remain unchanged.
 
 ###### Scenario R2-S4: Unknown target location is unresolved

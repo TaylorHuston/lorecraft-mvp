@@ -47,6 +47,26 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
       "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
     );
 
+    const failureText = "I trigger a fixture provider failure.";
+    const failureInput = page.locator("#director-input");
+    await failureInput.fill(failureText);
+    await failureInput.press("Enter");
+    await expect(page.locator("#turn-error-message")).toContainText(
+      "LLM provider returned HTTP 503.",
+      { timeout: 60_000 },
+    );
+    await expect(page.locator("#story-stream")).toContainText(playerText);
+
+    await page.reload();
+    await expect(page.locator("#story-stream")).toContainText(playerText);
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-turns-items")).toContainText(
+      `Turn #2: failed - ${failureText}`,
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "provider_error",
+    );
+
     await page.locator("#debug-tab-npcs").click();
     await expect(page.locator("#npc-debug-panel")).toContainText("Mira");
     await expect(page.locator("#npc-debug-panel")).toContainText("Brother Alden");
@@ -163,12 +183,14 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "Actor move destination is unknown.",
     );
+    await expectStoryStreamNearBottom(page);
     await page.locator("#debug-tab-locations").click();
     await expect(page.locator("#location-card-bell-tower")).toHaveCount(0);
 
     await page.locator("#rough-reset-button").click();
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
+    await expect(page.locator("#story-empty-state")).toBeVisible();
     await page.locator("#debug-tab-locations").click();
     await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(
@@ -214,4 +236,14 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {
+  await expect
+    .poll(async () =>
+      page.locator("#story-stream").evaluate((element) =>
+        Math.max(0, element.scrollHeight - element.scrollTop - element.clientHeight),
+      ),
+    )
+    .toBeLessThanOrEqual(32);
 }

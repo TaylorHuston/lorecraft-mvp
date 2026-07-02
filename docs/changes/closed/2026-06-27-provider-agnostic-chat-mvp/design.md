@@ -100,15 +100,15 @@ The system SHALL make synchronous Director turn progress and failure visible to 
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 - Need UI and backend proof that the feed rebuilds from existing tables without adding a timeline table.
 
 #### Story LC-001-S2: Provider-agnostic backend Director boundary
@@ -183,15 +183,15 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 - Need to verify the Route Handler can call a local Ollama endpoint and persist results through Convex.
 
 #### Story LC-001-S3: Persistent current-scene NPC state
@@ -291,15 +291,15 @@ The system SHALL use NPC facts as hidden Director guidance rather than player-vi
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 - Need prompt and validation tests to prevent unnecessary NPC fact churn.
 
 #### Story LC-001-S4: Debuggable Director calls and reset
@@ -374,15 +374,15 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 - Need implementation proof that reset does not delete stable seeded world rows.
 
 ## Epic File Rules

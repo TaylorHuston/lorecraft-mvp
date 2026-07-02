@@ -32,7 +32,7 @@ Fresh delegated `/sdd-review` passed after one narrow safe remediation. Taylor a
 
 ### REQUIRED
 
-- [x] `docs/changes/2026-06-30-end-to-end-testing/design.md` - The design Story section still said `Not implemented yet`, `Not verified yet`, and implementation/verification were pending. Impact: active change artifacts contradicted Epic truth and repo reality. Recommendation: update the design with implementation and verification evidence.
+- [x] `docs/changes/2026-06-30-end-to-end-testing/design.md` - The design Story section still had implementation-pending placeholder text. Impact: active change artifacts contradicted Epic truth and repo reality. Recommendation: update the design with implementation and verification evidence.
 - [x] `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` - `LC-001-S1` still said full browser click automation was not installed. Impact: stale verification gap after Playwright E2E now covers the current MVP play-feed path. Recommendation: add E2E evidence and replace the stale gap.
 - [x] `docs/changes/2026-06-30-end-to-end-testing/tasks.md` - Manual UI confirmation status was present as `pending Taylor`, but checklist/closeout fields were not reconciled. Impact: closeout state stayed contradictory. Recommendation: mark status recording complete and fill closeout status fields.
 - [x] `playwright.config.ts` - `LORECRAFT_E2E_BASE_URL` could point the destructive seed/reset test at a non-local app. Impact: accidental mutation of preview, production, or shared data. Recommendation: fail closed unless the base URL is localhost or loopback.

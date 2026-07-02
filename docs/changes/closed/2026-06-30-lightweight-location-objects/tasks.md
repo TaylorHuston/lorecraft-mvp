@@ -87,7 +87,7 @@
 - [x] 5.1 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, and branch readiness.
 - [x] 5.2 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
 - [x] 5.3 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
+- [x] 5.4 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 5.5 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
 - [x] 5.6 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [x] 5.7 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
@@ -159,7 +159,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending user
+- Status: pending Taylor
 - App URL / route: local Lorecraft app root, typically `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel demo world with at least Chapel, Vestry, and Graveyard; optional debug-created location
 - Steps for the user:
@@ -200,7 +200,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Review record: `docs/changes/closed/2026-06-30-lightweight-location-objects/review.md`
 - `review.md` findings resolved: yes
 - Planning updates resolved: no unresolved planning blockers
-- Manual UI confirmation status: pending user
+- Manual UI confirmation status: pending Taylor
 - PR / merge state: merged locally into `develop`
 - Deferred scope accepted: live provider-backed `npm run dev:debug` playtest, manual UI confirmation, Dungeon mode, path/link constraints, dynamic location creation by LLM, player-facing location widget, polished World Builder, object/exit editing, full production auth/ownership/rate limiting
 - Change moved to `docs/changes/closed/`: yes

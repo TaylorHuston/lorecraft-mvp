@@ -43,9 +43,13 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const content = isExtractionRequest(parsedBody)
-    ? fixtureExtractionResponse(parsedBody)
-    : fixtureStoryResponse(parsedBody);
+  const extractionRequest = isExtractionRequest(parsedBody);
+  if (!extractionRequest && shouldFailStoryRequest(parsedBody)) {
+    writeJson(response, 503, { error: { message: "Fixture story provider failure." } });
+    return;
+  }
+
+  const content = extractionRequest ? fixtureExtractionResponse(parsedBody) : fixtureStoryResponse(parsedBody);
   writeJson(response, 200, {
     id: "chatcmpl-lorecraft-fixture",
     object: "chat.completion",
@@ -103,6 +107,10 @@ function fixtureStoryResponse(body) {
   }
 
   return storyResponse;
+}
+
+function shouldFailStoryRequest(body) {
+  return /Current Input:\s*>[^\n]*fixture provider failure/i.test(requestPromptText(body));
 }
 
 function fixtureExtractionResponse(body) {

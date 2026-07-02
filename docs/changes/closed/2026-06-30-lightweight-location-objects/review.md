@@ -6,7 +6,7 @@ ready
 
 The change is ready for local integration to `develop` after safe review fixes. The branch now has deterministic browser evidence for Location Cards, edited prompt context, debug-created location movement, present-NPC movement, unknown-location rejection evidence, and reset behavior. The debug UI also keeps stable Location card identity while syncing canonical reset values back into editable fields.
 
-Manual UI confirmation remains pending user. Remote/shared deployment hardening is accepted deferred scope; this branch is reviewable only as a local prototype surface.
+Manual UI confirmation remains pending Taylor. Remote/shared deployment hardening is accepted deferred scope; this branch is reviewable only as a local prototype surface.
 
 ## Gate Scorecard
 
@@ -17,7 +17,7 @@ Manual UI confirmation remains pending user. Remote/shared deployment hardening 
 | Requirements and Scenarios | pass | Requirements are concrete and traceable; deterministic E2E covers the accepted browser/Convex/provider paths that changed. |
 | ID traceability | pass | No duplicate active Story IDs found in `docs/epics/**/epic.md`. |
 | Tests and verification | pass | `npm run e2e`, `npm run ci:required`, focused director tests, and `git diff --check` pass after review fixes. |
-| Manual UI confirmation | deferred | Manual walkthrough is documented as pending user; deterministic E2E covers the integration-critical behavior. |
+| Manual UI confirmation | deferred | Manual walkthrough is documented as pending Taylor; deterministic E2E covers the integration-critical behavior. |
 | Code review | pass | Review fixes addressed stale E2E coverage, Location editor remount/reset behavior, and debug tab accessibility. |
 | Visual / UX consistency | pass | Debug panel remains aligned with the current utilitarian dark workbench guidance. |
 | Security review | pass local / deferred remote | Local-only debug posture is acceptable for this prototype. Auth, ownership, rate limiting, and server-owned debug/reset controls are required before remote/shared deployment. |

@@ -157,15 +157,15 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 
 ## Epic File Rules
 
