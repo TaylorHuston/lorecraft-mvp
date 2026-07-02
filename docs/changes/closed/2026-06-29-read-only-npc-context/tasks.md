@@ -24,7 +24,7 @@
     - [x] Scenario R1-S1: NPC description grounds a look action.
     - [x] Scenario R1-S2: NPC context is structured separately from transcript.
   - [x] Requirement R2: Read-Only NPC Mutation Boundary.
-    - [x] Scenario R2-S1: Game Master returns an NPC update.
+    - [x] Scenario R2-S1: Story generation includes NPC update-like text.
     - [x] Scenario R2-S2: Existing NPC values remain unchanged after narration.
   - [x] Requirement R3: Debug NPC Inspection And Overrides.
     - [x] Scenario R3-S1: Debug panel shows NPC fields.
@@ -179,8 +179,8 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ### Apply Readiness
 
-- Status: applied; final verification in progress.
-- Reason: Product/design scope has been implemented on the compliant app branch; final CI/review/manual confirmation remain.
+- Status: closed.
+- Reason: Product/design scope was implemented and reviewed on the compliant app branch; remaining manual UI confirmation was accepted as a non-blocking closeout gap for this local MVP iteration.
 
 ## Closeout
 

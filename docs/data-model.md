@@ -1,3 +1,6 @@
+---
+modified: 2026-06-30
+---
 # Data Model
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
@@ -24,23 +27,27 @@ Strategy:
 - The MVP has one active deterministic demo world at a time.
 - Later, canonical worlds will likely become templates and active play will happen in copied story instances.
 
-## Room
+## Room / Location
 
 Table: `rooms`
 
-A room is a location in the world graph.
+A room is the current storage model for a lightweight Location Card. Product-facing language should generally call these `locations`; the backing table remains `rooms` for now to avoid churn.
 
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
-| `key` | Stable room key used by code and seed data, such as `chapel`. |
+| `key` | Stable location key used by code and seed data, such as `chapel`. |
 | `name` | Player/debug display name. |
-| `description` | Stable baseline room description. |
+| `description` | Stable baseline location description. |
 
 Strategy:
 
-- Rooms provide scene context for the Game Master.
-- Narrative movement does not currently mutate room or actor-location state.
+- Location Cards provide canonical scene context for the Game Master.
+- Persistent Game Master requests include the current Location Card plus a compact list of known locations that can be movement targets.
+- Clear narrative travel to an existing location can mutate actor `roomId` only through the post-narration extractor and Convex validation.
+- Movement does not require linked exits yet; any existing location is eligible for this MVP slice.
+- Unknown destinations are handled in narration/debug evidence and do not create canonical locations.
+- A future `Dungeon` concept may add linked rooms, path constraints, locks, hazards, and stricter navigation, but that is not part of the current model.
 - Dynamic room state should be stored as facts, not by rewriting `description`.
 
 ## Exit
@@ -59,8 +66,8 @@ An exit connects two rooms.
 
 Strategy:
 
-- Exits are context, not an active movement system yet.
-- Future movement can use this graph, but the current Game Master path only narrates movement attempts.
+- Exits are visible context, not enforced movement constraints yet.
+- Future movement can use this graph, but the current accepted movement path allows travel to any existing location after validation.
 
 ## Actor
 
@@ -71,7 +78,7 @@ An actor is a player or NPC in the world.
 | Field | Meaning |
 |---|---|
 | `worldId` | Owning world. |
-| `roomId` | Current room. This is stable during the current narrative-only MVP flow. |
+| `roomId` | Current location/room. This can change only through validated actor movement or explicit reset/debug tooling. |
 | `key` | Optional stable actor key, such as `taylor` or `mira`. Used for facts and Game Master updates. |
 | `name` | Display name. |
 | `role` | `player` or `npc`. |
@@ -81,6 +88,7 @@ Strategy:
 
 - Keep `description` stable for now.
 - Put mutable state in actor-scoped facts.
+- Actor location is canonical state, not transcript inference. The Game Master can propose actor moves only through the extractor, and Convex validates current-scene actor presence plus destination existence before patching `roomId`.
 - Do not add an `npcs` table until NPC-specific behavior outgrows generic actors plus facts.
 
 ## World Object
@@ -133,9 +141,9 @@ Strategy:
 | `background` | Short pre-player biography and social context. | Readable Game Master context. Should not become a full lore article. |
 | `persona` | Temperament and decision style. | Readable Game Master context. Guides behavior without describing momentary emotion. |
 | `voice` | Dialogue style and verbal habits. | Readable Game Master context. Guides how the NPC speaks. |
-| `mood` | Current affect or attitude. | Readable Game Master context. Game Master-authored mutation is currently disabled. |
+| `mood` | Current affect or attitude. | May be mutated only by the post-narration extractor after backend validation. |
 | `status` | Durable current circumstance. | Readable Game Master context. Should not describe one-frame physical beats. |
-| `memory` | Rolling summary of meaningful direct player interaction. | Readable Game Master context. Future compaction/mutation is deferred. |
+| `memory` | Rolling summary of meaningful direct player interaction. | May be mutated only by the post-narration extractor after backend validation. |
 | `knowledge` | Private or semi-private facts the NPC knows. | Hidden read-only Game Master context; ignored if returned as an attempted `npcUpdates` field. |
 
 Strategy:
@@ -143,8 +151,11 @@ Strategy:
 - Current-scene NPC actor fields and actor facts are included in persistent Game Master requests as read-only NPC profile context.
 - Actor `description` is stable visible identity: physical presentation and immediately legible role. Put biography in `background`, behavior in `persona`, dialogue style in `voice`, current circumstance in `status`, and direct player history in `memory`.
 - `knowledge` can shape narration and dialogue, but it is not automatically player-visible.
-- Game Master-authored NPC mutation is currently disabled. If the model returns `npcUpdates`, they are recorded as ignored debug evidence rather than applied to actor rows or facts.
-- Debug NPC overrides are process-local server state, not Convex rows. They can temporarily override profile values in prompt context, but they disappear when the application server restarts.
+- Game Master-authored NPC mutation is allowed only through the post-narration extractor for `mood`, `status`, and `memory`.
+- Game Master-authored actor movement is allowed only through the post-narration extractor for current-scene actors moving to existing locations.
+- Debug NPC edits are canonical Convex demo-world actor rows and actor facts. They can change profile values in prompt context, and Reset Session restores seeded NPCs while removing debug-created NPCs.
+- Clearing an editable NPC fact in the debug UI removes that manual canonical fact instead of leaving the previous value in prompt context.
+- Debug-created NPCs and locations are capped per demo world so ordinary debug use cannot exceed the bounded reset deletion limits.
 
 Useful future fact keys:
 
@@ -261,7 +272,7 @@ Current operation types:
 
 | Operation | Meaning |
 |---|---|
-| `moveActor` | Move an actor to a room. Present in schema, not used by narrative Game Master turns yet. |
+| `moveActor` | Move an actor to a room/location after bounded extractor validation. |
 | `setFact` | Set a durable fact value. |
 | `appendEvent` | Record an event. |
 
@@ -289,18 +300,21 @@ A Game Master call records provider interaction and validation results.
 | `rawResponse` | Optional raw provider text. Useful for debugging invalid outputs. |
 | `parsedResponse` | Optional parsed structured output. |
 | `status` | `success`, `provider_error`, or `invalid_output`. |
-| `acceptedUpdates` | NPC updates accepted by validation. |
-| `ignoredUpdates` | NPC updates or fields rejected by validation. |
+| `acceptedUpdates` | NPC updates and actor movement proposals accepted by validation. |
+| `ignoredUpdates` | NPC updates, actor moves, or fields rejected by validation. |
 | `error` | Optional error message. |
 
 Strategy:
 
 - Game Master calls are diagnostics, not canonical game state.
 - They explain provider failures, invalid JSON, accepted updates, and ignored updates.
+- A persistent turn can have two Game Master calls: `story_generation` for the plain-prose narration and `npc_state_extraction` for bounded NPC fact extraction plus actor movement extraction.
 - Do not use this table as the source of truth for what the world remembers.
-- Current request summaries include compact prompt/debug metadata such as `directorMode`, `outputContract`, prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
-- In current story-generation mode, `acceptedUpdates` and `ignoredUpdates` are empty and `parsedResponse` is normalized to a narration with no `npcUpdates`.
+- Current request summaries include compact prompt/debug metadata such as `directorMode`, `callRole`, `outputContract`, prompt component keys, read-only knowledge keys, required scene beat, and effective generation settings.
+- Story-generation calls use `outputContract: "plain_prose"` and do not carry accepted NPC updates.
+- NPC-state extraction calls use `outputContract: "json_npc_updates"` and may carry accepted or ignored updates for `mood`, `status`, and `memory`, plus accepted or ignored actor moves to existing locations.
 - `rawRequest` is omitted by default and only stored when local raw request debug storage is explicitly enabled. It can contain hidden NPC knowledge, prompt guidance, and player text, so it is diagnostic evidence rather than canonical game state.
+- Full debug snapshot sections such as hidden facts, state diffs, and Game Master calls are local/debug-oriented and are omitted from the client snapshot unless debug routes are enabled in a non-production process.
 
 ## Game Master Prompt Context
 
@@ -309,12 +323,15 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 | Component | Source | Meaning |
 |---|---|---|
 | `promptGuidance` | Debug UI request input | Per-turn text guidance for style, NPC behavior, and persistence strategy during playtesting. |
-| `aiInstructions` | Editable backend configuration plus per-turn guidance | Story-first behavior, dialogue allowance, read-only persistence boundary, and current playtest guidance. |
+| `aiInstructions` | Editable backend configuration plus per-turn guidance | Story-first behavior, dialogue allowance, post-narration persistence boundary, and current playtest guidance. |
 | `world` | Derived from world, room, exit, object, and player rows | Current world, room, baseline scene description, visible exits, visible objects, and player identity. |
-| `npcCards` | Rendered from current-scene NPC profiles and temporary debug overrides | Card-like story memory the Game Master should treat as canonical NPC context. |
+| `locationCard` | Derived from the current room/location, room facts, visible objects, exits, and present actors | Canonical current-location card for persistent Game Master context. |
+| `knownLocations` | Derived from existing room rows | Compact list of valid movement destinations for the current world. |
+| `npcCards` | Rendered from current-scene NPC profiles | Card-like story memory the Game Master should treat as canonical NPC context. |
 | `recentStory` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
 | `currentInput` | Current request body | The player's narrative intent for this turn. |
-| `output` | Backend output contract | Current story generation asks for player-facing prose only. |
+| `gameMasterNarration` | Completed story-generation call | Extractor-only input containing the player-facing narration to inspect for durable NPC changes. |
+| `output` | Backend output contract | Story generation asks for player-facing prose only; state extraction asks for JSON `npcUpdates` and `actorMoves`. |
 
 Strategy:
 
@@ -322,9 +339,9 @@ Strategy:
 - Prompt guidance text is an experimental playtest control. It should guide narration, not override schema, validation, hidden knowledge boundaries, or durable-state rules.
 - Generation settings are developer configuration and are summarized in Game Master call debug metadata.
 - Persistent story generation now uses `outputContract: "plain_prose"` and requests player-facing narration only. The backend wraps that prose as a parsed response with an empty `npcUpdates` array.
-- Structured NPC mutation is not removed; it is deferred to a separate extractor step so story prose and state-diff JSON can use different prompts, settings, or models.
-- Persistent prompt priority is explicit: `currentInput` comes first; `npcCards` and `world` are canonical current scene truth; `recentStory` is lower-priority continuity and may contain stale prose.
-- If `recentStory` conflicts with `npcCards` or `world`, the Game Master should follow the canonical card/world context.
+- Structured mutation lives in a separate extractor step so story prose and state-diff JSON can use different prompts, settings, or models.
+- Persistent prompt priority is explicit: `currentInput` comes first; `locationCard`, `knownLocations`, `npcCards`, and `world` are canonical current scene truth; `recentStory` is lower-priority continuity and may contain stale prose.
+- If `recentStory` conflicts with `locationCard`, `knownLocations`, `npcCards`, or `world`, the Game Master should follow the canonical card/world context.
 - Required scene beats should stay narrow until playtesting proves broader automation is needed. They currently belong to the persistent mode path, not transcript mode.
 - Trivial physical actions such as `I jump.` derive a `trivial_player_action` scene beat that avoids forcing NPC speech; passing reactions stay in narration/debug instead.
 

@@ -20,7 +20,7 @@ Longer term, Lorecraft should feel like a TTRPG-style Game Master rather than pu
 
 - Make current-scene NPC objects readable Game Master context again.
 - Ground NPC-focused narration in authored NPC descriptions and attributes.
-- Prevent Game Master output from mutating NPC fields or facts in this change.
+- Prevent player-facing story-generation output from mutating NPC fields or facts in this historical read-only phase.
 - Add a debug-panel `NPCs` tab where Taylor can inspect NPC values and apply temporary test overrides.
 - Ensure debug overrides are non-durable and disappear on application server restart.
 
@@ -65,20 +65,20 @@ The system SHALL include current-scene NPC profiles in persistent Game Master re
 - THEN NPC profile data is represented as structured context owned by Convex state and debug overrides
 - AND recent feed transcript remains separate supporting history.
 
-##### R2: Read-Only NPC Mutation Boundary
+##### R2: Read-Only Story-Generation Mutation Boundary
 
-The system SHALL prevent Game Master output from mutating NPC state in this change.
+The system SHALL prevent the player-facing story-generation output from mutating NPC state in this historical read-only phase. Later extractor work may propose bounded mutations through a separate validated pass.
 
-###### Scenario R2-S1: Game Master returns an NPC update
+###### Scenario R2-S1: Story generation includes NPC update-like text
 
-- WHEN the Game Master response includes a proposed NPC update
-- THEN the backend does not persist the NPC update
-- AND no NPC fact state diff or LLM-authored NPC state event is recorded for that update.
+- WHEN the player-facing story-generation response includes prose that resembles an NPC update
+- THEN the backend does not parse that prose as a durable NPC mutation
+- AND any durable NPC fact change must come from a separate validated extractor pass.
 
 ###### Scenario R2-S2: Existing NPC values remain unchanged after narration
 
 - WHEN a successful persistent Game Master turn narrates an NPC-focused interaction
-- THEN persisted actor rows and actor-scoped facts remain unchanged unless a non-Game Master manual/debug path changes them.
+- THEN persisted actor rows and actor-scoped facts remain unchanged unless a non-story-generation path changes them, such as debug editing or a later bounded extractor pass.
 
 ##### R3: Debug NPC Inspection And Overrides
 
@@ -103,15 +103,15 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting NPC values and 
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 
 ## Epic File Rules
 

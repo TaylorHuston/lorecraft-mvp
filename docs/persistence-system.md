@@ -29,13 +29,13 @@ Convex stores the current world. If the database says the shutters are closed, t
 
 ### The LLM Reads, The Backend Decides
 
-Game Master output is untrusted model output. The current story-generation step returns player-facing prose, and the backend wraps that prose into the existing turn result shape with no state updates.
+Game Master output is untrusted model output. The story-generation step returns player-facing prose, and the backend wraps that prose into the existing turn result shape with no state updates from the prose itself.
 
-For the current MVP, NPC mutation is disabled. The Game Master receives current-scene NPC profiles rendered as card-like read-only context and is asked to write narration only.
+Persistent mode gives the Game Master current Location Cards, known locations, and current-scene NPC Cards as canonical read context. The model can write story prose from that context, but prose is not accepted as state by itself.
 
-Structured state mutation is expected to return as a separate extractor step rather than being mixed into the creative writing response. That future extractor can read the player input, narration, and relevant cards, then propose bounded `npcUpdates` for backend validation.
+Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the player input, completed narration, current Location Card, Known Locations, NPC Cards, and recent story, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 
-The Game Master may not directly mutate NPC facts, rooms, exits, actor locations, inventory, combat state, HP, object state, or arbitrary world facts.
+The Game Master may not directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations can change only through the bounded extractor and Convex validation.
 
 ### Recent Context Is Not Durable Truth
 
@@ -87,15 +87,16 @@ Current synchronous flow:
 3. The route loads bounded Game Master context from Convex.
 4. Convex creates a pending turn with the next world-scoped sequence number.
 5. Convex records the player input command and links it to the turn.
-6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, read-only NPC Cards, bounded recent story, current input, and output guidance.
+6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded recent story, current input, and output guidance.
 7. The provider returns player-facing story prose.
 8. The backend parses the prose into a normalized turn result with `narration` and an empty `npcUpdates` array.
 9. Convex records the Game Master call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
 10. On success, Convex stores the narration and marks the turn `succeeded`.
-11. Convex does not run structured NPC mutation extraction in this read-only NPC context test.
-12. Convex does not create LLM-authored NPC state-change events or state diffs.
-13. On provider or output failure after the turn exists, Convex keeps the command and Game Master call, marks the turn `failed`, and does not store fake narration or state changes.
-14. The UI updates from Convex state.
+11. Persistent mode runs a separate JSON state extraction request after successful narration.
+12. The backend validates proposed NPC updates and actor moves. Accepted NPC updates can change `mood`, `status`, and `memory`; accepted actor moves can move the player or current-scene NPCs to existing locations.
+13. Convex records accepted mutations as canonical facts or actor `roomId` changes plus turn-scoped state diffs. Ignored proposals remain debug evidence.
+14. On provider or output failure after the turn exists, Convex keeps the command and Game Master call, marks the turn `failed`, and does not store fake narration or state changes.
+15. The UI updates from Convex state.
 
 The important bit is that the provider does not own continuity. The next turn starts from Convex again.
 
@@ -109,11 +110,11 @@ Lorecraft currently has two Game Master modes. The application server selects th
 
 ### Persistent mode
 
-Persistent mode is the default. It now uses a plain-prose Game Master contract for the creative story step. The backend stores the returned prose as narration and records no accepted or ignored NPC updates.
+Persistent mode is the default. It uses a plain-prose Game Master contract for the creative story step. The backend stores the returned prose as narration, then runs a separate bounded state extraction step.
 
-Use this mode to test Lorecraft's state-first thesis without reintroducing premature mutation logic: the transcript and debug records move forward, while canonical NPC profile data remains stable unless changed by seed data or explicit debug tools.
+Use this mode to test Lorecraft's state-first thesis: the transcript and debug records move forward, canonical NPC profile data can mutate only through accepted extractor updates, and actor locations can move only to existing known locations after validation.
 
-This is intended to compose with the next mutation change rather than be undone by it: state mutation should be added as a second structured extraction pass after narration, not as prose embedded inside JSON.
+This keeps story writing and persistence decisions separate. A future smaller extractor model or rule layer can replace or supplement the current extraction pass without changing the player-facing prose contract.
 
 ## Demo World Lifetime
 
@@ -152,7 +153,7 @@ The provider request uses a canonical opening seed plus the actual player/Game M
 
 ## NPC State Strategy
 
-The current MVP keeps NPC state deliberately small. The seeded chapel NPCs, currently Mira and Brother Alden, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior, but the Game Master does not update them.
+The current MVP keeps NPC state deliberately small. The seeded demo NPCs, currently Mira, Brother Alden, Rowan, and Lena, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior. The Game Master does not mutate them directly in prose; a separate extractor may propose bounded `mood`, `status`, and `memory` updates after narration, and Convex validates those proposals before they become canonical.
 
 ### `description`
 
@@ -213,7 +214,7 @@ Good examples:
 - `angry at Taylor`
 - `relieved but guarded`
 
-`mood` should shape near-term behavior, but it should not become biography or a full relationship summary. In the current MVP it is readable prompt context, not Game Master-mutable state.
+`mood` should shape near-term behavior, but it should not become biography or a full relationship summary. In the current MVP it may be updated only by the post-narration extractor when the completed story clearly creates a durable mood change.
 
 ### `status`
 
@@ -233,7 +234,7 @@ Avoid storing momentary beats as status:
 - `looked at Taylor`
 - `was pushed`
 
-Those can stay in narration or recent feed unless they create an ongoing condition. In the current MVP, the Game Master should narrate those beats without updating the stored `status`.
+Those can stay in narration or recent feed unless they create an ongoing condition. In the current MVP, stored `status` may be updated only by the post-narration extractor when the completed story clearly creates a durable circumstance.
 
 ### `memory`
 
@@ -245,7 +246,7 @@ Example:
 Mira remembers Taylor asking about the storm, promising to check the shutters, and speaking gently after she warned him away from the graveyard.
 ```
 
-`memory` is not an audit log. It should not absorb occupation, spouse, faction, visible condition, every recent action, or stable biography. Older details can be merged, compressed, or dropped as newer interactions become more important once NPC memory mutation is intentionally reintroduced.
+`memory` is not an audit log. It should not absorb occupation, spouse, faction, visible condition, every recent action, or stable biography. The extractor may update it as a compact rolling summary of meaningful direct player interaction, merging older details as newer interactions become more important.
 
 ### `knowledge`
 
@@ -259,11 +260,13 @@ knowledge = "Mira knows the storm began after the chapel bell rang at midnight, 
 
 Read-only does not mean player-visible. The Game Master should not mechanically expose hidden fact keys or reveal private knowledge without an in-scene reason. These facts also remain non-mutable through Game Master output: if the model returns `knowledge`, `secret`, `occupation`, or relationship fields inside `npcUpdates`, the backend ignores them.
 
-### Debug NPC overrides
+### Debug NPC edits
 
-The debug panel includes an `NPCs` tab for temporary playtest overrides. These overrides can replace an NPC description or fact value in the next persistent-mode Game Master prompt.
+The debug panel includes an `NPCs` tab for rough playtest editing. These edits can replace an NPC name, description, or profile fact value in the next persistent-mode Game Master prompt.
 
-Debug overrides are process-local server memory. They are not Convex data, are not product state, and disappear when the application server restarts. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without committing seed-data changes or building a World Builder UI.
+Debug NPC edits are canonical Convex demo-world state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Clearing an editable NPC fact removes that manual canonical fact instead of preserving stale prompt context. Reset Session restores seeded NPCs and removes debug-created NPCs; Reset World reseeds the full demo world.
+
+Debug-created NPCs and locations are capped per demo world so ordinary debug use stays resettable within the current bounded deletion limits.
 
 ## Prompt Context Strategy
 
@@ -271,7 +274,7 @@ Persistent Game Master requests are still stateless, but the prompt is no longer
 
 - Game Master instructions and tone guidance, which are editable configuration.
 - Scene state and visible facts, which come from Convex world data.
-- Read-only NPC cards, which are rendered from current-scene actor descriptions, actor facts, and optional debug overrides.
+- Read-only NPC cards, which are rendered from current-scene actor descriptions and actor facts.
 - NPC profiles, which are the typed intermediate shape used to build those cards.
 - Conversation focus, which is a non-durable hint derived from the current target or recent player-addressed NPC for ambiguous follow-up dialogue.
 - Hidden NPC knowledge, which comes from current-scene `knowledge` facts.
@@ -283,7 +286,7 @@ Persistent Game Master requests are still stateless, but the prompt is no longer
 
 Persistent prompt priority is explicit: current turn, last action, and scene directive outrank the rest of the context; NPC cards, NPC profiles, and visible facts are canonical current scene truth; recent feed is lower-priority history that may include stale model prose. If recent feed conflicts with NPC cards, profiles, or visible facts, the Game Master should follow the canonical card/profile/fact context.
 
-The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech. Quoted questions to the sole present NPC are treated as direct NPC questions. Game Master-authored fact churn is disabled entirely for this read-only NPC context test.
+The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech. Quoted questions to the sole present NPC are treated as direct NPC questions. Game Master-authored fact churn is constrained to the extractor and currently limited to `mood`, `status`, and `memory`.
 
 Transcript Game Master requests are simpler. They separate only editable Game Master/tone guidance, the canonical opening seed, the bounded transcript, and the current player input. They intentionally omit current scene state, visible facts, hidden NPC knowledge, and required scene beats.
 
@@ -305,7 +308,14 @@ Debug records are intentionally separate from story state.
 
 `directorCalls` stores provider/model metadata, request summaries, raw or parsed output, accepted updates, ignored updates, and errors. Local JSONL logging can also be enabled for troubleshooting route stages and timing.
 
-These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world.
+In persistent mode, a successful turn can now create two provider/debug records:
+
+- `story_generation`: the player-facing plain-prose Game Master response.
+- `npc_state_extraction`: the post-narration JSON extraction pass that may propose bounded NPC `mood`, `status`, and `memory` changes plus actor moves to existing locations.
+
+The extractor is allowed to fail closed. If story narration succeeds but extraction fails or returns invalid JSON, the story turn remains succeeded, no fake state is written, and the extractor failure is inspectable through local logs and `directorCalls`.
+
+These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world. Accepted extractor updates become canonical only after Convex validates and writes actor-scoped facts or actor `roomId` changes plus turn-scoped state diffs.
 
 The debug panel also exposes recent turn summaries: sequence number, status, player input, related narration/event/diff counts, and Game Master call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
 
@@ -313,7 +323,9 @@ The debug panel also exposes recent turn summaries: sequence number, status, pla
 
 The primary MVP reset path is fresh seeding. The seed mutation deletes prior Stormbound Chapel demo worlds and dependent rows, then recreates the world graph from the current seed.
 
-The debug panel still has a rough reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, then restores seeded NPC baseline descriptions and facts. It is a convenience tool, not the preferred server-restart workflow.
+The debug panel also has a session reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, restores seeded NPC baseline descriptions/facts, restores actor locations, restores seeded location text, and removes debug-created NPCs and locations. It is a convenience tool for repeating the same demo-world playtest without recreating the whole world row.
+
+Full hidden-state/debug snapshot sections are local/debug-oriented. In production mode they are omitted unless the app has an explicit debug/auth design; the current local prototype enables them through `LORECRAFT_ENABLE_DEBUG_ROUTES=1` in a non-production process.
 
 Long term, reset is not the product model. The likely product model is independent story/play-session instances created from world templates, but that is intentionally deferred until the single-world persistence loop proves itself.
 

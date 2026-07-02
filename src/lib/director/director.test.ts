@@ -1,21 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  DELETE as deleteNpcOverrides,
-  GET as getNpcOverrides,
-  POST as postNpcOverride,
-} from "../../app/api/debug/npc-overrides/route";
+import { describe, expect, it } from "vitest";
 import { buildDirectorDebugLogRecord, writeDirectorDebugLog } from "./debug-log";
 import { readDirectorMode } from "./mode";
 import { validateNarrativeInput } from "./input";
 import {
-  clearNpcDebugOverride,
-  clearNpcDebugOverrides,
-  getNpcDebugOverrides,
-  setNpcDebugOverride,
-} from "./npc-debug-overrides";
-import { applyNpcDebugOverrides } from "./npc-profiles";
-import {
   buildDirectorRequest,
+  buildNpcStateExtractionRequest,
   buildTranscriptDirectorRequest,
   deriveRequiredSceneBeat,
 } from "./prompt";
@@ -23,7 +12,10 @@ import { rawDirectorRequestForStorage, shouldStoreRawDirectorRequest } from "./r
 import {
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
+  parseNpcStateExtractionOutput,
   parsePlainProseDirectorOutput,
+  parseStateExtractionOutput,
+  validateActorMoves,
   validateNpcUpdates,
 } from "./output";
 import { readLlmConfig, requestOpenAICompatibleChat } from "./provider";
@@ -144,6 +136,39 @@ const context: DirectorContext = {
     mira,
   ],
   objects: [{ key: "lantern", name: "Lantern", description: "A cracked lantern." }],
+  locationCard: {
+    id: "room-id",
+    key: "chapel",
+    name: "Chapel",
+    description: "Rain taps against warped shutters.",
+    facts: [{ key: "sanctity", value: "fading", source: "seed" }],
+    visibleObjects: [{ key: "lantern", name: "Lantern", description: "A cracked lantern." }],
+    visibleExits: [{ label: "north", toLocationKey: "graveyard", toLocationName: "Graveyard" }],
+    presentActors: [
+      { key: "taylor", name: "Taylor", role: "player" },
+      { key: "mira", name: "Mira", role: "npc" },
+    ],
+  },
+  knownLocations: [
+    {
+      id: "room-id",
+      key: "chapel",
+      name: "Chapel",
+      description: "Rain taps against warped shutters.",
+    },
+    {
+      id: "vestry-id",
+      key: "vestry",
+      name: "Vestry",
+      description: "The vestry smells of old paper and damp wool.",
+    },
+    {
+      id: "graveyard-id",
+      key: "graveyard",
+      name: "Graveyard",
+      description: "Tilted stones vanish into the rain.",
+    },
+  ],
   recentFeed: Array.from({ length: 15 }, (_, index) => ({
     id: `entry-${index}`,
     kind: index % 2 === 0 ? ("player" as const) : ("director" as const),
@@ -224,18 +249,6 @@ const transcriptWithInvalidTurn: TranscriptDirectorContext = {
   ],
 };
 
-function jsonRequest(method: string, url: string, body: unknown) {
-  return new Request(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-async function expectJson(response: Response, expected: unknown) {
-  expect(await response.json()).toEqual(expected);
-}
-
 describe("Director request construction", () => {
   it("builds a bounded plain-prose story request from compact prompt sections", () => {
     const request = buildDirectorRequest(context, "I ask Mira about the storm.", {
@@ -257,6 +270,7 @@ describe("Director request construction", () => {
     expect(request.messages).toHaveLength(2);
     expect(request.requestSummary).toMatchObject({
       directorMode: "persistent",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       worldName: "Stormbound Chapel",
       roomKey: "chapel",
@@ -264,14 +278,16 @@ describe("Director request construction", () => {
       actorKeys: ["taylor", "mira"],
       npcFactKeys: ["mood", "status", "memory"],
       npcProfileKeys: ["mira"],
+      locationKeys: ["chapel", "vestry", "graveyard"],
+      movementMode: "bounded_existing_locations",
       readOnlyKnowledgeKeys: ["mira.knowledge"],
       requiredSceneBeat: {
         kind: "direct_npc_question",
         targetActorKey: "mira",
         expectsNpcResponse: true,
-        allowsNpcUpdates: false,
+        allowsNpcUpdates: true,
       },
-      npcMutationMode: "read_only",
+      npcMutationMode: "bounded_updates",
       generationSettings: {
         temperature: 0.4,
         maxTokens: 700,
@@ -283,6 +299,8 @@ describe("Director request construction", () => {
     expect(request.requestSummary.promptComponentKeys).toEqual([
       "aiInstructions",
       "world",
+      "locationCard",
+      "knownLocations",
       "npcCards",
       "recentStory",
       "currentInput",
@@ -290,6 +308,12 @@ describe("Director request construction", () => {
     ]);
     expect(userMessage?.content).toContain("AI Instructions:");
     expect(userMessage?.content).toContain("World:");
+    expect(userMessage?.content).toContain("Location Card:");
+    expect(userMessage?.content).toContain("LOCATION CARD: Chapel (chapel)");
+    expect(userMessage?.content).toContain("Facts: sanctity=fading (seed)");
+    expect(userMessage?.content).toContain("Present actors: Taylor (taylor, player); Mira (mira, npc)");
+    expect(userMessage?.content).toContain("Known Locations:");
+    expect(userMessage?.content).toContain("- Vestry (vestry): The vestry smells of old paper and damp wool.");
     expect(userMessage?.content).toContain("NPC Cards:");
     expect(userMessage?.content).toContain("Recent Story:");
     expect(userMessage?.content).toContain("Current Input:");
@@ -320,7 +344,9 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("npcProfiles");
     expect(userMessage?.content).not.toContain("hiddenNpcKnowledge");
     expect(userMessage?.content).not.toContain("mutableFacts");
+    expect(userMessage?.content).not.toContain("npcUpdates");
     expect(userMessage?.content).not.toContain("Return JSON");
+    expect(userMessage?.content).not.toContain("read-only for this turn");
     expect(userMessage?.content.length).toBeLessThan(5000);
     expect(systemMessage?.content).toContain("Continue the scene in present tense");
     expect(systemMessage?.content).toContain("NPC cards are canonical");
@@ -328,22 +354,101 @@ describe("Director request construction", () => {
     expect(systemMessage?.content).not.toContain("strict JSON");
   });
 
-  it("applies debug NPC overrides to persistent prompt context without changing transcript mode", () => {
-    const overriddenContext = applyNpcDebugOverrides(context, {
-      mira: {
-        description: "A drenched archivist with silver spectacles and a storm-dark cloak.",
-        facts: {
-          mood: "deeply suspicious",
-          occupation: "chapel archivist",
-        },
+  it("builds a JSON-only NPC state extraction request from the completed story beat", () => {
+    const storyRequest = buildDirectorRequest(context, "I ask Mira about the storm.", {
+      generationSettings: {
+        temperature: 0.4,
+        maxTokens: 100,
+        responseFormat: "text",
       },
     });
-    const request = buildDirectorRequest(overriddenContext, "I look at Mira.");
+    const request = buildNpcStateExtractionRequest(
+      context,
+      "I ask Mira about the storm.",
+      "Mira's hand tightens around the pew. \"The bell rang at midnight,\" she says.",
+      {
+        generationSettings: {
+          temperature: 0.2,
+          maxTokens: 100,
+          responseFormat: "text",
+        },
+        requiredSceneBeat: {
+          ...storyRequest.requestSummary.requiredSceneBeat,
+          instruction: "",
+        },
+      },
+    );
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary).toMatchObject({
+      directorMode: "persistent",
+      callRole: "npc_state_extraction",
+      outputContract: "json_npc_updates",
+      worldName: "Stormbound Chapel",
+      roomKey: "chapel",
+      recentFeedCount: 12,
+      actorKeys: ["taylor", "mira"],
+      npcFactKeys: ["mood", "status", "memory"],
+      npcProfileKeys: ["mira"],
+      readOnlyKnowledgeKeys: ["mira.knowledge"],
+      requiredSceneBeat: {
+        kind: "direct_npc_question",
+        targetActorKey: "mira",
+        expectsNpcResponse: true,
+        allowsNpcUpdates: true,
+      },
+      npcMutationMode: "bounded_updates",
+      generationSettings: {
+        temperature: 0.2,
+        maxTokens: 100,
+        responseFormat: "json_object",
+      },
+    });
+    expect(request.requestSummary.promptComponentKeys).toEqual([
+      "extractionInstructions",
+      "locationCard",
+      "knownLocations",
+      "npcCards",
+      "recentStory",
+      "currentInput",
+      "gameMasterNarration",
+      "output",
+    ]);
+    expect(systemMessage?.content).toContain("Return only a JSON object");
+    expect(userMessage?.content).toContain("Allowed update fields: mood, status, memory");
+    expect(userMessage?.content).toContain("Actor movement is separate from NPC facts");
+    expect(userMessage?.content).toContain("Known Locations:");
+    expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
+    expect(userMessage?.content).toContain("> I ask Mira about the storm.");
+    expect(userMessage?.content).toContain("Mira's hand tightens around the pew");
+    expect(userMessage?.content).toContain('{"npcUpdates":[],"actorMoves":[]}');
+    expect(userMessage?.content).toContain("Do not update description, background, persona");
+  });
+
+  it("uses canonical NPC actor and fact values in persistent prompt context without changing transcript mode", () => {
+    const canonicalContext: DirectorContext = {
+      ...context,
+      actors: context.actors.map((actor) =>
+        actor.key === "mira"
+          ? {
+              ...actor,
+              description: "A drenched archivist with silver spectacles and a storm-dark cloak.",
+              facts: [
+                ...actor.facts.map((fact) =>
+                  fact.key === "mood" ? { ...fact, value: "deeply suspicious" } : fact,
+                ),
+                { key: "occupation", value: "chapel archivist", source: "manual" },
+              ],
+            }
+          : actor,
+      ),
+    };
+    const request = buildDirectorRequest(canonicalContext, "I look at Mira.");
     const userMessage = request.messages.find((message) => message.role === "user");
 
     expect(request.requestSummary).toMatchObject({
       npcProfileKeys: ["mira"],
-      npcOverrideKeys: ["mira.description", "mira.mood", "mira.occupation"],
     });
     expect(userMessage?.content).toContain(
       "Description: A drenched archivist with silver spectacles and a storm-dark cloak.",
@@ -354,7 +459,12 @@ describe("Director request construction", () => {
     const transcriptRequest = buildTranscriptDirectorRequest(transcriptContext, "I look at Mira.");
     const transcriptUserMessage = transcriptRequest.messages.find((message) => message.role === "user");
     expect(transcriptUserMessage?.content).not.toContain("npcProfiles");
+    expect(transcriptUserMessage?.content).not.toContain("Location Card");
+    expect(transcriptUserMessage?.content).not.toContain("Known Locations");
+    expect(transcriptUserMessage?.content).not.toContain("actorMoves");
     expect(transcriptRequest.requestSummary.npcProfileKeys).toBeUndefined();
+    expect(transcriptRequest.requestSummary.locationKeys).toBeUndefined();
+    expect(transcriptRequest.requestSummary.movementMode).toBeUndefined();
   });
 
   it("includes multiple current-scene NPCs as readable cards and targets the addressed NPC", () => {
@@ -382,19 +492,20 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("hiddenNpcKnowledge");
   });
 
-  it("adds debug-only NPCs to persistent prompt context", () => {
+  it("adds canonical debug-created NPCs to persistent prompt context", () => {
+    const ilyra: DirectorActor = {
+      key: "debug-npc-1",
+      name: "Ilyra",
+      role: "npc",
+      description: "A temporary scholar with ink-stained sleeves.",
+      facts: [
+        { key: "persona", value: "Curious and direct.", source: "manual" },
+        { key: "voice", value: "Precise, clipped, and impatient.", source: "manual" },
+        { key: "status", value: "standing beside the chapel pews", source: "manual" },
+      ],
+    };
     const request = buildDirectorRequest(
-      applyNpcDebugOverrides(context, {
-        "debug-npc-1": {
-          name: "Ilyra",
-          description: "A temporary scholar with ink-stained sleeves.",
-          facts: {
-            persona: "Curious and direct.",
-            voice: "Precise, clipped, and impatient.",
-            status: "standing beside the chapel pews",
-          },
-        },
-      }),
+      { ...context, actors: [...context.actors, ilyra] },
       "I ask Ilyra what she noticed.",
     );
     const userMessage = request.messages.find((message) => message.role === "user");
@@ -402,13 +513,6 @@ describe("Director request construction", () => {
     expect(request.requestSummary).toMatchObject({
       actorKeys: ["taylor", "mira", "debug-npc-1"],
       npcProfileKeys: ["mira", "debug-npc-1"],
-      npcOverrideKeys: expect.arrayContaining([
-        "debug-npc-1.name",
-        "debug-npc-1.description",
-        "debug-npc-1.persona",
-        "debug-npc-1.status",
-        "debug-npc-1.voice",
-      ]),
     });
     expect(userMessage?.content).toContain("NPC CARD: Ilyra (debug-npc-1)");
     expect(userMessage?.content).toContain(
@@ -430,17 +534,22 @@ describe("Director request construction", () => {
 
     expect(request.requestSummary).toMatchObject({
       directorMode: "transcript",
+      callRole: "story_generation",
       outputContract: "plain_prose",
       roomKey: "transcript",
       actorKeys: [],
       npcFactKeys: [],
       readOnlyKnowledgeKeys: [],
+      requiredSceneBeat: {
+        allowsNpcUpdates: false,
+      },
       recentFeedCount: 2,
       generationSettings: {
         temperature: 0.7,
         responseFormat: "text",
       },
     });
+    expect(request.requestSummary.npcMutationMode).toBeUndefined();
     expect(systemMessage?.content).toContain("Do not return JSON");
     expect(systemMessage?.content).toContain("Recent story is the live continuity");
     expect(systemMessage?.content).toContain("Resolve the current player input first");
@@ -547,18 +656,22 @@ describe("Director request construction", () => {
   });
 
   it("uses recent addressed NPC focus for ambiguous follow-up dialogue", () => {
-    const garthContext = {
-      ...applyNpcDebugOverrides(context, {
-        "debug-npc-1": {
+    const garthContext: DirectorContext = {
+      ...context,
+      actors: [
+        ...context.actors,
+        {
+          key: "debug-npc-1",
           name: "Garth",
+          role: "npc",
           description: "A burly bartender with a limp and curled mustache.",
-          facts: {
-            persona: "Friendly and boisterous.",
-            voice: "Speaks with dramatic flair.",
-            status: "working behind the bar",
-          },
+          facts: [
+            { key: "persona", value: "Friendly and boisterous.", source: "manual" },
+            { key: "voice", value: "Speaks with dramatic flair.", source: "manual" },
+            { key: "status", value: "working behind the bar", source: "manual" },
+          ],
         },
-      }),
+      ],
       recentFeed: [
         {
           id: "garth-greeting",
@@ -586,193 +699,6 @@ describe("Director request construction", () => {
       targetActorKey: "debug-npc-1",
       expectsNpcResponse: false,
     });
-  });
-});
-
-describe("NPC debug override plumbing", () => {
-  it("stores normalized NPC debug overrides in process memory", () => {
-    const worldId = "test-world-store";
-    clearNpcDebugOverrides(worldId);
-
-    const stored = setNpcDebugOverride(worldId, " mira ", {
-      name: "  Mira Brightfall  ",
-      description: "  She has bright red hair.  ",
-      facts: {
-        " mood ": "  amused  ",
-        empty: "   ",
-      },
-    });
-
-    expect(stored).toEqual({
-      mira: {
-        name: "Mira Brightfall",
-        description: "She has bright red hair.",
-        facts: {
-          mood: "amused",
-        },
-      },
-    });
-    expect(getNpcDebugOverrides(worldId)).toEqual(stored);
-
-    expect(clearNpcDebugOverride(worldId, "mira")).toEqual({});
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("bounds NPC debug override storage in process memory", () => {
-    for (let index = 0; index <= 20; index += 1) {
-      setNpcDebugOverride(`test-world-bound-${index}`, "mira", {
-        description: `description ${index}`,
-      });
-    }
-
-    expect(getNpcDebugOverrides("test-world-bound-0")).toEqual({});
-    expect(getNpcDebugOverrides("test-world-bound-20")).toEqual({
-      mira: { description: "description 20" },
-    });
-
-    for (let index = 0; index <= 20; index += 1) {
-      clearNpcDebugOverrides(`test-world-bound-${index}`);
-    }
-
-    const worldId = "test-world-actor-bound";
-    clearNpcDebugOverrides(worldId);
-    for (let index = 0; index <= 50; index += 1) {
-      setNpcDebugOverride(worldId, `actor-${index}`, {
-        description: `description ${index}`,
-      });
-    }
-
-    const boundedOverrides = getNpcDebugOverrides(worldId);
-    expect(Object.keys(boundedOverrides)).toHaveLength(50);
-    expect(boundedOverrides["actor-0"]).toBeUndefined();
-    expect(boundedOverrides["actor-50"]).toEqual({ description: "description 50" });
-    clearNpcDebugOverrides(worldId);
-  });
-
-  it("exposes NPC debug overrides through GET, POST, and DELETE route handlers", async () => {
-    const worldId = "test-world-route";
-    clearNpcDebugOverrides(worldId);
-
-    const postResponse = await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      }),
-    );
-    expect(postResponse.status).toBe(200);
-    await expectJson(postResponse, {
-      ok: true,
-      overrides: {
-        mira: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      },
-    });
-
-    const getResponse = await getNpcOverrides(
-      new Request(`http://localhost/api/debug/npc-overrides?worldId=${worldId}`),
-    );
-    expect(getResponse.status).toBe(200);
-    await expectJson(getResponse, {
-      ok: true,
-      overrides: {
-        mira: {
-          description: "She has bright red hair.",
-          facts: {
-            mood: "curious",
-          },
-        },
-      },
-    });
-
-    const deleteResponse = await deleteNpcOverrides(
-      new Request(`http://localhost/api/debug/npc-overrides?worldId=${worldId}&actorKey=mira`, {
-        method: "DELETE",
-      }),
-    );
-    expect(deleteResponse.status).toBe(200);
-    await expectJson(deleteResponse, { ok: true, overrides: {} });
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("rejects malformed NPC debug override requests before mutating the store", async () => {
-    const worldId = "test-world-invalid-route";
-    clearNpcDebugOverrides(worldId);
-
-    const response = await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          facts: "mood=curious",
-        },
-      }),
-    );
-
-    expect(response.status).toBe(400);
-    await expectJson(response, { ok: false, error: "override.facts must be an object when provided." });
-    expect(getNpcDebugOverrides(worldId)).toEqual({});
-  });
-
-  it("disables NPC debug override routes in production unless explicitly enabled", async () => {
-    const worldId = "test-world-production-route";
-    clearNpcDebugOverrides(worldId);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("LORECRAFT_ENABLE_DEBUG_ROUTES", "");
-
-    try {
-      const response = await postNpcOverride(
-        jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-          worldId,
-          actorKey: "mira",
-          override: {
-            description: "She has bright red hair.",
-          },
-        }),
-      );
-
-      expect(response.status).toBe(404);
-      await expectJson(response, { ok: false, error: "Debug NPC overrides are disabled." });
-      expect(getNpcDebugOverrides(worldId)).toEqual({});
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it("feeds route-saved NPC debug overrides into the next persistent Director request", async () => {
-    const worldId = "test-world-route-to-prompt";
-    clearNpcDebugOverrides(worldId);
-
-    await postNpcOverride(
-      jsonRequest("POST", "http://localhost/api/debug/npc-overrides", {
-        worldId,
-        actorKey: "mira",
-        override: {
-          description: "She has bright red hair.",
-        },
-      }),
-    );
-
-    const request = buildDirectorRequest(
-      applyNpcDebugOverrides(context, getNpcDebugOverrides(worldId)),
-      "What color hair do you have, Mira?",
-    );
-    const userMessage = request.messages.find((message) => message.role === "user");
-
-    expect(request.requestSummary.npcOverrideKeys).toEqual(["mira.description"]);
-    expect(userMessage?.content).toContain("Description: She has bright red hair.");
-    expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
-    expect(userMessage?.content).not.toContain("npcProfiles");
-    expect(userMessage?.content).not.toContain("currentSceneActors");
   });
 });
 
@@ -851,11 +777,212 @@ describe("Director output parsing", () => {
     });
   });
 
+  it("trims an incomplete trailing prose fragment without changing the raw response", () => {
+    const result = parsePlainProseDirectorOutput(
+      "Mira runs toward the aisle. Brother Alden drops beside the altar. She scram",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        narration: "Mira runs toward the aisle. Brother Alden drops beside the altar.",
+        npcUpdates: [],
+      },
+    });
+  });
+
+  it("accepts NPC state extraction JSON without requiring narration", () => {
+    const result = parseNpcStateExtractionOutput(
+      JSON.stringify({
+        npcUpdates: [
+          {
+            actorKey: "mira",
+            reason: "Mira answered Taylor's question with new trust.",
+            changes: {
+              mood: "guarded but willing to answer",
+              memory: "Mira told Taylor the chapel bell rang at midnight.",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      npcUpdates: [
+        {
+          actorKey: "mira",
+          reason: "Mira answered Taylor's question with new trust.",
+          changes: {
+            mood: "guarded but willing to answer",
+            memory: "Mira told Taylor the chapel bell rang at midnight.",
+          },
+        },
+      ],
+    });
+  });
+
+  it("accepts an empty NPC state extraction result", () => {
+    expect(parseNpcStateExtractionOutput('{"npcUpdates":[]}')).toEqual({
+      ok: true,
+      npcUpdates: [],
+    });
+  });
+
+  it("accepts state extraction JSON with NPC updates and actor moves", () => {
+    expect(
+      parseStateExtractionOutput(
+        JSON.stringify({
+          npcUpdates: [],
+          actorMoves: [
+            {
+              actorKey: "taylor",
+              toLocationKey: "vestry",
+              reason: "Taylor entered the vestry in the narration.",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      npcUpdates: [],
+      actorMoves: [
+        {
+          actorKey: "taylor",
+          toLocationKey: "vestry",
+          reason: "Taylor entered the vestry in the narration.",
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed NPC state extraction JSON", () => {
+    expect(parseNpcStateExtractionOutput("Mira seems different.")).toEqual({
+      ok: false,
+      error: "NPC state extractor response was not valid JSON.",
+    });
+  });
+
   it("rejects empty plain prose without inventing narration", () => {
     expect(parsePlainProseDirectorOutput("   ")).toEqual({
       ok: false,
       error: "Game Master returned an empty response.",
     });
+  });
+});
+
+describe("Actor movement validation", () => {
+  it("accepts player and present-NPC moves to existing locations after clear travel", () => {
+    const validation = validateActorMoves(
+      [
+        {
+          actorKey: "taylor",
+          toLocationKey: "vestry",
+          reason: "Taylor enters the vestry.",
+        },
+        {
+          actorKey: "mira",
+          toLocationKey: "vestry",
+          reason: "Mira follows Taylor into the vestry.",
+        },
+      ],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry and ask Mira to follow.",
+      "You enter the vestry as Mira follows close behind you.",
+    );
+
+    expect(validation.acceptedMoves).toEqual([
+      {
+        actorKey: "taylor",
+        actorName: "Taylor",
+        toLocationKey: "vestry",
+        toLocationName: "Vestry",
+        reason: "Taylor enters the vestry.",
+      },
+      {
+        actorKey: "mira",
+        actorName: "Mira",
+        toLocationKey: "vestry",
+        toLocationName: "Vestry",
+        reason: "Mira follows Taylor into the vestry.",
+      },
+    ]);
+    expect(validation.ignoredMoves).toEqual([]);
+  });
+
+  it("rejects unknown destinations, offscreen actors, non-travel input, and unconfirmed arrival", () => {
+    const noTarget = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "bell-tower", reason: "Taylor climbs the bell tower." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the bell tower.",
+      "The chapel offers no obvious route upward.",
+    );
+    const offscreen = validateActorMoves(
+      [{ actorKey: "osric", toLocationKey: "vestry", reason: "Osric enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You enter the vestry.",
+    );
+    const noTravel = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I look at the vestry door.",
+      "The vestry door is damp and swollen in its frame.",
+    );
+    const noArrival = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "The chapel floor creaks under your first step.",
+    );
+    const destinationMentionWithoutArrival = validateActorMoves(
+      [{ actorKey: "taylor", toLocationKey: "vestry", reason: "Taylor enters the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You remain in the chapel, looking toward the vestry door.",
+    );
+
+    expect(noTarget.acceptedMoves).toEqual([]);
+    expect(noTarget.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "bell-tower", reason: "Actor move destination is unknown." },
+    ]);
+    expect(offscreen.ignoredMoves).toMatchObject([
+      { actorKey: "osric", toLocationKey: "vestry", reason: "Actor move actor is unknown or not in the current scene." },
+    ]);
+    expect(noTravel.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Player input did not clearly attempt travel to this location." },
+    ]);
+    expect(noArrival.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Game Master narration did not confirm arrival at this location." },
+    ]);
+    expect(destinationMentionWithoutArrival.ignoredMoves).toMatchObject([
+      { actorKey: "taylor", toLocationKey: "vestry", reason: "Game Master narration did not confirm arrival at this location." },
+    ]);
+  });
+
+  it("rejects NPC movement when the narration only confirms player travel", () => {
+    const validation = validateActorMoves(
+      [{ actorKey: "mira", toLocationKey: "vestry", reason: "Mira follows Taylor into the vestry." }],
+      context.actors,
+      context.knownLocations ?? [],
+      "I go to the vestry.",
+      "You enter the vestry and the damp smell of old hymnals closes around you.",
+    );
+
+    expect(validation.acceptedMoves).toEqual([]);
+    expect(validation.ignoredMoves).toMatchObject([
+      {
+        actorKey: "mira",
+        toLocationKey: "vestry",
+        reason: "Game Master narration did not explicitly confirm this NPC moved.",
+      },
+    ]);
   });
 });
 

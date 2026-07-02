@@ -110,15 +110,15 @@ The system SHALL keep empty, pending, and error states understandable without re
 
 ##### Implemented By
 
-Not implemented yet.
+Closed implementation summary is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verified By
 
-Not verified yet.
+Closed verification evidence is maintained in this change's tasks.md and the LC-001 Epic.
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- Historical placeholder reconciled at closeout; no current implementation-pending claim remains.
 - Needs browser verification with a long feed and debug panel content because the risk is visual layout behavior, not backend correctness.
 
 ## Epic File Rules
