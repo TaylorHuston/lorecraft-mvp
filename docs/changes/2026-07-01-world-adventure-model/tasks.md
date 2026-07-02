@@ -83,12 +83,12 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-01 | Planning | main | `docs/changes/2026-07-01-world-adventure-model/` | Proposal, design, and task ledger drafted. | uncommitted |
-| 2026-07-01 | Discovery | main + Kepler explorer; `convex-migration-helper`, Convex generated guidelines, Next route-handler docs | branch policy, Convex schema/functions, Next route, UI, scripts, E2E, Epic template | Selected `change/world-adventure-model`; decided to widen schema for local MVP compatibility while moving implemented runtime reads/writes to `adventureId`; delegated read-only identity-surface audit. | uncommitted |
-| 2026-07-01 | Epic artifact and schema enabling | main | `docs/epics/lc-002-world-adventure-model/epic.md`, `convex/schema.ts` | Created LC-002 draft Epic and added `worldVersions`, `adventures`, plus optional `adventureId` fields/indexes on runtime tables. | uncommitted |
-| 2026-07-01 | Adventure seed/copy/reset runtime | main | `convex/world.ts`, `convex/schema.ts` | Added Stormbound Chapel baseline WorldVersion creation, default Adventure creation, Adventure-owned runtime copy, WorldVersion isolation helpers, and selected-Adventure reset to source version. | uncommitted |
-| 2026-07-01 | Adventure-scoped Game Master flow | main | `src/app/api/director/turn/route.ts`, `src/lib/director/*`, `src/app/world-client.tsx` | Route, prompt/log/error contracts, debug UI, reset/debug edits, scripts, and snapshots now use `adventureId` and expose source WorldVersion context. | uncommitted |
-| 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | uncommitted |
+| 2026-07-01 | Planning | main | `docs/changes/2026-07-01-world-adventure-model/` | Proposal, design, and task ledger drafted. | c8add34 |
+| 2026-07-01 | Discovery | main + Kepler explorer; `convex-migration-helper`, Convex generated guidelines, Next route-handler docs | branch policy, Convex schema/functions, Next route, UI, scripts, E2E, Epic template | Selected `change/world-adventure-model`; decided to widen schema for local MVP compatibility while moving implemented runtime reads/writes to `adventureId`; delegated read-only identity-surface audit. | c8add34 |
+| 2026-07-01 | Epic artifact and schema enabling | main | `docs/epics/lc-002-world-adventure-model/epic.md`, `convex/schema.ts` | Created LC-002 draft Epic and added `worldVersions`, `adventures`, plus optional `adventureId` fields/indexes on runtime tables. | c8add34 |
+| 2026-07-01 | Adventure seed/copy/reset runtime | main | `convex/world.ts`, `convex/schema.ts` | Added Stormbound Chapel baseline WorldVersion creation, default Adventure creation, Adventure-owned runtime copy, WorldVersion isolation helpers, and selected-Adventure reset to source version. | c8add34 |
+| 2026-07-01 | Adventure-scoped Game Master flow | main | `src/app/api/director/turn/route.ts`, `src/lib/director/*`, `src/app/world-client.tsx` | Route, prompt/log/error contracts, debug UI, reset/debug edits, scripts, and snapshots now use `adventureId` and expose source WorldVersion context. | c8add34 |
+| 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | c8add34 |
 
 ## Verification Ledger
 
@@ -140,18 +140,18 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Closeout
 
-- Epic files updated:
-- Story labels/references and Requirement/Scenario IDs current:
-- Implemented By maps current:
-- Scenario-mapped Verified By maps current:
-- Superseded earlier Epic truth reconciled:
-- ADR status:
-- Changelog current:
-- `sdd-review` verdict:
-- Review record:
-- `review.md` findings resolved:
-- Planning updates resolved:
-- Manual UI confirmation status:
-- PR / merge state:
-- Deferred scope accepted:
-- Change moved to `docs/changes/closed/`:
+- Epic files updated: LC-002 created and LC-001 deferred-scope/runtime-identity wording reconciled.
+- Story labels/references and Requirement/Scenario IDs current: yes.
+- Implemented By maps current: yes, in LC-002.
+- Scenario-mapped Verified By maps current: yes, in LC-002.
+- Superseded earlier Epic truth reconciled: LC-001 no longer treats independent story/play-session instances as purely future scope.
+- ADR status: accepted; implementation follows `docs/adrs/2026-07-01-world-adventure-frozen-copies.md`.
+- Changelog current: yes, `Unreleased` notes Adventure instances and Adventure-scoped runtime/reset behavior.
+- `sdd-review` verdict: pending.
+- Review record: pending `/sdd-review`.
+- `review.md` findings resolved: not applicable until review runs.
+- Planning updates resolved: none.
+- Manual UI confirmation status: pending Taylor.
+- PR / merge state: implementation committed on `change/world-adventure-model`; no PR/merge yet.
+- Deferred scope accepted: Adventure picker, World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
+- Change moved to `docs/changes/closed/`: no; pending review and closeout authorization.
