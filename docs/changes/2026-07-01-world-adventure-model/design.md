@@ -11,7 +11,7 @@ That model is intentionally temporary. The accepted ADR [World Templates Create 
 **Goals:**
 
 - Introduce World, WorldVersion, and Adventure as distinct product/data concepts.
-- Keep the Stormbound Chapel playtest simple: show Stormbound Chapel as the World container, list local Adventures inside it, continue an existing Adventure, or create a new Adventure copy.
+- Keep the Stormbound Chapel playtest simple: show Stormbound Chapel as the World container at `/`, list local Adventures inside it, continue an existing Adventure at `/adventures/<id>`, or create a new Adventure copy.
 - Scope mutable runtime state to Adventure identity.
 - Prove existing Adventures do not change when their source World gets a new version.
 - Preserve the current Game Master story loop, debug panel, NPC Cards, Location Cards, state extraction, movement validation, turns, and deterministic E2E path under the new identity model.
@@ -51,8 +51,9 @@ The system SHALL create an Adventure from a selected WorldVersion by copying bas
 - WHEN the local demo world is seeded or repaired
 - THEN the system creates an authored Stormbound Chapel WorldVersion
 - AND the system creates or resumes local Adventures from that version
-- AND the startup screen shows Stormbound Chapel as the World container
+- AND the startup screen shows Stormbound Chapel as the World container at `/`
 - AND the player can continue an existing Adventure from that container or create a new one
+- AND opening an Adventure navigates to `/adventures/<id>`
 
 ###### Scenario R1-S2: Adventure records source identity
 
@@ -263,7 +264,7 @@ See `docs/epics/lc-002-world-adventure-model/epic.md` Story S4.
 - User impact: Clearer reset/resume behavior and foundation for future World Builder flows.
 - Implementation complexity: Highest of the immediate options.
 - Reversibility: Reasonable during MVP because local seeded data is disposable.
-- Client surfaces: Current browser can show a World container, list Adventures inside it, create a new Adventure, and open the selected Adventure; future clients can target Adventure APIs.
+- Client surfaces: Current browser can show a World container, list Adventures inside it, create a new Adventure, and open the selected Adventure at `/adventures/<id>`; future clients can target Adventure APIs.
 - API / contract shape: Route and Convex contracts should identify the selected Adventure for play and optionally source World/Version for debug context.
 - Frontend/backend boundary: Strong; backend owns copy/reset/isolation while UI presents the current story.
 - Data / schema impact: Meaningful schema migration from `worldId` runtime ownership to `adventureId`.
@@ -276,7 +277,7 @@ See `docs/epics/lc-002-world-adventure-model/epic.md` Story S4.
 
 Use Option 3: introduce explicit `WorldVersion` and `Adventure` concepts and move mutable runtime ownership to `adventureId`.
 
-Implementation should keep the player-facing MVP simple. On local seed/repair, the app should create the Stormbound Chapel World, create an initial immutable WorldVersion, and create or resume Adventures from that version. The current play UI should start on a lightweight World container screen where a playtester can see Stormbound Chapel and continue or create Adventures inside it.
+Implementation should keep the player-facing MVP simple. On local seed/repair, the app should create the Stormbound Chapel World, create an initial immutable WorldVersion, and create or resume Adventures from that version. The current play UI should start on a lightweight World container screen at `/` where a playtester can see Stormbound Chapel and continue or create Adventures inside it. Opening an Adventure should navigate to `/adventures/<id>` so refresh, browser history, and direct links preserve Adventure identity.
 
 Convex should own copy and reset behavior. The route, prompt builder, debug panel, and E2E path should request and render current Adventure context. Source World and WorldVersion should appear as debug context, not runtime truth. Existing provider and extraction behavior should remain unchanged except that it reads and writes Adventure-scoped state.
 

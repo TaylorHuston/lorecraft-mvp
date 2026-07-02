@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: manual feedback refinement committed; dev server running; ready for `sdd-review`
-- Last completed action: committed Stormbound Chapel World container layout, removed landing Reset World, guarded reset/submit race, and reran E2E
+- Current state: Adventure URL refinement committed; dev server running; ready for `sdd-review`
+- Last completed action: committed `/adventures/<id>` route, verified direct Adventure URL loading, reran required CI and E2E
 - Next action: run `sdd-review`
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: none in app repo
@@ -90,6 +90,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-01 | Adventure-scoped Game Master flow | main | `src/app/api/director/turn/route.ts`, `src/lib/director/*`, `src/app/world-client.tsx` | Route, prompt/log/error contracts, debug UI, reset/debug edits, scripts, and snapshots now use `adventureId` and expose source WorldVersion context. | c8add34 |
 | 2026-07-01 | Documentation reconciliation | main | README, CHANGELOG, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, LC-001 Epic, LC-002 Epic | Codified World source, immutable WorldVersion, mutable Adventure runtime, reset semantics, debug identity, and scenario-mapped Epic evidence. | c8add34 |
 | 2026-07-02 | Manual feedback: Adventure startup screen | main after Taylor feedback | `convex/world.ts`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | First app access now shows a lightweight World container screen for Stormbound Chapel, with Adventures listed inside by turn count and last played date; opening an Adventure remains required before the debug drawer/story input appears. | d61235a, ceb661f |
+| 2026-07-02 | Manual feedback: Adventure URLs | main after Taylor feedback | `src/app/adventures/[adventureId]/page.tsx`, `src/app/world-client.tsx`, E2E, LC-002 Epic, README, CHANGELOG, data/persistence docs | Each Adventure now opens at `/adventures/<id>`; Continue, New Adventure, Reset World, reload, and direct URL loading preserve Adventure identity. | d15dc71 |
 
 ## Verification Ledger
 
@@ -118,6 +119,10 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | Browser smoke after World-container refinement | manual/browser automation smoke | Restarted `npm run dev:debug`; landing shows `Stormbound Chapel` as the World container, lists Adventure rows with turn count and last played date, and has no Reset World action. | passed |
 | 2026-07-02 | `npm run ci:required` after World-container refinement | deterministic required gate | Lint, full unit tests, typecheck, and production build pass after moving reset off the landing and guarding reset/submit races. | passed |
 | 2026-07-02 | `npm run e2e` after World-container refinement | deterministic browser E2E | Full deterministic playtest passes with setup reset occurring through the open Adventure debug panel. | passed |
+| 2026-07-02 | `npm run typecheck`; `npm run lint`; `npm run test -- src/app/api/director/turn/route.test.ts src/lib/director/director.test.ts` after Adventure URL refinement | deterministic automated gates | TypeScript, lint, and focused Game Master route/director tests pass after adding the Adventure route. | passed |
+| 2026-07-02 | `npm run ci:required` after Adventure URL refinement | deterministic required gate | Lint, full unit tests, typecheck, and production build pass; Next build includes dynamic `/adventures/[adventureId]` route. | passed |
+| 2026-07-02 | `npm run e2e` after Adventure URL refinement | deterministic browser E2E | Full deterministic playtest passes with Continue/Create/Reset setup navigating to `/adventures/<id>` and reload preserving the selected Adventure. | passed |
+| 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after Adventure URL refinement | manual/browser automation smoke | Clicking Continue from `/` navigated to `/adventures/kn70pv1ayan3rrzw8ms3hb493189sazj`; direct loading that URL reopened the Adventure story UI. | passed |
 
 ## Manual Feedback
 
@@ -128,6 +133,7 @@ Record the user's manual testing feedback after implementation starts.
 | 2026-07-01 | Frozen copies; World updates should not break an existing story. | accepted architecture constraint | Captured in accepted ADR and this proposal. | incorporated |
 | 2026-07-02 | On first access, the app should show a page to continue previous Adventures or create a new one. | accepted UX requirement | Added lightweight Adventure landing screen; updated LC-002 and docs so Adventure selection is no longer deferred or contradicted by "no management screen" wording. | incorporated |
 | 2026-07-02 | Stormbound Chapel should be the container; Adventures should be listed inside it with turn count and last played date. Reset World should not be on the home screen. | accepted UX refinement | Reworked the landing screen to a World container with Adventure rows and removed Reset World from the landing; reset remains in the open Adventure debug panel. | incorporated |
+| 2026-07-02 | Each Adventure should have its own URL; `/adventures/<id>` works fine. | accepted UX/routing refinement | Added an App Router route for `/adventures/[adventureId]`, route-driven Adventure opening, and E2E/direct-load coverage. | incorporated |
 
 ## Planning Updates
 
@@ -142,7 +148,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Status: pending Taylor
 - App URL / route: `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel WorldVersion and default Adventure
-- Steps for the user: open the app, confirm it lands on the Stormbound Chapel World container with Adventure rows, continue an existing Adventure or create a new one, submit at least one turn, inspect debug Adventure/source version identity, reset from the open Adventure debug panel
+- Steps for the user: open the app, confirm it lands on the Stormbound Chapel World container with Adventure rows, continue an existing Adventure or create a new one, confirm the browser URL is `/adventures/<id>`, reload that URL, submit at least one turn, inspect debug Adventure/source version identity, reset from the open Adventure debug panel
 - Expected result: the story loop works as before, but reset/debug wording and state identity make clear that play happens inside an Adventure copied from a WorldVersion
 - Feedback that would change artifacts: stronger Adventure naming, visible World/Adventure labels, different reset wording, or stronger migration/preservation requirements
 

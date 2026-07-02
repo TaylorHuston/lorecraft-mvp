@@ -9,7 +9,7 @@ The format is based on Keep a Changelog 1.1.0.
 ### Added
 
 - Adventure instances created from frozen WorldVersions, with the default Stormbound Chapel playtest now running inside a mutable Adventure copy.
-- Startup World container screen for Stormbound Chapel, with local Adventures listed by turn count and last played date.
+- Startup World container screen for Stormbound Chapel, with local Adventures listed by turn count and last played date and opened at `/adventures/<id>`.
 
 ### Changed
 

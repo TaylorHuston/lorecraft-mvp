@@ -19,9 +19,9 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#director-input")).toHaveValue("");
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
 
     await page.reload();
-    await continueFirstAdventure(page);
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
 
@@ -64,7 +64,6 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#story-stream")).toContainText(playerText);
 
     await page.reload();
-    await continueFirstAdventure(page);
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
@@ -240,17 +239,17 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     });
     if (await page.locator("#adventure-list button[id^='continue-adventure-']").first().isVisible()) {
       await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
       await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
       await page.locator("#fresh-seed-button").click();
-      await expect(page.locator("#turn-notice-message")).toContainText(
-        "Fresh Stormbound Chapel world seeded.",
-        { timeout: 30_000 },
-      );
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     } else {
       await page.locator("#create-adventure-button").click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     }
   } else if (await page.locator("#seed-world-button").isVisible()) {
     await page.locator("#seed-world-button").click();
+    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
   }
 
   await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
@@ -259,12 +258,6 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
-}
-
-async function continueFirstAdventure(page: import("@playwright/test").Page) {
-  await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
-  await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
-  await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
 }
 
 async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {

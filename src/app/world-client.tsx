@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -80,7 +81,12 @@ const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
     "Keep fleeting gestures and reactions in narration. Only update durable NPC facts when the change should matter after recent context falls away.",
 };
 
-export function WorldClient() {
+export function WorldClient({
+  initialAdventureId = null,
+}: {
+  initialAdventureId?: Id<"adventures"> | null;
+}) {
+  const router = useRouter();
   const adventures = useQuery(api.world.listAdventures);
   const seedWorld = useMutation(api.world.seedDemoWorld);
   const createAdventure = useMutation(api.world.createAdventure);
@@ -90,7 +96,9 @@ export function WorldClient() {
   const updateNpc = useAction(api.world.updateNpc);
   const createNpc = useAction(api.world.createNpc);
   const resetNpc = useAction(api.world.resetNpc);
-  const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(null);
+  const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(
+    initialAdventureId,
+  );
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +170,7 @@ export function WorldClient() {
       setError(null);
       const seededAdventureId = await seedWorld();
       setSelectedAdventureId(seededAdventureId);
+      router.push(`/adventures/${seededAdventureId}`);
       setNpcDrafts({});
       setNpcSaveStatus({});
       setCollapsedNpcKeys({});
@@ -181,6 +190,7 @@ export function WorldClient() {
     try {
       const result = await createAdventure({});
       setSelectedAdventureId(result.adventureId);
+      router.push(`/adventures/${result.adventureId}`);
       resetLocalDraftState();
     } catch (createError) {
       setError(errorMessage(createError));
@@ -193,6 +203,7 @@ export function WorldClient() {
     setError(null);
     setNotice(null);
     setSelectedAdventureId(nextAdventureId);
+    router.push(`/adventures/${nextAdventureId}`);
     resetLocalDraftState();
   }
 
@@ -202,6 +213,7 @@ export function WorldClient() {
     await flushQueuedNpcSaves();
     await flushActiveLocationSaves();
     setSelectedAdventureId(null);
+    router.push("/");
     resetLocalDraftState();
   }
 
