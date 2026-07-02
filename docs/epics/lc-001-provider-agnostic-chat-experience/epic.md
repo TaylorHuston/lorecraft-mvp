@@ -33,7 +33,7 @@ Lorecraft needs a first playable AI Game Master loop where the player can intera
 
 ## Deferred Scope
 
-This Epic keeps the MVP to one editable persistent world. The later target model is independent story/play-session instances generated from a world or template, so each story can mutate separately from canonical authored world data.
+This Epic originally kept the MVP to one editable persistent world. LC-002 now implements the first slice of the later target model: a default Adventure copied from a frozen WorldVersion, so mutable play state is separate from authored World source data. Adventure management UI, accounts, sharing, branching, rollback, and World patching into existing Adventures remain deferred.
 
 ## Candidate Stories
 
@@ -114,11 +114,11 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 - THEN the input prevents duplicate submission for that turn
 - AND the interface shows that the Game Master response is pending
 
-###### Scenario R3-S2: Missing world state
+###### Scenario R3-S2: Missing Adventure state
 
-- WHEN no world is seeded or the selected world cannot be loaded
+- WHEN no Adventure is seeded or the selected Adventure cannot be loaded
 - THEN the system does not call the LLM
-- AND the player sees an actionable message to seed or reload the world
+- AND the player sees an actionable message to seed or reload the Adventure
 
 #### Implemented By
 
@@ -166,7 +166,7 @@ The system SHALL keep Game Master orchestration and provider calls out of React 
 ###### Scenario R1-S1: UI submits intent
 
 - WHEN the player submits a narrative turn
-- THEN the client calls the Game Master Route Handler with the input and selected world
+- THEN the client calls the Game Master Route Handler with the input and selected Adventure
 - AND React does not import provider SDKs, provider request types, secrets, or durable game rules
 
 ###### Scenario R1-S2: Backend coordinates the turn
@@ -181,9 +181,9 @@ The system SHALL keep Game Master orchestration and provider calls out of React 
 - THEN the reusable application/domain modules can move behind Convex actions or another backend service
 - AND React-facing behavior does not need to own Game Master rules
 
-###### Scenario R1-S4: Malformed world id
+###### Scenario R1-S4: Malformed Adventure id
 
-- WHEN the Route Handler receives a malformed `worldId`
+- WHEN the Route Handler receives a malformed `adventureId`
 - THEN it returns a structured `400` `TurnResponse` error
 - AND it does not record player input or call the LLM
 
@@ -619,8 +619,8 @@ The system SHALL create a durable turn for each persisted narrative player inten
 
 ###### Scenario R1-S1: Successful narrative turn
 
-- WHEN the player submits valid narrative input for a seeded world
-- THEN the backend creates a turn with a world-scoped sequence number
+- WHEN the player submits valid narrative input for a seeded Adventure
+- THEN the backend creates a turn with an Adventure-scoped sequence number
 - AND the turn links the player input, Game Master call, narration, accepted state diffs, and events caused by that input
 - AND the turn ends with a succeeded status after persistence completes
 
@@ -633,7 +633,7 @@ The system SHALL create a durable turn for each persisted narrative player inten
 
 ###### Scenario R1-S3: Request rejected before persistence
 
-- WHEN a request is malformed, missing required configuration, or references an invalid world before game persistence starts
+- WHEN a request is malformed, missing required configuration, or references an invalid Adventure before game persistence starts
 - THEN no turn is created
 - AND the route returns the existing structured setup or validation error
 
@@ -655,7 +655,7 @@ The system SHALL expose turn scope in persisted history without making the playe
 
 ###### Scenario R2-S3: Seed rows remain outside player turns
 
-- WHEN the world is seeded
+- WHEN the demo Adventure is seeded
 - THEN seed narration and seed events may remain unscoped
 - AND narrative turns still begin with the first persisted player intent
 
@@ -665,9 +665,9 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 
 ###### Scenario R3-S1: Rough reset clears turn history
 
-- WHEN the existing rough reset is invoked
-- THEN persisted turns and turn-linked history for the playtest world are cleared with commands, narrations, events, state diffs, and Game Master calls
-- AND seeded world graph rows and baseline facts are restored as they are today
+- WHEN Reset Session is invoked
+- THEN persisted turns and turn-linked history for the selected Adventure are cleared with commands, narrations, events, state diffs, and Game Master calls
+- AND the Adventure's source WorldVersion baseline is restored
 
 ###### Scenario R3-S2: State diffs remain tied to one turn
 
@@ -686,8 +686,8 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `convex/schema.ts` | defines `turns` plus optional `turnId` links on commands, narrations, events, state diffs, and Game Master calls. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | creates pending turns with world-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during rough reset. | Recheck when this Story changes or the listed path changes. |
-| `src/app/api/director/turn/route.ts` | passes `turnId` through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/world-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts` | creates pending turns with Adventure-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during Adventure reset. | Recheck when this Story changes or the listed path changes. |
+| `src/app/api/director/turn/route.ts` | passes `turnId` through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/Adventure-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | includes optional `turnId` in local JSONL debug records. | Recheck when this Story changes or the listed path changes. |
 | `src/app/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
 | `docs/data-model.md`, `docs/persistence-system.md` | document scoped turns and defer snapshot rollback. | Recheck when this Story changes or the listed path changes. |

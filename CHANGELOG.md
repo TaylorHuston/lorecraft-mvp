@@ -6,6 +6,14 @@ The format is based on Keep a Changelog 1.1.0.
 
 ## [Unreleased]
 
+### Added
+
+- Adventure instances created from frozen WorldVersions, with the default Stormbound Chapel playtest now running inside a mutable Adventure copy.
+
+### Changed
+
+- Runtime story state, debug edits, Game Master turns, state diffs, and reset behavior now target the selected Adventure instead of using the authored World as mutable play state.
+
 ## [0.2.0] - 2026-07-01
 
 Second MVP release focused on turning the initial chat spike into a more inspectable persistent-world playtest loop, with deterministic browser coverage, bounded state extraction, and lightweight location state.

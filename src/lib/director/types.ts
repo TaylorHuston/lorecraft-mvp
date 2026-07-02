@@ -74,10 +74,21 @@ export type DirectorKnownLocation = {
 };
 
 export type DirectorContext = {
+  adventure: {
+    id: string;
+    name: string;
+    worldId: string;
+    worldVersionId: string;
+  };
   world: {
     id: string;
     name: string;
     description: string;
+  };
+  sourceWorldVersion: {
+    id: string;
+    versionNumber: number;
+    name: string;
   };
   player: {
     id: string;
@@ -107,10 +118,21 @@ export type DirectorContext = {
 };
 
 export type TranscriptDirectorContext = {
+  adventure: {
+    id: string;
+    name: string;
+    worldId: string;
+    worldVersionId: string;
+  };
   world: {
     id: string;
     name: string;
     description: string;
+  };
+  sourceWorldVersion: {
+    id: string;
+    versionNumber: number;
+    name: string;
   };
   initialSeed: string;
   transcript: DirectorFeedEntry[];
@@ -130,6 +152,9 @@ export type DirectorRequestSummary = {
   directorMode: DirectorMode;
   callRole?: DirectorCallRole;
   outputContract: DirectorOutputContract;
+  adventureId?: string;
+  worldId?: string;
+  worldVersionId?: string;
   worldName: string;
   roomKey: string;
   playerInputLength: number;

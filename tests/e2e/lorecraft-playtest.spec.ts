@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () => {
-  test("runs a deterministic seeded-world browser playtest", async ({ page }) => {
+test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verification", () => {
+  test("runs a deterministic seeded-Adventure browser playtest", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#lorecraft-app")).toBeVisible();
 
@@ -33,12 +33,17 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 
     await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
     await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: succeeded");
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "lorecraft-fixture-model",
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "story_generation",
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "worldVersionId",
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "npc_state_extraction",
@@ -190,7 +195,9 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await page.locator("#rough-reset-button").click();
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
-    await expect(page.locator("#story-empty-state")).toBeVisible();
+    await expect(page.locator("#story-stream")).toContainText("You stand in the chapel");
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
     await page.locator("#debug-tab-locations").click();
     await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(

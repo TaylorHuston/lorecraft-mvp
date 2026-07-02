@@ -46,7 +46,7 @@ type NpcDebugActor = {
   locationName: string;
 };
 type NpcPendingSave = {
-  worldId: Id<"worlds">;
+  adventureId: Id<"adventures">;
   actor: NpcDebugActor;
   payload: NpcDebugSavePayload;
   saveVersion: number;
@@ -72,7 +72,7 @@ const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
 };
 
 export function WorldClient() {
-  const defaultWorldId = useQuery(api.world.getDefaultWorld);
+  const defaultAdventureId = useQuery(api.world.getDefaultAdventure);
   const seedWorld = useMutation(api.world.seedDemoWorld);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const updateLocation = useAction(api.world.updateLocation);
@@ -80,7 +80,7 @@ export function WorldClient() {
   const updateNpc = useAction(api.world.updateNpc);
   const createNpc = useAction(api.world.createNpc);
   const resetNpc = useAction(api.world.resetNpc);
-  const [selectedWorldId, setSelectedWorldId] = useState<Id<"worlds"> | null>(null);
+  const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(null);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,12 +112,13 @@ export function WorldClient() {
   const locationActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
   const nextDebugNpcOrdinal = useRef(1);
 
-  const worldId = selectedWorldId ?? defaultWorldId ?? null;
-  const isLoadingDefaultWorld = selectedWorldId === null && defaultWorldId === undefined;
-  const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
+  const adventureId = selectedAdventureId ?? defaultAdventureId ?? null;
+  const isLoadingDefaultAdventure =
+    selectedAdventureId === null && defaultAdventureId === undefined;
+  const snapshot = useQuery(api.world.getSnapshot, adventureId ? { adventureId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
-  const topBarWorldName = snapshot?.world.name ?? (worldId ? "Loading world" : "No world");
+  const topBarWorldName = snapshot?.world.name ?? (adventureId ? "Loading world" : "No world");
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -147,8 +148,8 @@ export function WorldClient() {
       await cancelQueuedNpcSavesAndWaitForActive();
       await flushActiveLocationSaves();
       setError(null);
-      const seededWorldId = await seedWorld();
-      setSelectedWorldId(seededWorldId);
+      const seededAdventureId = await seedWorld();
+      setSelectedAdventureId(seededAdventureId);
       setNpcDrafts({});
       setNpcSaveStatus({});
       setCollapsedNpcKeys({});
@@ -162,7 +163,7 @@ export function WorldClient() {
   }
 
   async function handleReset() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -173,7 +174,7 @@ export function WorldClient() {
       await cancelQueuedNpcSavesAndWaitForActive();
       await flushActiveLocationSaves();
       setError(null);
-      const result = await resetPlaytestWorld({ worldId });
+      const result = await resetPlaytestWorld({ adventureId });
       setNpcDrafts({});
       setNpcSaveStatus({});
       setCollapsedNpcKeys({});
@@ -192,7 +193,7 @@ export function WorldClient() {
     event.preventDefault();
     const submittedInput = input.trim();
 
-    if (!worldId || !submittedInput || isSubmitting) {
+    if (!adventureId || !submittedInput || isSubmitting) {
       return;
     }
 
@@ -212,7 +213,7 @@ export function WorldClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          worldId,
+          adventureId,
           input: submittedInput,
           promptGuidance,
         }),
@@ -246,7 +247,7 @@ export function WorldClient() {
   }
 
   async function addNpc() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -272,7 +273,7 @@ export function WorldClient() {
     setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
     try {
       const result = await createNpc({
-        worldId,
+        adventureId,
         key: actorKey,
         ...payload,
       });
@@ -296,18 +297,18 @@ export function WorldClient() {
   }
 
   function scheduleNpcSave(actor: NpcDebugActor, payload: NpcDebugSavePayload) {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
     npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
     const saveVersion = npcSaveVersions.current[actor.key];
-    const saveWorldId = worldId;
+    const saveAdventureId = adventureId;
 
     setNpcSaveStatus((current) => ({ ...current, [actor.key]: "unsaved" }));
     clearTimeout(npcSaveTimers.current[actor.key]);
     npcPendingSaves.current[actor.key] = {
-      worldId: saveWorldId,
+      adventureId: saveAdventureId,
       actor,
       payload,
       saveVersion,
@@ -315,13 +316,13 @@ export function WorldClient() {
     npcSaveTimers.current[actor.key] = setTimeout(() => {
       delete npcSaveTimers.current[actor.key];
       delete npcPendingSaves.current[actor.key];
-      void startPersistNpc({ worldId: saveWorldId, actor, payload, saveVersion });
+      void startPersistNpc({ adventureId: saveAdventureId, actor, payload, saveVersion });
     }, 700);
   }
 
   function startPersistNpc(pendingSave: NpcPendingSave) {
     const savePromise = persistNpc(
-      pendingSave.worldId,
+      pendingSave.adventureId,
       pendingSave.actor,
       pendingSave.payload,
       pendingSave.saveVersion,
@@ -375,7 +376,7 @@ export function WorldClient() {
   }
 
   async function persistNpc(
-    saveWorldId: Id<"worlds">,
+    saveAdventureId: Id<"adventures">,
     actor: NpcDebugActor,
     payload: NpcDebugSavePayload,
     saveVersion: number,
@@ -385,7 +386,7 @@ export function WorldClient() {
     setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saving" }));
     try {
       const result = await updateNpc({
-        worldId: saveWorldId,
+        adventureId: saveAdventureId,
         actorId: actor._id,
         name: payload.name,
         description: payload.description,
@@ -413,7 +414,7 @@ export function WorldClient() {
   }
 
   async function resetNpcDebugActor(actor: NpcDebugActor) {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -425,7 +426,7 @@ export function WorldClient() {
     delete npcPendingSaves.current[actor.key];
     npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
     try {
-      const result = await resetNpc({ worldId, actorId: actor._id });
+      const result = await resetNpc({ adventureId, actorId: actor._id });
       if (!result.ok) {
         setError(result.error ?? "Failed to reset NPC.");
         return;
@@ -450,12 +451,12 @@ export function WorldClient() {
     name: string,
     description: string,
   ): Promise<boolean> {
-    if (!worldId) {
+    if (!adventureId) {
       return false;
     }
 
     setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saving" }));
-    const savePromise = persistLocation(worldId, locationId, locationKey, name, description);
+    const savePromise = persistLocation(adventureId, locationId, locationKey, name, description);
     locationActiveSaves.current[locationKey] = [
       ...(locationActiveSaves.current[locationKey] ?? []),
       savePromise,
@@ -474,7 +475,7 @@ export function WorldClient() {
   }
 
   async function persistLocation(
-    saveWorldId: Id<"worlds">,
+    saveAdventureId: Id<"adventures">,
     locationId: Id<"rooms">,
     locationKey: string,
     name: string,
@@ -484,7 +485,7 @@ export function WorldClient() {
     setNotice(null);
     try {
       const result = await updateLocation({
-        worldId: saveWorldId,
+        adventureId: saveAdventureId,
         locationId,
         name,
         description,
@@ -515,14 +516,14 @@ export function WorldClient() {
   }
 
   async function handleCreateLocation() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
     setError(null);
     setNotice(null);
     const result = await createLocation({
-      worldId,
+      adventureId,
       key: newLocation.key,
       name: newLocation.name,
       description: newLocation.description,
@@ -585,17 +586,17 @@ export function WorldClient() {
           className="flex h-[calc(100vh-3rem)] min-h-0 flex-col"
         >
           <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
-            {isLoadingDefaultWorld ? (
-              <p id="default-world-loading-state" className="text-zinc-400">
-                Loading world state...
+            {isLoadingDefaultAdventure ? (
+              <p id="default-adventure-loading-state" className="text-zinc-400">
+                Loading Adventure state...
               </p>
-            ) : !worldId ? (
+            ) : !adventureId ? (
               <div
                 id="seed-world-empty-state"
                 className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4"
               >
                 <p className="max-w-xl text-base leading-7 text-zinc-300">
-                  Seed a fresh demo world to begin the transcript playtest.
+                  Seed a fresh demo Adventure to begin the playtest.
                 </p>
                 <button
                   id="seed-world-button"
@@ -607,19 +608,19 @@ export function WorldClient() {
                 </button>
               </div>
             ) : snapshot === undefined ? (
-              <p id="world-loading-state" className="text-zinc-400">Loading world state...</p>
+              <p id="adventure-loading-state" className="text-zinc-400">Loading Adventure state...</p>
             ) : snapshot === null ? (
-              <div id="world-missing-state" className="min-h-0 flex-1 space-y-4">
+              <div id="adventure-missing-state" className="min-h-0 flex-1 space-y-4">
                 <p className="text-zinc-300">
-                  The selected world is missing required player or room state.
+                  The selected Adventure is missing required player or location state.
                 </p>
                 <button
-                  id="seed-or-reload-world-button"
+                  id="seed-or-reload-adventure-button"
                   type="button"
                   onClick={handleSeed}
                   className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-950/20"
                 >
-                  Seed or reload demo world
+                  Seed or reload demo Adventure
                 </button>
               </div>
             ) : (
@@ -726,7 +727,7 @@ export function WorldClient() {
                 Debug panel
               </h2>
               <p className="mt-2 text-xs leading-5 text-zinc-500">
-                Hidden world state, Game Master calls, validation decisions, events, and state diffs.
+                Hidden Adventure state, Game Master calls, validation decisions, events, and state diffs.
               </p>
             </div>
             <div id="debug-panel-actions" className="flex flex-wrap gap-2">
@@ -740,7 +741,7 @@ export function WorldClient() {
               <DebugActionButton
                 id="rough-reset-button"
                 onClick={handleReset}
-                disabled={!worldId || isResetting || isSeeding}
+                disabled={!adventureId || isResetting || isSeeding}
                 tone="danger"
               >
                 {isResetting ? "Resetting" : "Reset Session"}
@@ -809,6 +810,8 @@ export function WorldClient() {
                   <DebugList
                     title="Scene"
                     items={[
+                      `Adventure: ${snapshot.adventure.name} (${snapshot.adventure._id})`,
+                      `Source WorldVersion: v${snapshot.sourceWorldVersion.versionNumber} (${snapshot.sourceWorldVersion._id})`,
                       `${snapshot.world.name} / ${snapshot.room.name}`,
                       `Player: ${snapshot.player.name} (${snapshot.player.key})`,
                       `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,

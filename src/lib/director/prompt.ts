@@ -53,9 +53,9 @@ export function buildDirectorRequest(
   } = {},
 ): DirectorRequest {
   const prompt = buildPromptComponents(context, playerInput, {
-      promptGuidance: options.promptGuidance,
-      requiredSceneBeat: options.requiredSceneBeat,
-    });
+    promptGuidance: options.promptGuidance,
+    requiredSceneBeat: options.requiredSceneBeat,
+  });
   const generationSettings = options.generationSettings
     ? { ...options.generationSettings, responseFormat: "text" as const }
     : undefined;
@@ -69,6 +69,9 @@ export function buildDirectorRequest(
       directorMode: "persistent",
       callRole: "story_generation",
       outputContract: "plain_prose",
+      adventureId: context.adventure.id,
+      worldId: context.world.id,
+      worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: context.room.key,
       playerInputLength: playerInput.length,
@@ -144,6 +147,9 @@ export function buildNpcStateExtractionRequest(
       directorMode: "persistent",
       callRole: "npc_state_extraction",
       outputContract: "json_npc_updates",
+      adventureId: context.adventure.id,
+      worldId: context.world.id,
+      worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: context.room.key,
       playerInputLength: playerInput.length,
@@ -224,6 +230,9 @@ export function buildTranscriptDirectorRequest(
       directorMode: "transcript",
       callRole: "story_generation",
       outputContract: "plain_prose",
+      adventureId: context.adventure.id,
+      worldId: context.world.id,
+      worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: "transcript",
       playerInputLength: playerInput.length,

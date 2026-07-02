@@ -108,10 +108,21 @@ const brotherAlden: DirectorActor = {
 };
 
 const context: DirectorContext = {
+  adventure: {
+    id: "adventure-id",
+    name: "Stormbound Chapel",
+    worldId: "world-id",
+    worldVersionId: "world-version-id",
+  },
   world: {
     id: "world-id",
     name: "Stormbound Chapel",
     description: "A chapel in a storm.",
+  },
+  sourceWorldVersion: {
+    id: "world-version-id",
+    versionNumber: 1,
+    name: "Stormbound Chapel",
   },
   player: {
     id: "player-id",
@@ -181,10 +192,21 @@ const context: DirectorContext = {
 };
 
 const transcriptContext: TranscriptDirectorContext = {
+  adventure: {
+    id: "adventure-id",
+    name: "Stormbound Chapel",
+    worldId: "world-id",
+    worldVersionId: "world-version-id",
+  },
   world: {
     id: "world-id",
     name: "Stormbound Chapel",
     description: "A chapel in a storm.",
+  },
+  sourceWorldVersion: {
+    id: "world-version-id",
+    versionNumber: 1,
+    name: "Stormbound Chapel",
   },
   initialSeed:
     "Stormbound Chapel: A chapel in a storm.\nOpening scene: Rain taps against warped shutters. Mira waits near the aisle.",
@@ -1278,15 +1300,15 @@ describe("Raw Director request storage", () => {
 });
 
 describe("Director turn route errors", () => {
-  it("maps malformed Convex world ids to a structured 400 response", () => {
+  it("maps malformed Convex Adventure ids to a structured 400 response", () => {
     const result = normalizeWorldLoadError(
-      new Error('ArgumentValidationError: Value does not match validator for field "worldId"'),
+      new Error('ArgumentValidationError: Value does not match validator for field "adventureId"'),
     );
 
     expect(result).toEqual({
       httpStatus: 400,
-      clientMessage: "The selected world id is invalid. Seed or reload the world and try again.",
-      logMessage: "The selected world id is invalid.",
+      clientMessage: "The selected Adventure id is invalid. Seed or reload the Adventure and try again.",
+      logMessage: "The selected Adventure id is invalid.",
     });
   });
 
@@ -1295,8 +1317,8 @@ describe("Director turn route errors", () => {
 
     expect(result).toEqual({
       httpStatus: 500,
-      clientMessage: "The selected world could not be loaded. Seed or reload the world and try again.",
-      logMessage: "The selected world could not be loaded.",
+      clientMessage: "The selected Adventure could not be loaded. Seed or reload the Adventure and try again.",
+      logMessage: "The selected Adventure could not be loaded.",
     });
   });
 });

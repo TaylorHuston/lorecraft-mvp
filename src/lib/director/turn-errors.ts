@@ -14,14 +14,14 @@ export function normalizeWorldLoadError(error: unknown): WorldLoadError {
   if (isValidationError) {
     return {
       httpStatus: 400,
-      clientMessage: "The selected world id is invalid. Seed or reload the world and try again.",
-      logMessage: "The selected world id is invalid.",
+      clientMessage: "The selected Adventure id is invalid. Seed or reload the Adventure and try again.",
+      logMessage: "The selected Adventure id is invalid.",
     };
   }
 
   return {
     httpStatus: 500,
-    clientMessage: "The selected world could not be loaded. Seed or reload the world and try again.",
-    logMessage: "The selected world could not be loaded.",
+    clientMessage: "The selected Adventure could not be loaded. Seed or reload the Adventure and try again.",
+    logMessage: "The selected Adventure could not be loaded.",
   };
 }
