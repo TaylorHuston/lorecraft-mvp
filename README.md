@@ -1,8 +1,48 @@
 # Lorecraft MVP
 
-Experimental Next.js + Convex scaffold for the Lorecraft persistent-world memory spike.
+Lorecraft is a local-first prototype for AI Dungeon-style play with database-backed world memory.
 
-The first goal is not a complete RPG. It is to test whether a small world can remember narrative interaction as durable state: a resumable story feed, Game Master narrations, world events, debug records, and readable NPC profile/facts.
+The experiment is simple: can a small narrative world remember what changed because the world has explicit state, not because a long chat transcript happens to mention it?
+
+This is not a complete RPG. The current MVP is a playable persistent-world spike with one resettable demo world, a narrative story feed, an AI Game Master, inspectable debug state, NPC Cards, Location Cards, and bounded state mutation through Convex.
+
+## Current Features
+
+- Narrative-only story input and a resumable player-facing story stream.
+- Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
+- Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
+- Stormbound Chapel demo world with seeded locations, NPCs, story context, and resettable local state.
+- NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
+- Location Cards with current-location context, known destination context, debug editing, and bounded movement.
+- Post-narration state extraction for validated NPC `mood`, `status`, and `memory` updates.
+- Bounded actor movement to existing canonical locations when the player clearly travels and the narration confirms arrival.
+- Debug panel for prompt guidance, NPCs, locations, hidden state, turns, Game Master calls, and state diffs.
+- Deterministic Playwright E2E coverage using a local OpenAI-compatible fixture provider.
+
+## What This Is Testing
+
+Lorecraft's product thesis is state-first storytelling:
+
+- The Game Master writes prose.
+- Convex stores world truth.
+- LLM output is untrusted until backend validation accepts a bounded state change.
+- Each turn is rebuilt from canonical state plus recent story context.
+
+This is meant to explore a middle ground between freeform AI storytelling and rigid text RPGs. The player should interact naturally, while the engine keeps enough structured state to prevent the world from drifting when old transcript context falls away.
+
+## What This Is Not Yet
+
+This repo does not currently include:
+
+- Production deployment.
+- User accounts, auth, permissions, or world ownership.
+- Multiplayer.
+- Combat, HP, inventory, stats, quests, rulesets, or dice systems.
+- A polished World Builder.
+- Campaign copies or reusable world templates.
+- Marketplace, billing, creator tools, or public hosting.
+
+Remote/shared deployments are not production-ready. The current route guardrails are prototype safety checks, not a replacement for real authentication, ownership checks, rate limiting, or production operations.
 
 ## Stack
 
@@ -13,7 +53,7 @@ The first goal is not a complete RPG. It is to test whether a small world can re
 - Convex 1.42
 - npm
 
-## Development
+## Quick Start
 
 Install dependencies:
 
@@ -21,7 +61,7 @@ Install dependencies:
 npm install
 ```
 
-Configure an OpenAI-compatible local model endpoint for Game Master turns. Ollama on macOS is the first intended runtime:
+Configure an OpenAI-compatible local model endpoint. Ollama on macOS is the main local playtest path:
 
 ```bash
 LLM_BASE_URL=http://localhost:11434/v1
@@ -30,6 +70,53 @@ LLM_MODEL=<installed-ollama-model>
 ```
 
 LM Studio, OpenRouter, Vercel AI Gateway, or a direct provider can use the same variables if they expose an OpenAI-compatible chat completions endpoint.
+
+Provision or validate the local Convex deployment once:
+
+```bash
+npm run convex:once
+```
+
+Start the local app with debug diagnostics enabled:
+
+```bash
+npm run dev:debug
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+Seed the demo world from the app if prompted, then try:
+
+```text
+I ask Mira what she knows about the storm.
+```
+
+## Game Master Modes
+
+Persistent mode is the default. It sends canonical world, location, NPC, and recent-story context to the Game Master. Story generation returns plain prose; a separate extraction pass may propose bounded state changes that Convex validates before saving.
+
+Transcript mode is a comparison mode for story-only generation from the opening seed plus transcript. It does not include live canonical world state and does not apply NPC fact changes, actor movement, state diffs, or LLM-authored world events.
+
+Start transcript mode with:
+
+```bash
+LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug
+```
+
+## Useful Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev:debug` | Start Convex and Next.js with local Game Master diagnostics enabled. |
+| `npm run ci:required` | Run lint, unit tests, typecheck, and production build. |
+| `npm run e2e` | Run deterministic browser E2E with a local fixture provider. |
+| `npm run playtest:director` | Run a live persistent-mode Game Master smoke test against a running dev server. |
+| `npm run playtest:director:transcript` | Run a live transcript-mode smoke test. |
+| `npm run benchmark:director-models` | Compare local models against the latest logged Game Master prompt. |
 
 Optional local tuning variables:
 
@@ -40,110 +127,78 @@ LLM_TOP_P=0.9
 LLM_REASONING_EFFORT=none
 ```
 
-Unset optional values use safe defaults. `LLM_MAX_TOKENS=250` keeps local turns short while reducing mid-sentence truncation during action-heavy beats; raise it only when testing longer descriptive beats. `LLM_REASONING_EFFORT=none` is useful for local Ollama Gemma playtests where some models otherwise return reasoning text with empty assistant content. The app currently supports the OpenAI-compatible subset above and records a compact generation-settings summary in Game Master debug metadata.
+Unset optional values use safe defaults. `LLM_MAX_TOKENS=250` keeps local turns short while reducing mid-sentence truncation during action-heavy beats. `LLM_REASONING_EFFORT=none` is useful for local Ollama Gemma playtests where some models otherwise return reasoning text with empty assistant content.
 
-To compare local models against the same latest logged Game Master prompt:
+## Testing
 
-```bash
-npm run benchmark:director-models
-```
-
-Provision or validate the local Convex deployment once:
+The required local gate is:
 
 ```bash
-npm run convex:once
+npm run ci:required
 ```
 
-Start the local development loop with Game Master diagnostics enabled:
+This runs:
 
-```bash
-npm run dev:debug
-```
+- `npm run lint`
+- `npm run test`
+- `npm run typecheck`
+- `npm run build`
 
-This starts Convex and Next.js together. The app runs at:
-
-```text
-http://localhost:3000
-```
-
-`npm run dev:debug` currently enables all local Game Master diagnostics: newline-delimited JSON logs at `logs/director-debug.jsonl`, raw provider request messages in those local logs, raw LLM response text in those local logs, persisted provider request messages in `directorCalls.rawRequest`, and debug-only Convex write/snapshot surfaces. The debug flag is process-local; the npm scripts do not persist it into Convex deployment environment variables.
-
-Each recorded Game Master story attempt writes one `director.turn.unit` record containing the turn ID, command ID, player input, provider host, model, compact request summary, outcome, errors, parsed narration/output when available, response length metadata, raw request, raw response, and timing data. Persistent mode can also write a `director.turn.extraction` record for the post-narration NPC-state extractor, including accepted/ignored updates and extraction timing. Pre-turn failures still write `director.turn.rejected` records because no concrete turn exists yet. This can include prompt guidance, player text, model output, and in persistent mode hidden NPC knowledge, so keep it local/debug-only.
-
-By default `/api/director/turn` accepts local browser requests only. Remote deployments must opt in with `LORECRAFT_ALLOW_REMOTE_DIRECTOR=1` and configure `LORECRAFT_SERVER_WRITE_TOKEN` for server-owned Convex writes before provider calls and state mutation can work outside local development. This is a prototype guardrail, not a replacement for real user auth and world ownership.
-
-Persistent Game Master mode is the default. To compare story-only prose generation without canonical world mutation, start the app with transcript mode:
-
-```bash
-LORECRAFT_DIRECTOR_MODE=transcript npm run dev:debug
-```
-
-Transcript mode still persists turns, player input, Game Master narrations, Game Master debug calls, and local logs. Its prompt is built from the canonical opening seed plus the transcript only; it does not include current room state, present actors, exits, object state, NPC facts, hidden NPC knowledge, or a scene-beat classifier. It does not run NPC-state extraction and does not apply NPC fact changes, LLM-authored world events, or LLM-authored state diffs from the Game Master response.
-
-The demo world is intentionally resettable seed data for now. Seeding Stormbound Chapel deletes the current deterministic demo world and recreates it, so use the seed/reset workflow when you want to test the initial world setup from scratch.
-
-Run the repeatable local Game Master smoke playtest against a running dev server:
-
-```bash
-npm run playtest:director
-```
-
-The script seeds a fresh demo world, sends a direct Mira question, sends a plain action, and verifies response shape plus Game Master debug metadata. In persistent mode it expects both `story_generation` and `npc_state_extraction` Game Master call records for each turn. Use `--base-url` if Next is running somewhere other than `http://localhost:3000`.
-
-When the app is running in transcript mode, run the no-mutation smoke check:
-
-```bash
-npm run playtest:director:transcript
-```
-
-Install the local Chromium browser used by Playwright E2E once:
-
-```bash
-npm run e2e:install
-```
-
-Run the deterministic browser E2E smoke check:
+The deterministic browser test is:
 
 ```bash
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It builds and runs Next on a separate port so it can run without stopping an already-running `next dev` server for normal playtesting. It verifies the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the persisted story, inspect debug turn evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset location state for another turn. This path is deterministic and does not call Ollama, OpenRouter, Vercel AI Gateway, or any hosted model.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the story, inspect debug turn evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset location state.
 
-The E2E script is intentionally local-only and destructive against its local test state. `LORECRAFT_E2E_BASE_URL` must point to the configured local E2E app origin, which defaults to `http://127.0.0.1:3101`, and the local Convex port `3210` must be free so Playwright starts the intended anonymous E2E Convex service instead of reusing an existing playtest backend.
+`npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 
-Live-provider playtest scripts remain separate because they evaluate local model/runtime behavior rather than deterministic browser integration.
+Install the local Chromium browser for Playwright once if needed:
 
-## What Is Scaffolded
-
-- `convex/schema.ts` defines the persistent-world tables.
-- `convex/world.ts` seeds a fresh deterministic Stormbound Chapel demo world, reconstructs the feed, persists Game Master debug records, exposes actor/fact state, and resets playtest state.
-- `src/app/api/director/turn/route.ts` coordinates synchronous Game Master turns through a provider-neutral backend boundary.
-- `src/lib/director/` contains provider-agnostic prompt, parsing, validation, and OpenAI-compatible adapter logic.
-- `src/app/world-client.tsx` renders the narrative playtest UI and debug state panel.
-- `src/app/providers.tsx` wires the Convex React provider into the App Router root.
-- `playwright.config.ts`, `scripts/llm-fixture-server.mjs`, and `tests/e2e/` provide deterministic browser E2E coverage of the current playtest loop.
-
-Persistent story generation remains plain prose. NPC `mood`, `status`, and `memory` can be updated only by the separate post-narration extractor after Convex validates the actor, field, value, and scene boundary. Actor location can also move only through that extractor, and only when the player clearly travels to an existing canonical location and the narration confirms arrival.
-
-The persistence strategy is documented in [`docs/persistence-system.md`](docs/persistence-system.md). The canonical object and field reference is [`docs/data-model.md`](docs/data-model.md). Update them when canonical state, Game Master mutation authority, feed reconstruction, reset behavior, or object semantics change.
-
-Try narrative input such as:
-
-```text
-I ask Mira what she knows about the storm.
+```bash
+npm run e2e:install
 ```
 
-Direct questions to present NPCs derive a required scene beat so the Game Master is prompted to let that NPC make a meaningful response or choice. Current-scene NPC profiles are rendered into card-like prompt context, including Mira's description, background, persona, voice, mood, status, memory, and private knowledge. Persistent mode now applies only validated post-narration extractor updates for current-scene NPC `mood`, `status`, and `memory`.
+## Project Structure
 
-The seeded demo world currently includes Mira and Brother Alden in the chapel, plus Rowan and Lena in the Lantern & Bell Tavern, so local playtesting can compare how the Game Master handles multiple NPCs across different scenes.
+| Path | Purpose |
+|---|---|
+| `convex/schema.ts` | Persistent-world table and index definitions. |
+| `convex/world.ts` | Demo world seed/reset, feed reconstruction, canonical state reads/writes, and mutation validation. |
+| `src/app/api/director/turn/route.ts` | Synchronous Game Master turn orchestration boundary. |
+| `src/lib/director/` | Prompt construction, provider adapter, parsing, validation, and generation settings. |
+| `src/app/world-client.tsx` | Narrative playtest UI and debug panel. |
+| `scripts/llm-fixture-server.mjs` | Local OpenAI-compatible fixture provider for deterministic tests. |
+| `tests/e2e/` | Playwright coverage for the current playtest loop. |
+| `docs/` | Architecture, data model, persistence strategy, testing, CI/CD, deployment notes, Epics, and completed changes. |
 
-The debug panel includes text-only prompt guidance sections for style, NPC behavior, and persistence strategy. It also includes `NPCs` and `Locations` tabs for rough canonical demo-world inspection, editing, and creation. Prompt guidance, NPC Cards, and Location Cards are summarized in Game Master debug metadata. NPC and location debug edits are stored in Convex demo-world rows/facts and can be reset by seeding a fresh world or using Reset Session. Clearing an NPC profile fact in the debug UI removes that manual canonical fact, so stale values are not kept in future prompts.
+## Documentation
 
-The player-facing surface is intentionally narrative-only for now. Slash commands, MUD-style commands, linked path enforcement, combat, HP, inventory, quests, campaign copies, marketplace logic, and polished builder UI are out of scope.
+- [`docs/architecture.md`](docs/architecture.md) explains the Next.js, Convex, Game Master, prompt/extractor, and debug boundaries.
+- [`docs/data-model.md`](docs/data-model.md) defines the current canonical Convex objects and fields.
+- [`docs/persistence-system.md`](docs/persistence-system.md) explains the state-first persistence strategy.
+- [`docs/testing.md`](docs/testing.md) describes unit, CI, deterministic E2E, live-provider playtest, and manual verification guidance.
+- [`docs/ci-cd.md`](docs/ci-cd.md) documents required gates and branch policy.
+- [`docs/deployment.md`](docs/deployment.md) captures the current non-deployed status and production gaps.
+- [`CHANGELOG.md`](CHANGELOG.md) summarizes user-facing release changes.
 
-## Current Intent
+## Debugging And Local Logs
 
-Keep this repo disposable until the core loop proves itself. The current proof is one editable persistent world with a rough reset. The later target model is independent story/play-session instances generated from a world or template.
+`npm run dev:debug` enables local Game Master diagnostics:
 
-The long-term direction is not a lightweight MUD. Lorecraft should feel like a TTRPG-style Game Master: story-first play supported by structured Story Cards, durable memory, and eventually selective hidden adjudication for risky or consequential uncertainty. Do not add movement commands, combat rules, stats, or broad simulation systems before playtesting shows a concrete need.
+- newline-delimited JSON logs at `logs/director-debug.jsonl`
+- raw provider request messages in local logs
+- raw LLM response text in local logs
+- persisted provider request messages in `directorCalls.rawRequest`
+- debug-only Convex write/snapshot surfaces
+
+Each recorded Game Master story attempt writes a `director.turn.unit` record with turn metadata, player input, provider/model summary, outcome, parsed narration/output when available, raw request/response diagnostics, and timing data. Persistent mode can also write `director.turn.extraction` records for post-narration NPC-state extraction. Pre-turn failures write `director.turn.rejected` records because no concrete turn exists yet.
+
+These diagnostics can include prompt guidance, player text, model output, and hidden NPC knowledge. Keep them local and out of commits, public docs, and shared deployments.
+
+## Current Direction
+
+Lorecraft should feel like a TTRPG-style Game Master: story-first play supported by structured Story Cards, durable memory, and eventually selective hidden adjudication for risky or consequential uncertainty.
+
+The long-term direction is not a lightweight MUD. Do not add slash commands, command lists, combat turns, HP, inventory, quest systems, or broad simulation controls until playtesting shows a concrete need.
