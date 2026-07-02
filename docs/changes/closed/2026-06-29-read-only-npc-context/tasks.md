@@ -179,8 +179,8 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ### Apply Readiness
 
-- Status: applied; final verification in progress.
-- Reason: Product/design scope has been implemented on the compliant app branch; final CI/review/manual confirmation remain.
+- Status: closed.
+- Reason: Product/design scope was implemented and reviewed on the compliant app branch; remaining manual UI confirmation was accepted as a non-blocking closeout gap for this local MVP iteration.
 
 ## Closeout
 

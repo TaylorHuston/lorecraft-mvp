@@ -380,7 +380,7 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 ### Verified By
 
 - R1-S1 and R3-S1/R3-S2: `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers successful and failed Game Master/debug call persistence, accepted/ignored update metadata, and extractor debug records.
-- R1-S2: `src/app/api/director/turn/route.test.ts` proves provider errors and invalid extractor output are recorded as debug-visible extractor failures without faking state.
+- R1-S2: `src/app/api/director/turn/route.test.ts` proves provider errors and invalid extractor output are recorded as debug-visible extractor failures without faking state; `npm run e2e` proves failed-turn debug evidence remains visible after browser reload.
 - R2-S1 and R2-S2: Local debug log unit tests prove JSONL writes are opt-in, raw LLM response text is omitted unless explicitly enabled, and raw request text is gated separately.
 - R4-S1 and R4-S2: `npm run e2e` exercises Reset Session through the browser and proves the story surface returns to the empty seeded state while canonical debug state is restored.
 - Supporting gates: `npm run ci:required` passed for lint, unit tests, typecheck, and production build.
@@ -652,13 +652,13 @@ The system SHALL keep transient story beats out of durable NPC facts unless they
 #### Scenario R5-S1: Ephemeral reactions stay in narration
 
 - WHEN Mira glances, flinches, smiles, pauses, or briefly reacts to a player action
-- THEN the Game Master can narrate the beat without returning an `npcUpdates` entry
+- THEN the Game Master can narrate the beat as plain prose without requiring any post-narration extractor update
 - AND existing NPC facts remain unchanged
 
 #### Scenario R5-S2: Durable changes remain bounded
 
 - WHEN an interaction meaningfully changes Mira's current attitude, ongoing circumstance, or rolling memory
-- THEN the Game Master may propose updates only for `mood`, `status`, or `memory`
+- THEN the post-narration extractor may propose updates only for `mood`, `status`, or `memory`
 - AND the backend validates, accepts, ignores, and records updates through the existing persistence boundary
 
 ### Requirement R6: Dev-Configurable Generation Settings
@@ -1266,7 +1266,7 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 
 ### Verification Gaps
 
-- Taylor manual browser confirmation remains pending.
+- Taylor confirmed manual browser playtesting for the original NPC state mutation workflow during closeout; this remediation adds deterministic route/E2E coverage without reopening that manual gate.
 - Live-provider extraction quality remains empirical; deterministic tests cover parser, validation, no-update, invalid-output, and provider-error contracts.
 
 ## Story LC-001-S11: End To End Playtest Verification

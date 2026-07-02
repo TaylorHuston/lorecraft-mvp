@@ -63,6 +63,7 @@
 | 2026-07-01 | Deterministic E2E failure/empty coverage | main; read-only test strategy subagent `Bohr` | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | Added fixture story-provider failure trigger and browser assertions for error display, previous-story preservation, reloadable failed-turn debug evidence, near-bottom anchoring, and empty story state after reset | 887bb2a |
 | 2026-07-01 | Epic and closed-artifact reconciliation | main | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, selected closed change artifacts | Reconciled read-only story generation vs extractor mutation wording, scenario-mapped verification evidence, S12 topical-order note, manual status vocabulary, and stale closed-design placeholders | 887bb2a |
 | 2026-07-01 | Apply-side implementation self-check remediation | main; read-only self-check subagent `Boole` | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, this ledger | Remediated self-check findings by converting remaining S1/S3/S6/S7/S8/S9/S10/S12 evidence into scenario-mapped entries and replacing the remaining stale S3 memory mutation phrase | 887bb2a |
+| 2026-07-01 | Review-pass artifact remediation | main; delegated review findings from `Euler` and `Galileo` | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `docs/changes/closed/2026-06-29-read-only-npc-context/tasks.md`, this ledger | Removed stale closed-change readiness text, fixed S7 extractor-boundary wording, mapped S4 failed-turn reload E2E evidence, and reconciled S10 manual confirmation status | review-fix commit |
 
 ## Verification Ledger
 
@@ -78,6 +79,8 @@
 | 2026-07-01 | Read-only implementation self-check subagent `Boole` | delegated implementation self-check | Found remaining non-scenario-mapped Epic evidence and one stale S3 memory phrase before commit | findings remediated |
 | 2026-07-01 | `npm run test -- src/app/api/director/turn/route.test.ts` after self-check remediation | focused automated test | Route contract still passes after final documentation remediation | passed, 5 tests |
 | 2026-07-01 | Post-remediation active Epic scan | artifact check | Active Epic/change no longer has command-log shaped `Verified By` evidence or stale Game Master mutation phrases in targeted patterns | passed |
+| 2026-07-01 | Delegated `/sdd-review` passes | delegated review | Artifact/coverage and docs/merge reviewers found narrow artifact drift; code/security reviewer found no issues | findings remediated |
+| 2026-07-01 | Review-fix artifact scan | artifact check | No remaining stale readiness, manual-status, implementation-pending, or Game Master mutation wording in targeted active/closed artifacts | passed |
 
 ## Manual UI Confirmation
 
@@ -94,8 +97,8 @@
 
 ## Artifact Updates
 
-- Epic update: complete. LC-001 now documents the story-order note, read-only story-generation boundary, extractor mutation boundary, scenario-mapped evidence for affected Stories, and current Verification Gaps.
-- Closed change artifact update: complete. Selected closed designs/tasks/reviews no longer use stale manual-status vocabulary or active-looking implementation-pending placeholders.
+- Epic update: complete. LC-001 now documents the story-order note, read-only story-generation boundary, extractor mutation boundary, scenario-mapped evidence for affected Stories, and current Verification Gaps after delegated review remediation.
+- Closed change artifact update: complete. Selected closed designs/tasks/reviews no longer use stale manual-status vocabulary, active-looking implementation-pending placeholders, or stale readiness blocks.
 - Changelog: no public entry. This is internal test hardening and SDD artifact reconciliation; the only runtime change is error-order hardening for malformed local route input.
 
 ## Open Questions
@@ -104,7 +107,7 @@
 
 ## Closeout
 
-- Review record: pending `/sdd-review`.
+- Review record: `docs/changes/2026-07-01-lc-001-epic-verify-fixes/review.md` with ready verdict after delegated required findings were remediated.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: no public entry required.
 - PR / merge state: unmerged branch with local remediation commit `887bb2a`.
