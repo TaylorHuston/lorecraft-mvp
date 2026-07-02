@@ -6,7 +6,7 @@ Epics and Stories remain the source of truth for implemented behavior. ADRs expl
 
 ## Current Records
 
-No ADRs have been recorded yet.
+- [2026-07-01: World Templates Create Frozen Adventure Copies](2026-07-01-world-adventure-frozen-copies.md)
 
 ## When To Add One
 
