@@ -76,8 +76,9 @@ ready
 - Conflict check: clean
 - Commit state: review remediation committed locally as part of this review pass
 - PR status: not requested
-- Merge status: not authorized by this review invocation
+- Merge status: merged locally into `develop` on 2026-07-01 after Taylor authorized closeout
 
 ## Review Log
 
 - 2026-07-01: Review created after delegated review findings were remediated.
+- 2026-07-01: Change merged locally into `develop` and moved under `docs/changes/closed/`.

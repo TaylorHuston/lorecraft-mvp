@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Status: implementation and verification complete; committed locally and ready for /sdd-review.
-- Branch: `change/lc-001-epic-verify-fixes`.
+- Status: closed; merged locally into `develop`.
+- Branch: `develop`.
 - Source report: `docs/epics/lc-001-provider-agnostic-chat-experience/reviews/2026-07-01-0254-epic-verify.md`.
-- Next action: run `/sdd-review` as the independent local gate.
+- Next action: none.
 
 ## Discovery
 
@@ -58,7 +58,7 @@
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-01 | Discovery and change setup | main | `docs/changes/2026-07-01-lc-001-epic-verify-fixes/` | Created remediation change from Epic-verify report | 887bb2a |
+| 2026-07-01 | Discovery and change setup | main | Change artifacts | Created remediation change from Epic-verify report | 887bb2a |
 | 2026-07-01 | Route contract and focused tests | main; read-only test strategy subagent `Bohr` | `src/app/api/director/turn/route.ts`, `src/app/api/director/turn/route.test.ts`, `vitest.config.ts` | Moved LLM config read after world-context load so malformed `worldId` returns structured `400`; added route tests for malformed world ID, missing config, no-update extraction, invalid extractor output, and extractor provider failure | 887bb2a |
 | 2026-07-01 | Deterministic E2E failure/empty coverage | main; read-only test strategy subagent `Bohr` | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | Added fixture story-provider failure trigger and browser assertions for error display, previous-story preservation, reloadable failed-turn debug evidence, near-bottom anchoring, and empty story state after reset | 887bb2a |
 | 2026-07-01 | Epic and closed-artifact reconciliation | main | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, selected closed change artifacts | Reconciled read-only story generation vs extractor mutation wording, scenario-mapped verification evidence, S12 topical-order note, manual status vocabulary, and stale closed-design placeholders | 887bb2a |
@@ -107,9 +107,9 @@
 
 ## Closeout
 
-- Review record: `docs/changes/2026-07-01-lc-001-epic-verify-fixes/review.md` with ready verdict after delegated required findings were remediated.
+- Review record: `docs/changes/closed/2026-07-01-lc-001-epic-verify-fixes/review.md` with ready verdict after delegated required findings were remediated.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: no public entry required.
-- PR / merge state: unmerged branch with local remediation commit `887bb2a`.
+- PR / merge state: merged locally into `develop` on 2026-07-01 with source commits `887bb2a`, `dae11e8`, and `74d505e`.
 - Deferred gaps accepted: live-provider model-quality/movement judgment remains empirical; transcript-mode browser-specific Playwright coverage remains deferred until transcript mode is a regular browser target.
-- Folder state: active.
+- Folder state: closed.
