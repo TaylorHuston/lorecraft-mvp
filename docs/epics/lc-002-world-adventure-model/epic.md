@@ -121,8 +121,8 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified: 2026-07-01
+Modified: 2026-07-02
+Last verified: 2026-07-02
 
 As a playtester, I want story turns and state changes to belong to my Adventure, so that play can resume from the story I actually changed.
 
@@ -169,17 +169,18 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 |---|---|---|---|
 | R1-S1, R1-S2, R2-S1 | `npm run test -- src/app/api/director/turn/route.test.ts src/lib/director/director.test.ts`; `npm run test` | Route/unit contracts use `adventureId`, Adventure load errors are structured, and prompt/debug summaries include Adventure/source-version metadata. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run typecheck`; `npm run convex:once` | TypeScript and Convex generated schema/functions accept Adventure-scoped runtime contracts. | Passing |
+| R1-S1, R1-S2, R2-S1 | `npm run e2e`; `npm run ci:required` | Browser playtest and required CI pass with Adventure-scoped story turns, debug state, reload behavior, and reset/delete flows. | Passing |
 
 #### Verification Gaps
 
-- Full browser E2E and broad CI are still pending in this apply run.
+- Optional live-provider smoke remains deferred; deterministic browser E2E and required CI are passing.
 
 ### Story S3: World Version Edits Do Not Mutate Existing Adventures
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified: 2026-07-01
+Modified: 2026-07-02
+Last verified: 2026-07-02
 
 As a creator or playtester, I want World updates to affect future Adventures only, so that ongoing stories do not unexpectedly change.
 
@@ -268,10 +269,11 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R1-S1, R1-S2 | Live Convex smoke: reset the v2 isolation-check Adventure with `world:resetPlaytestWorld`, then reloaded its snapshot. It stayed tied to WorldVersion v2 and restored v2 baseline rows without affecting the original v1 Adventure. | Reset restores the selected Adventure from its original source WorldVersion and does not upgrade from or mutate other Adventures. | Passing |
+| R1-S1, R1-S2 | `npm run e2e`; `npm run ci:required` | Browser playtest and required CI pass with selected-Adventure reset restoring source-version baseline state. | Passing |
 
 #### Verification Gaps
 
-- Full browser E2E and broad CI are still pending in this apply run.
+- Optional live-provider smoke remains deferred; deterministic browser E2E and required CI are passing.
 
 ## Cross-Story Concerns
 

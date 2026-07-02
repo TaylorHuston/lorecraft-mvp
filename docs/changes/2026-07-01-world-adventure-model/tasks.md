@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: Adventure deletion refinement committed; dev server running; ready for `sdd-review`
-- Last completed action: committed home-screen Adventure deletion after focused checks, E2E, required CI, and live browser smoke
-- Next action: run `sdd-review`
+- Current state: Review pass completed; dev server running; ready for closeout/merge authorization
+- Last completed action: ran `sdd-review`, refreshed stale Epic verification evidence, and reran `npm run ci:required`
+- Next action: close and merge after user authorization
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: none in app repo
 - Known blockers: none identified
@@ -68,12 +68,12 @@
 ### 5. Review And Closeout
 
 - [x] 5.1 Update root `CHANGELOG.md` under `Unreleased`.
-- [ ] 5.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
-- [ ] 5.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
-- [ ] 5.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 5.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
-- [ ] 5.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
-- [ ] 5.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
+- [x] 5.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
+- [x] 5.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
+- [x] 5.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 5.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
+- [x] 5.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
+- [x] 5.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 5.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [ ] 5.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -131,6 +131,7 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | `npm run e2e` after Adventure deletion refinement | deterministic browser E2E | Full deterministic playtest passes; the test creates a temporary Adventure, returns to the World container, confirms Delete, verifies the row disappears, and sees the deletion notice. | passed |
 | 2026-07-02 | `npm run ci:required` after Adventure deletion refinement | deterministic required gate | Lint, full unit tests, typecheck, and production build pass after the delete flow. | passed |
 | 2026-07-02 | Browser smoke against restarted `npm run dev:debug` after Adventure deletion refinement | manual/browser automation smoke | With one existing Adventure visible, created temporary Adventure `kn711ye5j9bg4bjnjhg689k56989ra5e`, deleted it from `/`, saw `Deleted Stormbound Chapel Adventure 2.`, and the list returned to one Adventure. | passed |
+| 2026-07-02 | `sdd-review`; `npm run ci:required` | local integration gate | Source/target diff, SDD artifacts, Epic truth, docs/changelog, security posture, branch readiness, and required CI were reviewed; stale Epic verification wording was refreshed. | passed |
 
 ## Manual Feedback
 
@@ -175,11 +176,11 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: LC-001 no longer treats independent story/play-session instances as purely future scope.
 - ADR status: accepted; implementation follows `docs/adrs/2026-07-01-world-adventure-frozen-copies.md`.
 - Changelog current: yes, `Unreleased` notes Adventure instances and Adventure-scoped runtime/reset behavior.
-- `sdd-review` verdict: pending.
-- Review record: pending `/sdd-review`.
-- `review.md` findings resolved: not applicable until review runs.
+- `sdd-review` verdict: ready after minor artifact refresh.
+- Review record: clean review recorded in this ledger; no `review.md` created.
+- `review.md` findings resolved: not applicable; no unresolved findings.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
-- PR / merge state: initial implementation and manual feedback slices committed on `change/world-adventure-model`; no PR/merge yet.
+- PR / merge state: implementation, manual feedback slices, and review artifact refresh committed on `change/world-adventure-model`; no PR/merge yet.
 - Deferred scope accepted: polished World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
 - Change moved to `docs/changes/closed/`: no; pending review and closeout authorization.
