@@ -30,11 +30,11 @@ const convex = new ConvexHttpClient(convexUrl);
 console.log(`Transcript Game Master playtest target: ${baseUrl}`);
 console.log("Expected server mode: LORECRAFT_DIRECTOR_MODE=transcript");
 
-const worldId = await seedFreshWorld();
-const before = await convex.query(api.world.getSnapshot, { worldId });
+const adventureId = await seedFreshWorld();
+const before = await convex.query(api.world.getSnapshot, { adventureId });
 assertMiraFacts(before, "before");
 
-const result = await submitTurn(baseUrl, worldId, DIRECT_QUESTION_INPUT);
+const result = await submitTurn(baseUrl, adventureId, DIRECT_QUESTION_INPUT);
 if (typeof result.narration !== "string" || result.narration.trim().length === 0) {
   fail("Expected non-empty narration.");
 }
@@ -42,7 +42,7 @@ if (result.acceptedUpdates.length > 0 || result.ignoredUpdates.length > 0) {
   fail("Expected transcript route response to have empty accepted/ignored updates.");
 }
 
-const after = await convex.query(api.world.getSnapshot, { worldId });
+const after = await convex.query(api.world.getSnapshot, { adventureId });
 assertTranscriptSnapshot(after);
 
 console.log("");
@@ -59,13 +59,13 @@ async function seedFreshWorld() {
   }
 }
 
-async function submitTurn(targetBaseUrl, worldId, input) {
+async function submitTurn(targetBaseUrl, adventureId, input) {
   let response;
   try {
     response = await fetch(`${targetBaseUrl.replace(/\/$/, "")}/api/director/turn`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ worldId, input }),
+      body: JSON.stringify({ adventureId, input }),
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   } catch (error) {

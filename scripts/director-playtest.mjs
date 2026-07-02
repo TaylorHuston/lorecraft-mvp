@@ -23,14 +23,14 @@ const convex = new ConvexHttpClient(convexUrl);
 
 console.log(`Game Master playtest target: ${baseUrl}`);
 
-const worldId = await seedFreshWorld();
-const directQuestion = await submitTurn(baseUrl, worldId, DIRECT_QUESTION_INPUT);
+const adventureId = await seedFreshWorld();
+const directQuestion = await submitTurn(baseUrl, adventureId, DIRECT_QUESTION_INPUT);
 assertDirectQuestion(directQuestion);
 
-const plainAction = await submitTurn(baseUrl, worldId, PLAIN_ACTION_INPUT);
+const plainAction = await submitTurn(baseUrl, adventureId, PLAIN_ACTION_INPUT);
 assertPlainAction(plainAction);
 
-const snapshot = await convex.query(api.world.getSnapshot, { worldId });
+const snapshot = await convex.query(api.world.getSnapshot, { adventureId });
 assertSnapshot(snapshot);
 
 console.log("");
@@ -48,13 +48,13 @@ async function seedFreshWorld() {
   }
 }
 
-async function submitTurn(targetBaseUrl, worldId, input) {
+async function submitTurn(targetBaseUrl, adventureId, input) {
   let response;
   try {
     response = await fetch(`${targetBaseUrl.replace(/\/$/, "")}/api/director/turn`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ worldId, input }),
+      body: JSON.stringify({ adventureId, input }),
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   } catch (error) {

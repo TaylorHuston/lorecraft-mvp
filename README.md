@@ -11,7 +11,9 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Narrative-only story input and a resumable player-facing story stream.
 - Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
 - Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
-- Stormbound Chapel demo world with seeded locations, NPCs, story context, and resettable local state.
+- Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
+- Startup World container screen showing Stormbound Chapel with its local Adventures listed inside it, with each Adventure opened at `/adventures/<id>` and removable from the list.
+- Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
 - Location Cards with current-location context, known destination context, debug editing, and bounded movement.
 - Post-narration state extraction for validated NPC `mood`, `status`, and `memory` updates.
@@ -39,7 +41,7 @@ This repo does not currently include:
 - Multiplayer.
 - Combat, HP, inventory, stats, quests, rulesets, or dice systems.
 - A polished World Builder.
-- Campaign copies or reusable world templates.
+- Polished reusable World Builder.
 - Marketplace, billing, creator tools, or public hosting.
 
 Remote/shared deployments are not production-ready. The current route guardrails are prototype safety checks, not a replacement for real authentication, ownership checks, rate limiting, or production operations.
@@ -150,7 +152,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel, submit narrative input with Enter, receive a persisted Game Master response, reload the story, inspect debug turn evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset location state.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, submit narrative input with Enter, receive a persisted Game Master response, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset Adventure location state.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 
@@ -164,8 +166,8 @@ npm run e2e:install
 
 | Path | Purpose |
 |---|---|
-| `convex/schema.ts` | Persistent-world table and index definitions. |
-| `convex/world.ts` | Demo world seed/reset, feed reconstruction, canonical state reads/writes, and mutation validation. |
+| `convex/schema.ts` | World, WorldVersion, Adventure, runtime table, and index definitions. |
+| `convex/world.ts` | Demo World/Adventure seed/reset/copy, feed reconstruction, canonical state reads/writes, and mutation validation. |
 | `src/app/api/director/turn/route.ts` | Synchronous Game Master turn orchestration boundary. |
 | `src/lib/director/` | Prompt construction, provider adapter, parsing, validation, and generation settings. |
 | `src/app/world-client.tsx` | Narrative playtest UI and debug panel. |

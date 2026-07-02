@@ -12,6 +12,30 @@ import { internal } from "./_generated/api";
 
 type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
+type BaselineFact = { key: string; value: FactValue };
+type AdventureBaseline = {
+  world: { name: string; description: string };
+  rooms: Array<{ key: string; name: string; description: string }>;
+  exits: Array<{ fromRoomKey: string; toRoomKey: string; label: string; visible: boolean }>;
+  player: { key: string; name: string; description: string; roomKey: string };
+  npcs: Array<{
+    key: string;
+    name: string;
+    description: string;
+    roomKey: string;
+    facts: BaselineFact[];
+  }>;
+  objects: Array<{
+    key: string;
+    name: string;
+    description: string;
+    roomKey: string;
+    visible: boolean;
+    facts: BaselineFact[];
+  }>;
+  initialEvent: string;
+  initialNarration: string;
+};
 type AcceptedNpcUpdateForWrite = {
   actorKey: string;
   actorName: string;
@@ -37,6 +61,7 @@ type DebugNpcWriteResult = {
 };
 
 const WORLD_SLUG = "stormbound-chapel-default";
+const DEFAULT_ADVENTURE_SLUG = "stormbound-chapel-default-adventure";
 const DEMO_RESET_ROW_LIMIT = 500;
 const DEBUG_CREATED_LOCATION_LIMIT = 25;
 const DEBUG_CREATED_NPC_LIMIT = 25;
@@ -205,6 +230,42 @@ const SEEDED_ROOMS = [
   },
 ] as const;
 
+const SEEDED_EXITS = [
+  { fromRoomKey: "chapel", toRoomKey: "vestry", label: "west", visible: true },
+  { fromRoomKey: "vestry", toRoomKey: "chapel", label: "east", visible: true },
+  { fromRoomKey: "chapel", toRoomKey: "graveyard", label: "north", visible: true },
+  { fromRoomKey: "graveyard", toRoomKey: "chapel", label: "south", visible: true },
+  { fromRoomKey: "chapel", toRoomKey: "tavern", label: "east", visible: true },
+  { fromRoomKey: "tavern", toRoomKey: "chapel", label: "west", visible: true },
+] as const;
+
+const SEEDED_OBJECTS = [
+  {
+    key: "shutters",
+    name: "Shutters",
+    description: "Warped wooden shutters latched against the storm.",
+    roomKey: "chapel",
+    visible: true,
+    facts: [{ key: "open", value: false }],
+  },
+  {
+    key: "lantern",
+    name: "Lantern",
+    description: "A cracked lantern with a low, unsteady flame.",
+    roomKey: "chapel",
+    visible: true,
+    facts: [{ key: "broken", value: false }],
+  },
+  {
+    key: "altar",
+    name: "Altar",
+    description: "A stone altar scarred by old candle wax.",
+    roomKey: "chapel",
+    visible: true,
+    facts: [{ key: "marked_with_chalk", value: false }],
+  },
+] as const;
+
 const SEEDED_NPCS = [
   {
     key: MIRA_KEY,
@@ -292,6 +353,41 @@ const debugNpcWriteResult = v.object({
   error: v.optional(v.string()),
   actorId: v.optional(v.id("actors")),
 });
+const adventureCreateResult = v.union(
+  v.object({ ok: v.literal(true), adventureId: v.id("adventures") }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
+const adventureDeleteResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    deletedAdventureId: v.id("adventures"),
+    deletedTurns: v.number(),
+    deletedCommands: v.number(),
+    deletedNarrations: v.number(),
+    deletedEvents: v.number(),
+    deletedStateDiffs: v.number(),
+    deletedDirectorCalls: v.number(),
+    deletedFacts: v.number(),
+    deletedObjects: v.number(),
+    deletedExits: v.number(),
+    deletedActors: v.number(),
+    deletedLocations: v.number(),
+  }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
+const adventureListItem = v.object({
+  _id: v.id("adventures"),
+  name: v.string(),
+  worldName: v.string(),
+  sourceVersionNumber: v.number(),
+  currentLocationName: v.optional(v.string()),
+  turnCount: v.number(),
+  lastPlayedAt: v.number(),
+});
+const worldVersionCreateResult = v.union(
+  v.object({ ok: v.literal(true), worldVersionId: v.id("worldVersions") }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
 
 function normalized(input: string) {
   return input.trim().toLowerCase();
@@ -309,26 +405,74 @@ function roomSubjectId(roomKey: string) {
   return `room:${roomKey}`;
 }
 
+function slugify(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+}
+
+function buildStormboundBaseline(): AdventureBaseline {
+  return {
+    world: {
+      name: "Stormbound Chapel",
+      description:
+        "A small persistent-world test set around a chapel, a tavern, a vestry, and a rain-lashed graveyard.",
+    },
+    rooms: SEEDED_ROOMS.map((room) => ({ ...room })),
+    exits: SEEDED_EXITS.map((exit) => ({ ...exit })),
+    player: {
+      key: PLAYER_KEY,
+      name: "Taylor",
+      description: "The playtester exploring whether the world remembers.",
+      roomKey: "chapel",
+    },
+    npcs: SEEDED_NPCS.map((npc) => ({
+      key: npc.key,
+      name: npc.name,
+      description: npc.description,
+      roomKey: npc.roomKey,
+      facts: npc.facts.map((fact) => ({ key: fact.key, value: fact.value })),
+    })),
+    objects: SEEDED_OBJECTS.map((object) => ({
+      key: object.key,
+      name: object.name,
+      description: object.description,
+      roomKey: object.roomKey,
+      visible: object.visible,
+      facts: object.facts.map((fact) => ({ key: fact.key, value: fact.value })),
+    })),
+    initialEvent: "The Stormbound Chapel Adventure was created from its source WorldVersion.",
+    initialNarration: "You stand in the chapel while rain works at the shutters.",
+  };
+}
+
 function stableActorKey(actor: { key?: string; name: string }) {
   return actor.key ?? normalized(actor.name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-async function findRoomByKey(ctx: DatabaseCtx, worldId: Id<"worlds">, key: string) {
+async function findRoomByKey(ctx: DatabaseCtx, adventureId: Id<"adventures">, key: string) {
   return await ctx.db
     .query("rooms")
-    .withIndex("by_worldId_and_key", (q) => q.eq("worldId", worldId).eq("key", key))
+    .withIndex("by_adventureId_and_key", (q) =>
+      q.eq("adventureId", adventureId).eq("key", key),
+    )
     .unique();
 }
 
 async function findActorByKeyOrName(
   ctx: DatabaseCtx,
-  worldId: Id<"worlds">,
+  adventureId: Id<"adventures">,
   key: string,
   name: string,
 ) {
   const byKey = await ctx.db
     .query("actors")
-    .withIndex("by_worldId_and_key", (q) => q.eq("worldId", worldId).eq("key", key))
+    .withIndex("by_adventureId_and_key", (q) =>
+      q.eq("adventureId", adventureId).eq("key", key),
+    )
     .unique();
   if (byKey) {
     return byKey;
@@ -336,7 +480,7 @@ async function findActorByKeyOrName(
 
   const actors = await ctx.db
     .query("actors")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(100);
   return actors.find((actor) => actor.name.toLowerCase() === name.toLowerCase()) ?? null;
 }
@@ -345,6 +489,7 @@ async function setFact(
   ctx: MutationCtx,
   args: {
     worldId: Id<"worlds">;
+    adventureId: Id<"adventures">;
     subjectType: "world" | "room" | "actor" | "object" | "exit";
     subjectId: string;
     key: string;
@@ -355,8 +500,8 @@ async function setFact(
 ) {
   const existing = await ctx.db
     .query("facts")
-    .withIndex("by_worldId_and_subjectId_and_key", (q) =>
-      q.eq("worldId", args.worldId).eq("subjectId", args.subjectId).eq("key", args.key),
+    .withIndex("by_adventureId_and_subjectId_and_key", (q) =>
+      q.eq("adventureId", args.adventureId).eq("subjectId", args.subjectId).eq("key", args.key),
     )
     .unique();
 
@@ -369,6 +514,7 @@ async function setFact(
 
   return await ctx.db.insert("facts", {
     worldId: args.worldId,
+    adventureId: args.adventureId,
     subjectType: args.subjectType,
     subjectId: args.subjectId,
     key: args.key,
@@ -377,10 +523,241 @@ async function setFact(
   });
 }
 
+async function createAdventureFromBaseline(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    name: string;
+    worldId: Id<"worlds">;
+    worldVersionId: Id<"worldVersions">;
+    baseline: AdventureBaseline;
+  },
+) {
+  const adventureId = await ctx.db.insert("adventures", {
+    slug: args.slug,
+    worldId: args.worldId,
+    worldVersionId: args.worldVersionId,
+    name: args.name,
+  });
+
+  await copyBaselineRuntimeRows(ctx, {
+    worldId: args.worldId,
+    worldVersionId: args.worldVersionId,
+    adventureId,
+    baseline: args.baseline,
+  });
+  return adventureId;
+}
+
+async function ensureDemoWorldVersion(ctx: MutationCtx) {
+  const existingWorld = await ctx.db
+    .query("worlds")
+    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .unique();
+
+  if (existingWorld?.currentWorldVersionId) {
+    const existingVersion = await ctx.db.get(existingWorld.currentWorldVersionId);
+    if (existingVersion) {
+      return {
+        worldId: existingWorld._id,
+        worldVersionId: existingVersion._id,
+        baseline: existingVersion.baseline as AdventureBaseline,
+      };
+    }
+  }
+
+  const baseline = buildStormboundBaseline();
+  const worldId =
+    existingWorld?._id ??
+    (await ctx.db.insert("worlds", {
+      slug: WORLD_SLUG,
+      name: baseline.world.name,
+      description: baseline.world.description,
+    }));
+
+  const latest = await ctx.db
+    .query("worldVersions")
+    .withIndex("by_worldId_and_versionNumber", (q) => q.eq("worldId", worldId))
+    .order("desc")
+    .take(1);
+  if (latest[0]) {
+    await ctx.db.patch(worldId, { currentWorldVersionId: latest[0]._id });
+    return {
+      worldId,
+      worldVersionId: latest[0]._id,
+      baseline: latest[0].baseline as AdventureBaseline,
+    };
+  }
+
+  const worldVersionId = await ctx.db.insert("worldVersions", {
+    worldId,
+    versionNumber: 1,
+    name: baseline.world.name,
+    description: baseline.world.description,
+    baseline,
+  });
+  await ctx.db.patch(worldId, { currentWorldVersionId: worldVersionId });
+
+  return { worldId, worldVersionId, baseline };
+}
+
+async function nextAdventureIdentity(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  preferredName?: string,
+) {
+  const adventures = await ctx.db
+    .query("adventures")
+    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .take(100);
+  const ordinal = adventures.length + 1;
+  const name = preferredName?.trim().slice(0, 120) || `Stormbound Chapel Adventure ${ordinal}`;
+  const baseSlug = slugify(name) || `stormbound-chapel-adventure-${ordinal}`;
+
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
+    const existing = await ctx.db
+      .query("adventures")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!existing) {
+      return { name, slug };
+    }
+  }
+
+  return {
+    name,
+    slug: `${baseSlug}-${adventures.length + 101}`,
+  };
+}
+
+async function copyBaselineRuntimeRows(
+  ctx: MutationCtx,
+  args: {
+    worldId: Id<"worlds">;
+    worldVersionId: Id<"worldVersions">;
+    adventureId: Id<"adventures">;
+    baseline: AdventureBaseline;
+  },
+) {
+  const roomsByKey = new Map<string, Id<"rooms">>();
+  for (const room of args.baseline.rooms) {
+    const roomId = await ctx.db.insert("rooms", {
+      worldId: args.worldId,
+      adventureId: args.adventureId,
+      key: room.key,
+      name: room.name,
+      description: room.description,
+    });
+    roomsByKey.set(room.key, roomId);
+  }
+
+  for (const exit of args.baseline.exits) {
+    const fromRoomId = roomsByKey.get(exit.fromRoomKey);
+    const toRoomId = roomsByKey.get(exit.toRoomKey);
+    if (!fromRoomId || !toRoomId) {
+      continue;
+    }
+    await ctx.db.insert("exits", {
+      worldId: args.worldId,
+      adventureId: args.adventureId,
+      fromRoomId,
+      toRoomId,
+      label: exit.label,
+      visible: exit.visible,
+    });
+  }
+
+  const playerRoomId = roomsByKey.get(args.baseline.player.roomKey);
+  if (!playerRoomId) {
+    throw new Error("Adventure baseline is missing the player starting room.");
+  }
+  const playerId = await ctx.db.insert("actors", {
+    worldId: args.worldId,
+    adventureId: args.adventureId,
+    roomId: playerRoomId,
+    key: args.baseline.player.key,
+    name: args.baseline.player.name,
+    role: "player",
+    description: args.baseline.player.description,
+  });
+  await ctx.db.patch(args.adventureId, { currentPlayerActorId: playerId });
+
+  for (const npc of args.baseline.npcs) {
+    const roomId = roomsByKey.get(npc.roomKey);
+    if (!roomId) {
+      continue;
+    }
+    await ctx.db.insert("actors", {
+      worldId: args.worldId,
+      adventureId: args.adventureId,
+      roomId,
+      key: npc.key,
+      name: npc.name,
+      role: "npc",
+      description: npc.description,
+    });
+    for (const fact of npc.facts) {
+      await setFact(ctx, {
+        worldId: args.worldId,
+        adventureId: args.adventureId,
+        subjectType: "actor",
+        subjectId: actorSubjectId(npc.key),
+        key: fact.key,
+        value: fact.value,
+        source: "seed",
+        overwrite: false,
+      });
+    }
+  }
+
+  for (const object of args.baseline.objects) {
+    const roomId = roomsByKey.get(object.roomKey);
+    if (!roomId) {
+      continue;
+    }
+    const objectId = await ctx.db.insert("worldObjects", {
+      worldId: args.worldId,
+      adventureId: args.adventureId,
+      roomId,
+      key: object.key,
+      name: object.name,
+      description: object.description,
+      visible: object.visible,
+    });
+    for (const fact of object.facts) {
+      await setFact(ctx, {
+        worldId: args.worldId,
+        adventureId: args.adventureId,
+        subjectType: "object",
+        subjectId: objectSubjectId(objectId),
+        key: fact.key,
+        value: fact.value,
+        source: "seed",
+        overwrite: false,
+      });
+    }
+  }
+
+  await ctx.db.insert("events", {
+    worldId: args.worldId,
+    adventureId: args.adventureId,
+    text: args.baseline.initialEvent,
+    source: "seed",
+  });
+  await ctx.db.insert("narrations", {
+    worldId: args.worldId,
+    adventureId: args.adventureId,
+    text: args.baseline.initialNarration,
+    source: "seed",
+  });
+}
+
 async function applyAcceptedNpcUpdates(
   ctx: MutationCtx,
   args: {
     worldId: Id<"worlds">;
+    adventureId: Id<"adventures">;
     turnId: Id<"turns">;
     commandId: Id<"commands">;
     acceptedUpdates: AcceptedNpcUpdateForWrite[];
@@ -403,6 +780,7 @@ async function applyAcceptedNpcUpdates(
     for (const change of update.changes) {
       await setFact(ctx, {
         worldId: args.worldId,
+        adventureId: args.adventureId,
         subjectType: "actor",
         subjectId,
         key: change.key,
@@ -424,6 +802,7 @@ async function applyAcceptedNpcUpdates(
     const eventText = `${update.actorName}'s ${changedKeys} changed after the exchange.`;
     await ctx.db.insert("events", {
       worldId: args.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       text: eventText,
@@ -435,6 +814,7 @@ async function applyAcceptedNpcUpdates(
   if (operations.length > 0) {
     await ctx.db.insert("stateDiffs", {
       worldId: args.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       source: "llm",
@@ -449,6 +829,7 @@ async function applyAcceptedActorMoves(
   ctx: MutationCtx,
   args: {
     worldId: Id<"worlds">;
+    adventureId: Id<"adventures">;
     turnId: Id<"turns">;
     commandId: Id<"commands">;
     acceptedMoves: AcceptedActorMoveForWrite[];
@@ -458,8 +839,10 @@ async function applyAcceptedActorMoves(
     return 0;
   }
 
-  const world = await ctx.db.get(args.worldId);
-  const player = world?.currentPlayerActorId ? await ctx.db.get(world.currentPlayerActorId) : null;
+  const adventure = await ctx.db.get(args.adventureId);
+  const player = adventure?.currentPlayerActorId
+    ? await ctx.db.get(adventure.currentPlayerActorId)
+    : null;
   const currentRoomId = player?.roomId;
   const operations: Array<{ op: "moveActor"; actorId: Id<"actors">; toRoomId: Id<"rooms"> }> = [];
 
@@ -468,10 +851,16 @@ async function applyAcceptedActorMoves(
   }
 
   for (const move of args.acceptedMoves) {
-    const actor = await findActorByKeyOrName(ctx, args.worldId, move.actorKey, move.actorName);
-    const toRoom = await findRoomByKey(ctx, args.worldId, move.toLocationKey);
+    const actor = await findActorByKeyOrName(ctx, args.adventureId, move.actorKey, move.actorName);
+    const toRoom = await findRoomByKey(ctx, args.adventureId, move.toLocationKey);
 
-    if (!actor || !toRoom || actor.roomId !== currentRoomId) {
+    if (
+      !actor ||
+      !toRoom ||
+      actor.adventureId !== args.adventureId ||
+      toRoom.adventureId !== args.adventureId ||
+      actor.roomId !== currentRoomId
+    ) {
       continue;
     }
 
@@ -482,6 +871,7 @@ async function applyAcceptedActorMoves(
   if (operations.length > 0) {
     await ctx.db.insert("stateDiffs", {
       worldId: args.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       source: "llm",
@@ -494,14 +884,14 @@ async function applyAcceptedActorMoves(
 
 async function deleteActorFactByKey(
   ctx: MutationCtx,
-  worldId: Id<"worlds">,
+  adventureId: Id<"adventures">,
   actorKey: string,
   key: string,
 ) {
   const existing = await ctx.db
     .query("facts")
-    .withIndex("by_worldId_and_subjectId_and_key", (q) =>
-      q.eq("worldId", worldId).eq("subjectId", actorSubjectId(actorKey)).eq("key", key),
+    .withIndex("by_adventureId_and_subjectId_and_key", (q) =>
+      q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(actorKey)).eq("key", key),
     )
     .unique();
 
@@ -510,11 +900,11 @@ async function deleteActorFactByKey(
   }
 }
 
-async function deleteActorFacts(ctx: MutationCtx, worldId: Id<"worlds">, actorKey: string) {
+async function deleteActorFacts(ctx: MutationCtx, adventureId: Id<"adventures">, actorKey: string) {
   const rows = await ctx.db
     .query("facts")
-    .withIndex("by_worldId_and_subjectId", (q) =>
-      q.eq("worldId", worldId).eq("subjectId", actorSubjectId(actorKey)),
+    .withIndex("by_adventureId_and_subjectId", (q) =>
+      q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(actorKey)),
     )
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("facts", rows.length);
@@ -528,6 +918,7 @@ async function restoreSeededNpc(
   ctx: MutationCtx,
   args: {
     worldId: Id<"worlds">;
+    adventureId: Id<"adventures">;
     key: string;
     name: string;
     description: string;
@@ -535,7 +926,7 @@ async function restoreSeededNpc(
     legacyFactKeys?: readonly string[];
   },
 ) {
-  const actor = await findActorByKeyOrName(ctx, args.worldId, args.key, args.name);
+  const actor = await findActorByKeyOrName(ctx, args.adventureId, args.key, args.name);
   if (!actor) {
     return 0;
   }
@@ -547,12 +938,13 @@ async function restoreSeededNpc(
   });
 
   for (const key of args.legacyFactKeys ?? []) {
-    await deleteActorFactByKey(ctx, args.worldId, args.key, key);
+    await deleteActorFactByKey(ctx, args.adventureId, args.key, key);
   }
 
   for (const fact of args.facts) {
     await setFact(ctx, {
       worldId: args.worldId,
+      adventureId: args.adventureId,
       subjectType: "actor",
       subjectId: actorSubjectId(args.key),
       key: fact.key,
@@ -565,337 +957,254 @@ async function restoreSeededNpc(
   return args.facts.length;
 }
 
-async function resetSeededActorLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
-  const chapel = await findRoomByKey(ctx, worldId, "chapel");
-  const tavern = await findRoomByKey(ctx, worldId, "tavern");
-  if (!chapel || !tavern) {
-    return 0;
-  }
-
-  let moved = 0;
-  const seededActors = [
-    { key: PLAYER_KEY, name: "Taylor", roomId: chapel._id },
-    ...SEEDED_NPCS.map((npc) => ({
-      key: npc.key,
-      name: npc.name,
-      roomId: npc.roomKey === "tavern" ? tavern._id : chapel._id,
-    })),
-  ];
-
-  for (const seededActor of seededActors) {
-    const actor = await findActorByKeyOrName(ctx, worldId, seededActor.key, seededActor.name);
-    if (!actor || actor.roomId === seededActor.roomId) {
-      continue;
-    }
-    await ctx.db.patch(actor._id, { roomId: seededActor.roomId });
-    moved += 1;
-  }
-
-  return moved;
-}
-
-async function deleteNonSeededNpcs(ctx: MutationCtx, worldId: Id<"worlds">) {
-  const actors = await ctx.db
-    .query("actors")
-    .withIndex("by_worldId_and_role", (q) => q.eq("worldId", worldId).eq("role", "npc"))
-    .take(DEMO_RESET_ROW_LIMIT + 1);
-  assertDemoResetTableWithinLimit("actors", actors.length);
-
-  const seededNpcKeys = new Set<string>(SEEDED_NPCS.map((npc) => npc.key));
-  let deletedActors = 0;
-  for (const actor of actors) {
-    const actorKey = stableActorKey(actor);
-    if (seededNpcKeys.has(actorKey)) {
-      continue;
-    }
-    await deleteActorFacts(ctx, worldId, actorKey);
-    await ctx.db.delete(actor._id);
-    deletedActors += 1;
-  }
-
-  return deletedActors;
-}
-
-async function restoreSeededLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
-  let restoredLocations = 0;
-  for (const seededRoom of SEEDED_ROOMS) {
-    const room = await findRoomByKey(ctx, worldId, seededRoom.key);
-    if (!room) {
-      continue;
-    }
-
-    if (room.name !== seededRoom.name || room.description !== seededRoom.description) {
-      await ctx.db.patch(room._id, {
-        name: seededRoom.name,
-        description: seededRoom.description,
-      });
-      restoredLocations += 1;
-    }
-  }
-
-  return restoredLocations;
-}
-
-async function deleteNonSeededLocations(ctx: MutationCtx, worldId: Id<"worlds">) {
-  const rooms = await ctx.db
-    .query("rooms")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
-    .take(DEMO_RESET_ROW_LIMIT + 1);
-  assertDemoResetTableWithinLimit("rooms", rooms.length);
-
-  const seededRoomKeys = new Set<string>(SEEDED_ROOMS.map((room) => room.key));
-  let deletedLocations = 0;
-  for (const room of rooms) {
-    if (seededRoomKeys.has(room.key)) {
-      continue;
-    }
-    await ctx.db.delete(room._id);
-    deletedLocations += 1;
-  }
-
-  return deletedLocations;
-}
-
 export const seedDemoWorld = mutation({
   args: {},
-  returns: v.id("worlds"),
+  returns: v.id("adventures"),
   handler: async (ctx) => {
     await deleteDemoWorld(ctx);
 
+    const baseline = buildStormboundBaseline();
     const worldId = await ctx.db.insert("worlds", {
       slug: WORLD_SLUG,
+      name: baseline.world.name,
+      description: baseline.world.description,
+    });
+
+    const worldVersionId = await ctx.db.insert("worldVersions", {
+      worldId,
+      versionNumber: 1,
+      name: baseline.world.name,
+      description: baseline.world.description,
+      baseline,
+    });
+
+    await ctx.db.patch(worldId, { currentWorldVersionId: worldVersionId });
+    const adventureId = await createAdventureFromBaseline(ctx, {
+      slug: DEFAULT_ADVENTURE_SLUG,
       name: "Stormbound Chapel",
-      description:
-        "A small persistent-world test set around a chapel, a tavern, a vestry, and a rain-lashed graveyard.",
+      worldId,
+      worldVersionId,
+      baseline,
     });
 
-    const chapelId = await ctx.db.insert("rooms", {
-      worldId,
-      ...SEEDED_ROOMS[0],
-    });
-    const vestryId = await ctx.db.insert("rooms", {
-      worldId,
-      ...SEEDED_ROOMS[1],
-    });
-    const graveyardId = await ctx.db.insert("rooms", {
-      worldId,
-      ...SEEDED_ROOMS[2],
-    });
-    const tavernId = await ctx.db.insert("rooms", {
-      worldId,
-      ...SEEDED_ROOMS[3],
-    });
-
-    await Promise.all([
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: chapelId,
-        toRoomId: vestryId,
-        label: "west",
-        visible: true,
-      }),
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: vestryId,
-        toRoomId: chapelId,
-        label: "east",
-        visible: true,
-      }),
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: chapelId,
-        toRoomId: graveyardId,
-        label: "north",
-        visible: true,
-      }),
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: graveyardId,
-        toRoomId: chapelId,
-        label: "south",
-        visible: true,
-      }),
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: chapelId,
-        toRoomId: tavernId,
-        label: "east",
-        visible: true,
-      }),
-      ctx.db.insert("exits", {
-        worldId,
-        fromRoomId: tavernId,
-        toRoomId: chapelId,
-        label: "west",
-        visible: true,
-      }),
-    ]);
-
-    const playerId = await ctx.db.insert("actors", {
-      worldId,
-      roomId: chapelId,
-      key: PLAYER_KEY,
-      name: "Taylor",
-      role: "player",
-      description: "The playtester exploring whether the world remembers.",
-    });
-    await ctx.db.insert("actors", {
-      worldId,
-      roomId: chapelId,
-      key: MIRA_KEY,
-      name: "Mira",
-      role: "npc",
-      description: MIRA_DESCRIPTION,
-    });
-    await ctx.db.insert("actors", {
-      worldId,
-      roomId: chapelId,
-      key: PRIEST_KEY,
-      name: PRIEST_NAME,
-      role: "npc",
-      description: PRIEST_DESCRIPTION,
-    });
-    await ctx.db.insert("actors", {
-      worldId,
-      roomId: tavernId,
-      key: TAVERNKEEP_KEY,
-      name: TAVERNKEEP_NAME,
-      role: "npc",
-      description: TAVERNKEEP_DESCRIPTION,
-    });
-    await ctx.db.insert("actors", {
-      worldId,
-      roomId: tavernId,
-      key: MINSTREL_KEY,
-      name: MINSTREL_NAME,
-      role: "npc",
-      description: MINSTREL_DESCRIPTION,
-    });
-
-    await ctx.db.patch(worldId, { currentPlayerActorId: playerId });
-
-    const shuttersId = await ctx.db.insert("worldObjects", {
-      worldId,
-      roomId: chapelId,
-      key: "shutters",
-      name: "Shutters",
-      description: "Warped wooden shutters latched against the storm.",
-      visible: true,
-    });
-    const lanternId = await ctx.db.insert("worldObjects", {
-      worldId,
-      roomId: chapelId,
-      key: "lantern",
-      name: "Lantern",
-      description: "A cracked lantern with a low, unsteady flame.",
-      visible: true,
-    });
-    const altarId = await ctx.db.insert("worldObjects", {
-      worldId,
-      roomId: chapelId,
-      key: "altar",
-      name: "Altar",
-      description: "A stone altar scarred by old candle wax.",
-      visible: true,
-    });
-
-    await Promise.all([
-      setFact(ctx, {
-        worldId,
-        subjectType: "object",
-        subjectId: objectSubjectId(shuttersId),
-        key: "open",
-        value: false,
-        source: "seed",
-        overwrite: false,
-      }),
-      setFact(ctx, {
-        worldId,
-        subjectType: "object",
-        subjectId: objectSubjectId(lanternId),
-        key: "broken",
-        value: false,
-        source: "seed",
-        overwrite: false,
-      }),
-      setFact(ctx, {
-        worldId,
-        subjectType: "object",
-        subjectId: objectSubjectId(altarId),
-        key: "marked_with_chalk",
-        value: false,
-        source: "seed",
-        overwrite: false,
-      }),
-      ...MIRA_BASELINE_FACTS.map((fact) =>
-        setFact(ctx, {
-          worldId,
-          subjectType: "actor",
-          subjectId: actorSubjectId(MIRA_KEY),
-          key: fact.key,
-          value: fact.value,
-          source: "seed",
-          overwrite: false,
-        }),
-      ),
-      ...PRIEST_BASELINE_FACTS.map((fact) =>
-        setFact(ctx, {
-          worldId,
-          subjectType: "actor",
-          subjectId: actorSubjectId(PRIEST_KEY),
-          key: fact.key,
-          value: fact.value,
-          source: "seed",
-          overwrite: false,
-        }),
-      ),
-      ...TAVERNKEEP_BASELINE_FACTS.map((fact) =>
-        setFact(ctx, {
-          worldId,
-          subjectType: "actor",
-          subjectId: actorSubjectId(TAVERNKEEP_KEY),
-          key: fact.key,
-          value: fact.value,
-          source: "seed",
-          overwrite: false,
-        }),
-      ),
-      ...MINSTREL_BASELINE_FACTS.map((fact) =>
-        setFact(ctx, {
-          worldId,
-          subjectType: "actor",
-          subjectId: actorSubjectId(MINSTREL_KEY),
-          key: fact.key,
-          value: fact.value,
-          source: "seed",
-          overwrite: false,
-        }),
-      ),
-      ctx.db.insert("events", {
-        worldId,
-        text: "The Stormbound Chapel playtest world was seeded.",
-        source: "seed",
-      }),
-      ctx.db.insert("narrations", {
-        worldId,
-        text: "You stand in the chapel while rain works at the shutters.",
-        source: "seed",
-      }),
-    ]);
-
-    return worldId;
+    return adventureId;
   },
 });
 
-export const getDefaultWorld = query({
+export const getDefaultAdventure = query({
   args: {},
-  returns: v.union(v.null(), v.id("worlds")),
+  returns: v.union(v.null(), v.id("adventures")),
+  handler: async (ctx) => {
+    const adventure = await ctx.db
+      .query("adventures")
+      .withIndex("by_slug", (q) => q.eq("slug", DEFAULT_ADVENTURE_SLUG))
+      .unique();
+    return adventure?._id ?? null;
+  },
+});
+
+export const listAdventures = query({
+  args: {},
+  returns: v.array(adventureListItem),
   handler: async (ctx) => {
     const world = await ctx.db
       .query("worlds")
       .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
       .unique();
-    return world?._id ?? null;
+    if (!world) {
+      return [];
+    }
+
+    const adventures = await ctx.db
+      .query("adventures")
+      .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+      .take(50);
+
+    const items = await Promise.all(
+      adventures.map(async (adventure) => {
+        const sourceVersion = await ctx.db.get(adventure.worldVersionId);
+        const player = adventure.currentPlayerActorId
+          ? await ctx.db.get(adventure.currentPlayerActorId)
+          : null;
+        const currentRoom = player ? await ctx.db.get(player.roomId) : null;
+        const latestTurn = await ctx.db
+          .query("turns")
+          .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+            q.eq("adventureId", adventure._id),
+          )
+          .order("desc")
+          .take(1);
+        const turnCount = latestTurn[0]?.sequenceNumber ?? 0;
+
+        return {
+          _id: adventure._id,
+          name: adventure.name,
+          worldName: world.name,
+          sourceVersionNumber: sourceVersion?.versionNumber ?? 0,
+          currentLocationName: currentRoom?.name,
+          turnCount,
+          lastPlayedAt: latestTurn[0]?.completedAt ?? latestTurn[0]?._creationTime ?? adventure._creationTime,
+        };
+      }),
+    );
+
+    return items.sort((left, right) => right.lastPlayedAt - left.lastPlayedAt);
+  },
+});
+
+export const createAdventure = mutation({
+  args: {
+    name: v.optional(v.string()),
+  },
+  returns: adventureCreateResult,
+  handler: async (ctx, args) => {
+    const { worldId, worldVersionId, baseline } = await ensureDemoWorldVersion(ctx);
+    const identity = await nextAdventureIdentity(ctx, worldId, args.name);
+    const adventureId = await createAdventureFromBaseline(ctx, {
+      slug: identity.slug,
+      name: identity.name,
+      worldId,
+      worldVersionId,
+      baseline,
+    });
+
+    return { ok: true as const, adventureId };
+  },
+});
+
+export const deleteAdventure = mutation({
+  args: { adventureId: v.id("adventures") },
+  returns: adventureDeleteResult,
+  handler: async (ctx, args) => {
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false as const, error: "Adventure could not be found." };
+    }
+
+    const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
+    const deletedEvents = await deleteEvents(ctx, args.adventureId);
+    const deletedStateDiffs = await deleteStateDiffs(ctx, args.adventureId);
+    const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.adventureId);
+    const deletedCommands = await deleteCommands(ctx, args.adventureId);
+    const deletedTurns = await deleteTurns(ctx, args.adventureId);
+    const deletedFacts = await deleteFacts(ctx, args.adventureId);
+    const deletedObjects = await deleteWorldObjects(ctx, args.adventureId);
+    const deletedExits = await deleteExits(ctx, args.adventureId);
+    const deletedActors = await deleteActors(ctx, args.adventureId);
+    const deletedLocations = await deleteRooms(ctx, args.adventureId);
+
+    await ctx.db.delete(args.adventureId);
+
+    return {
+      ok: true as const,
+      deletedAdventureId: args.adventureId,
+      deletedTurns,
+      deletedCommands,
+      deletedNarrations,
+      deletedEvents,
+      deletedStateDiffs,
+      deletedDirectorCalls,
+      deletedFacts,
+      deletedObjects,
+      deletedExits,
+      deletedActors,
+      deletedLocations,
+    };
+  },
+});
+
+export const createDemoWorldVersion = mutation({
+  args: {
+    chapelDescription: v.optional(v.string()),
+  },
+  returns: worldVersionCreateResult,
+  handler: async (ctx, args) => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false as const, error: "Debug WorldVersion writes are disabled." };
+    }
+
+    const world = await ctx.db
+      .query("worlds")
+      .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+      .unique();
+    if (!world) {
+      return { ok: false as const, error: "Demo World could not be found." };
+    }
+
+    const latest = await ctx.db
+      .query("worldVersions")
+      .withIndex("by_worldId_and_versionNumber", (q) => q.eq("worldId", world._id))
+      .order("desc")
+      .take(1);
+    const baseline = buildStormboundBaseline();
+    const chapelDescription = args.chapelDescription?.trim();
+    if (chapelDescription) {
+      baseline.rooms = baseline.rooms.map((room) =>
+        room.key === "chapel"
+          ? { ...room, description: chapelDescription.slice(0, 1200) }
+          : room,
+      );
+    }
+
+    const worldVersionId = await ctx.db.insert("worldVersions", {
+      worldId: world._id,
+      versionNumber: (latest[0]?.versionNumber ?? 0) + 1,
+      name: baseline.world.name,
+      description: baseline.world.description,
+      baseline,
+    });
+    await ctx.db.patch(world._id, { currentWorldVersionId: worldVersionId });
+
+    return { ok: true as const, worldVersionId };
+  },
+});
+
+export const createAdventureFromCurrentWorldVersion = mutation({
+  args: {
+    slug: v.string(),
+    name: v.optional(v.string()),
+  },
+  returns: adventureCreateResult,
+  handler: async (ctx, args) => {
+    if (!debugLocationWritesEnabled()) {
+      return { ok: false as const, error: "Debug Adventure creation is disabled." };
+    }
+
+    const slug = args.slug.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{1,64}$/.test(slug)) {
+      return { ok: false as const, error: "Adventure slug must use lowercase letters, numbers, and hyphens." };
+    }
+
+    const existing = await ctx.db
+      .query("adventures")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (existing) {
+      return { ok: false as const, error: "An Adventure with that slug already exists." };
+    }
+
+    const world = await ctx.db
+      .query("worlds")
+      .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+      .unique();
+    if (!world?.currentWorldVersionId) {
+      return { ok: false as const, error: "Demo WorldVersion could not be found." };
+    }
+
+    const worldVersion = await ctx.db.get(world.currentWorldVersionId);
+    if (!worldVersion) {
+      return { ok: false as const, error: "Current WorldVersion could not be loaded." };
+    }
+
+    const adventureId = await createAdventureFromBaseline(ctx, {
+      slug,
+      name: args.name?.trim().slice(0, 120) || worldVersion.name,
+      worldId: world._id,
+      worldVersionId: worldVersion._id,
+      baseline: worldVersion.baseline as AdventureBaseline,
+    });
+
+    return { ok: true as const, adventureId };
   },
 });
 
@@ -910,14 +1219,25 @@ const feedEntry = v.object({
 });
 
 export const getSnapshot = query({
-  args: { worldId: v.id("worlds") },
+  args: { adventureId: v.id("adventures") },
   returns: v.union(
     v.null(),
     v.object({
+      adventure: v.object({
+        _id: v.id("adventures"),
+        name: v.string(),
+        worldId: v.id("worlds"),
+        worldVersionId: v.id("worldVersions"),
+      }),
       world: v.object({
         _id: v.id("worlds"),
         name: v.string(),
         description: v.string(),
+      }),
+      sourceWorldVersion: v.object({
+        _id: v.id("worldVersions"),
+        versionNumber: v.number(),
+        name: v.string(),
       }),
       player: v.object({
         _id: v.id("actors"),
@@ -1035,12 +1355,12 @@ export const getSnapshot = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const loaded = await loadCurrentWorld(ctx, args.worldId);
+    const loaded = await loadCurrentAdventure(ctx, args.adventureId);
     if (!loaded) {
       return null;
     }
 
-    const { world, player, room } = loaded;
+    const { adventure, world, worldVersion, player, room } = loaded;
     const includeDebugState = debugSnapshotDataEnabled();
     const [
       exits,
@@ -1056,54 +1376,65 @@ export const getSnapshot = query({
       locations,
     ] =
       await Promise.all([
-        loadVisibleExits(ctx, args.worldId, room._id),
+        loadVisibleExits(ctx, args.adventureId, room._id),
         ctx.db
           .query("actors")
-          .withIndex("by_worldId_and_roomId", (q) =>
-            q.eq("worldId", args.worldId).eq("roomId", room._id),
+          .withIndex("by_adventureId_and_roomId", (q) =>
+            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
           )
           .take(20),
         ctx.db
           .query("worldObjects")
-          .withIndex("by_worldId_and_roomId", (q) =>
-            q.eq("worldId", args.worldId).eq("roomId", room._id),
+          .withIndex("by_adventureId_and_roomId", (q) =>
+            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
           )
           .take(30),
         ctx.db
           .query("facts")
-          .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
           .order("desc")
           .take(80),
         ctx.db
           .query("events")
-          .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
           .order("desc")
           .take(30),
         ctx.db
           .query("narrations")
-          .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
           .order("desc")
           .take(30),
         ctx.db
           .query("stateDiffs")
-          .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
           .order("desc")
           .take(12),
         ctx.db
           .query("directorCalls")
-          .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
           .order("desc")
           .take(10),
-        loadTurnSummaries(ctx, args.worldId, 12),
-        loadFeed(ctx, args.worldId, 60),
-        loadLocationSummaries(ctx, args.worldId),
+        loadTurnSummaries(ctx, args.adventureId, 12),
+        loadFeed(ctx, args.adventureId, 60),
+        loadLocationSummaries(ctx, args.adventureId),
       ]);
 
     return {
+      adventure: {
+        _id: adventure._id,
+        name: adventure.name,
+        worldId: adventure.worldId,
+        worldVersionId: adventure.worldVersionId,
+      },
       world: {
         _id: world._id,
         name: world.name,
         description: world.description,
+      },
+      sourceWorldVersion: {
+        _id: worldVersion._id,
+        versionNumber: worldVersion.versionNumber,
+        name: worldVersion.name,
       },
       player: {
         _id: player._id,
@@ -1191,11 +1522,22 @@ export const getSnapshot = query({
 });
 
 export const getDirectorContext = query({
-  args: { worldId: v.id("worlds"), serverWriteToken: v.optional(v.string()) },
+  args: { adventureId: v.id("adventures"), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
+      adventure: v.object({
+        id: v.string(),
+        name: v.string(),
+        worldId: v.string(),
+        worldVersionId: v.string(),
+      }),
       world: v.object({ id: v.string(), name: v.string(), description: v.string() }),
+      sourceWorldVersion: v.object({
+        id: v.string(),
+        versionNumber: v.number(),
+        name: v.string(),
+      }),
       player: v.object({ id: v.string(), key: v.string(), name: v.string() }),
       room: v.object({
         id: v.string(),
@@ -1258,34 +1600,34 @@ export const getDirectorContext = query({
       return null;
     }
 
-    const loaded = await loadCurrentWorld(ctx, args.worldId);
+    const loaded = await loadCurrentAdventure(ctx, args.adventureId);
     if (!loaded) {
       return null;
     }
 
-    const { world, player, room } = loaded;
+    const { adventure, world, worldVersion, player, room } = loaded;
     const [exits, actors, objects, facts, recentFeed, allRooms] = await Promise.all([
-      loadVisibleExits(ctx, args.worldId, room._id),
+      loadVisibleExits(ctx, args.adventureId, room._id),
       ctx.db
         .query("actors")
-        .withIndex("by_worldId_and_roomId", (q) =>
-          q.eq("worldId", args.worldId).eq("roomId", room._id),
+        .withIndex("by_adventureId_and_roomId", (q) =>
+          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
         )
         .take(20),
       ctx.db
         .query("worldObjects")
-        .withIndex("by_worldId_and_roomId", (q) =>
-          q.eq("worldId", args.worldId).eq("roomId", room._id),
+        .withIndex("by_adventureId_and_roomId", (q) =>
+          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
         )
         .take(30),
       ctx.db
         .query("facts")
-        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .take(100),
-      loadFeed(ctx, args.worldId, 20),
+      loadFeed(ctx, args.adventureId, 20),
       ctx.db
         .query("rooms")
-        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .take(100),
     ]);
     const visibleObjects = objects
@@ -1302,10 +1644,21 @@ export const getDirectorContext = query({
     }));
 
     return {
+      adventure: {
+        id: adventure._id,
+        name: adventure.name,
+        worldId: adventure.worldId,
+        worldVersionId: adventure.worldVersionId,
+      },
       world: {
         id: world._id,
         name: world.name,
         description: world.description,
+      },
+      sourceWorldVersion: {
+        id: worldVersion._id,
+        versionNumber: worldVersion.versionNumber,
+        name: worldVersion.name,
       },
       player: {
         id: player._id,
@@ -1370,11 +1723,22 @@ export const getDirectorContext = query({
 });
 
 export const getTranscriptDirectorContext = query({
-  args: { worldId: v.id("worlds"), serverWriteToken: v.optional(v.string()) },
+  args: { adventureId: v.id("adventures"), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
+      adventure: v.object({
+        id: v.string(),
+        name: v.string(),
+        worldId: v.string(),
+        worldVersionId: v.string(),
+      }),
       world: v.object({ id: v.string(), name: v.string(), description: v.string() }),
+      sourceWorldVersion: v.object({
+        id: v.string(),
+        versionNumber: v.number(),
+        name: v.string(),
+      }),
       initialSeed: v.string(),
       transcript: v.array(feedEntry),
     }),
@@ -1384,23 +1748,24 @@ export const getTranscriptDirectorContext = query({
       return null;
     }
 
-    const world = await ctx.db.get(args.worldId);
-    if (!world) {
+    const loaded = await loadCurrentAdventure(ctx, args.adventureId);
+    if (!loaded) {
       return null;
     }
+    const { adventure, world, worldVersion } = loaded;
 
     const [chapel, player, actors, objects, transcript] = await Promise.all([
-      findRoomByKey(ctx, args.worldId, "chapel"),
-      findActorByKeyOrName(ctx, args.worldId, PLAYER_KEY, "Taylor"),
+      findRoomByKey(ctx, args.adventureId, "chapel"),
+      findActorByKeyOrName(ctx, args.adventureId, PLAYER_KEY, "Taylor"),
       ctx.db
         .query("actors")
-        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .take(100),
       ctx.db
         .query("worldObjects")
-        .withIndex("by_worldId", (q) => q.eq("worldId", args.worldId))
+        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .take(30),
-      loadTranscript(ctx, args.worldId, 40),
+      loadTranscript(ctx, args.adventureId, 40),
     ]);
     const startingNpcs = actors
       .filter((actor) => actor.role === "npc")
@@ -1424,10 +1789,21 @@ export const getTranscriptDirectorContext = query({
       .join("\n");
 
     return {
+      adventure: {
+        id: adventure._id,
+        name: adventure.name,
+        worldId: adventure.worldId,
+        worldVersionId: adventure.worldVersionId,
+      },
       world: {
         id: world._id,
         name: world.name,
         description: world.description,
+      },
+      sourceWorldVersion: {
+        id: worldVersion._id,
+        versionNumber: worldVersion.versionNumber,
+        name: worldVersion.name,
       },
       initialSeed,
       transcript,
@@ -1436,7 +1812,7 @@ export const getTranscriptDirectorContext = query({
 });
 
 export const recordPlayerInput = mutation({
-  args: { worldId: v.id("worlds"), input: v.string(), serverWriteToken: v.optional(v.string()) },
+  args: { adventureId: v.id("adventures"), input: v.string(), serverWriteToken: v.optional(v.string()) },
   returns: v.union(
     v.object({
       ok: v.literal(true),
@@ -1456,12 +1832,12 @@ export const recordPlayerInput = mutation({
       return { ok: false as const, error: "Enter narrative text to continue." };
     }
 
-    const world = await ctx.db.get(args.worldId);
-    if (!world?.currentPlayerActorId) {
-      return { ok: false as const, error: "No active player exists in this world yet." };
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure?.currentPlayerActorId) {
+      return { ok: false as const, error: "No active player exists in this Adventure yet." };
     }
 
-    const player = await ctx.db.get(world.currentPlayerActorId);
+    const player = await ctx.db.get(adventure.currentPlayerActorId);
     if (!player) {
       return { ok: false as const, error: "The active player could not be loaded." };
     }
@@ -1473,19 +1849,23 @@ export const recordPlayerInput = mutation({
 
     const previousTurn = await ctx.db
       .query("turns")
-      .withIndex("by_worldId_and_sequenceNumber", (q) => q.eq("worldId", args.worldId))
+      .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+        q.eq("adventureId", args.adventureId),
+      )
       .order("desc")
       .take(1);
     const sequenceNumber = (previousTurn[0]?.sequenceNumber ?? 0) + 1;
     const turnId = await ctx.db.insert("turns", {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       sequenceNumber,
       actorId: player._id,
       status: "pending",
     });
 
     const commandId = await ctx.db.insert("commands", {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId,
       actorId: player._id,
       input,
@@ -1500,7 +1880,7 @@ export const recordPlayerInput = mutation({
 
 export const completeDirectorTurn = mutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
     commandId: v.id("commands"),
@@ -1525,13 +1905,15 @@ export const completeDirectorTurn = mutation({
   handler: async (ctx, args) => {
     requireServerWrite(args.serverWriteToken);
 
+    const adventure = await ctx.db.get(args.adventureId);
     const turn = await ctx.db.get(args.turnId);
-    if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
-      throw new Error("Turn, world, and command do not match.");
+    if (!adventure || !turn || turn.adventureId !== args.adventureId || turn.commandId !== args.commandId) {
+      throw new Error("Turn, Adventure, and command do not match.");
     }
 
     const directorCall = {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       provider: args.provider,
@@ -1557,7 +1939,8 @@ export const completeDirectorTurn = mutation({
     }
 
     const narrationId = await ctx.db.insert("narrations", {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       text: args.narration.trim(),
@@ -1570,7 +1953,8 @@ export const completeDirectorTurn = mutation({
     }
 
     const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       acceptedUpdates: args.acceptedUpdates,
@@ -1584,7 +1968,7 @@ export const completeDirectorTurn = mutation({
 
 export const recordNpcStateExtraction = mutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
     commandId: v.id("commands"),
@@ -1609,9 +1993,10 @@ export const recordNpcStateExtraction = mutation({
   handler: async (ctx, args) => {
     requireServerWrite(args.serverWriteToken);
 
+    const adventure = await ctx.db.get(args.adventureId);
     const turn = await ctx.db.get(args.turnId);
-    if (!turn || turn.worldId !== args.worldId || turn.commandId !== args.commandId) {
-      throw new Error("Turn, world, and command do not match.");
+    if (!adventure || !turn || turn.adventureId !== args.adventureId || turn.commandId !== args.commandId) {
+      throw new Error("Turn, Adventure, and command do not match.");
     }
 
     const acceptedMoveUpdates = (args.acceptedMoves ?? []).map((move) => ({
@@ -1623,7 +2008,8 @@ export const recordNpcStateExtraction = mutation({
       ...move,
     }));
     const directorCall = {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       provider: args.provider,
@@ -1644,13 +2030,15 @@ export const recordNpcStateExtraction = mutation({
     }
 
     const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       acceptedUpdates: args.acceptedUpdates,
     });
     const movedActors = await applyAcceptedActorMoves(ctx, {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       turnId: args.turnId,
       commandId: args.commandId,
       acceptedMoves: args.acceptedMoves ?? [],
@@ -1661,7 +2049,7 @@ export const recordNpcStateExtraction = mutation({
 });
 
 export const resetPlaytestWorld = mutation({
-  args: { worldId: v.id("worlds") },
+  args: { adventureId: v.id("adventures") },
   returns: v.object({
     deletedTurns: v.number(),
     deletedCommands: v.number(),
@@ -1676,28 +2064,34 @@ export const resetPlaytestWorld = mutation({
     deletedActors: v.number(),
   }),
   handler: async (ctx, args) => {
-    const deletedNarrations = await deleteNarrations(ctx, args.worldId);
-    const deletedEvents = await deleteEvents(ctx, args.worldId);
-    const deletedStateDiffs = await deleteStateDiffs(ctx, args.worldId);
-    const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.worldId);
-    const deletedCommands = await deleteCommands(ctx, args.worldId);
-    const deletedTurns = await deleteTurns(ctx, args.worldId);
-
-    let restoredFacts = 0;
-    for (const npc of SEEDED_NPCS) {
-      restoredFacts += await restoreSeededNpc(ctx, {
-        worldId: args.worldId,
-        key: npc.key,
-        name: npc.name,
-        description: npc.description,
-        facts: npc.facts,
-        legacyFactKeys: "legacyFactKeys" in npc ? npc.legacyFactKeys : undefined,
-      });
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      throw new Error("Adventure could not be found.");
     }
-    const resetActorLocations = await resetSeededActorLocations(ctx, args.worldId);
-    const restoredLocations = await restoreSeededLocations(ctx, args.worldId);
-    const deletedActors = await deleteNonSeededNpcs(ctx, args.worldId);
-    const deletedLocations = await deleteNonSeededLocations(ctx, args.worldId);
+    const worldVersion = await ctx.db.get(adventure.worldVersionId);
+    if (!worldVersion) {
+      throw new Error("Adventure source WorldVersion could not be found.");
+    }
+    const baseline = worldVersion.baseline as AdventureBaseline;
+
+    const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
+    const deletedEvents = await deleteEvents(ctx, args.adventureId);
+    const deletedStateDiffs = await deleteStateDiffs(ctx, args.adventureId);
+    const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.adventureId);
+    const deletedCommands = await deleteCommands(ctx, args.adventureId);
+    const deletedTurns = await deleteTurns(ctx, args.adventureId);
+    await deleteFacts(ctx, args.adventureId);
+    await deleteWorldObjects(ctx, args.adventureId);
+    await deleteExits(ctx, args.adventureId);
+    const deletedActors = await deleteActors(ctx, args.adventureId);
+    const deletedLocations = await deleteRooms(ctx, args.adventureId);
+
+    await copyBaselineRuntimeRows(ctx, {
+      worldId: adventure.worldId,
+      worldVersionId: adventure.worldVersionId,
+      adventureId: args.adventureId,
+      baseline,
+    });
 
     return {
       deletedTurns,
@@ -1706,9 +2100,9 @@ export const resetPlaytestWorld = mutation({
       deletedEvents,
       deletedStateDiffs,
       deletedDirectorCalls,
-      restoredFacts,
-      resetActorLocations,
-      restoredLocations,
+      restoredFacts: baseline.npcs.reduce((total, npc) => total + npc.facts.length, 0),
+      resetActorLocations: baseline.npcs.length + 1,
+      restoredLocations: baseline.rooms.length,
       deletedLocations,
       deletedActors,
     };
@@ -1717,7 +2111,7 @@ export const resetPlaytestWorld = mutation({
 
 export const updateLocation = action({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     locationId: v.id("rooms"),
     name: v.string(),
     description: v.string(),
@@ -1738,7 +2132,7 @@ export const updateLocation = action({
 
 export const createLocation = action({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     key: v.string(),
     name: v.string(),
     description: v.string(),
@@ -1759,7 +2153,7 @@ export const createLocation = action({
 
 export const updateNpc = action({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     actorId: v.id("actors"),
     name: v.string(),
     description: v.string(),
@@ -1778,7 +2172,7 @@ export const updateNpc = action({
 
 export const createNpc = action({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     key: v.string(),
     name: v.string(),
     description: v.string(),
@@ -1797,7 +2191,7 @@ export const createNpc = action({
 
 export const resetNpc = action({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     actorId: v.id("actors"),
   },
   returns: debugNpcWriteResult,
@@ -1813,7 +2207,7 @@ export const resetNpc = action({
 
 export const updateLocationInternal = internalMutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     locationId: v.id("rooms"),
     name: v.string(),
     description: v.string(),
@@ -1821,8 +2215,8 @@ export const updateLocationInternal = internalMutation({
   returns: debugLocationWriteResult,
   handler: async (ctx, args) => {
     const room = await ctx.db.get(args.locationId);
-    if (!room || room.worldId !== args.worldId) {
-      return { ok: false, error: "Location could not be found in this world." };
+    if (!room || room.adventureId !== args.adventureId) {
+      return { ok: false, error: "Location could not be found in this Adventure." };
     }
 
     const name = args.name.trim();
@@ -1841,7 +2235,7 @@ export const updateLocationInternal = internalMutation({
 
 export const createLocationInternal = internalMutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     key: v.string(),
     name: v.string(),
     description: v.string(),
@@ -1862,12 +2256,17 @@ export const createLocationInternal = internalMutation({
       return { ok: false, error: "Location name and description are required." };
     }
 
-    const existing = await findRoomByKey(ctx, args.worldId, key);
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false, error: "Adventure could not be found." };
+    }
+
+    const existing = await findRoomByKey(ctx, args.adventureId, key);
     if (existing) {
       return { ok: false, error: "A location with that key already exists." };
     }
 
-    const debugLocationCount = await countDebugCreatedLocations(ctx, args.worldId);
+    const debugLocationCount = await countDebugCreatedLocations(ctx, args.adventureId);
     if (debugLocationCount >= DEBUG_CREATED_LOCATION_LIMIT) {
       return {
         ok: false,
@@ -1876,7 +2275,8 @@ export const createLocationInternal = internalMutation({
     }
 
     const locationId = await ctx.db.insert("rooms", {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       key,
       name: name.slice(0, 120),
       description: description.slice(0, 1200),
@@ -1887,7 +2287,7 @@ export const createLocationInternal = internalMutation({
 
 export const updateNpcInternal = internalMutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     actorId: v.id("actors"),
     name: v.string(),
     description: v.string(),
@@ -1896,8 +2296,8 @@ export const updateNpcInternal = internalMutation({
   returns: debugNpcWriteResult,
   handler: async (ctx, args) => {
     const actor = await ctx.db.get(args.actorId);
-    if (!actor || actor.worldId !== args.worldId || actor.role !== "npc") {
-      return { ok: false, error: "NPC could not be found in this world." };
+    if (!actor || actor.adventureId !== args.adventureId || actor.role !== "npc") {
+      return { ok: false, error: "NPC could not be found in this Adventure." };
     }
 
     const actorKey = stableActorKey(actor);
@@ -1911,7 +2311,7 @@ export const updateNpcInternal = internalMutation({
       name: name.slice(0, 120),
       description: description.slice(0, 1200),
     });
-    await writeNpcFacts(ctx, args.worldId, actorKey, args.facts);
+    await writeNpcFacts(ctx, actor.worldId, args.adventureId, actorKey, args.facts);
 
     return { ok: true, actorId: actor._id };
   },
@@ -1919,7 +2319,7 @@ export const updateNpcInternal = internalMutation({
 
 export const createNpcInternal = internalMutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     key: v.string(),
     name: v.string(),
     description: v.string(),
@@ -1937,12 +2337,17 @@ export const createNpcInternal = internalMutation({
       return { ok: false, error: "NPC name and description are required." };
     }
 
-    const existing = await findActorByKeyOrName(ctx, args.worldId, key, name);
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false, error: "Adventure could not be found." };
+    }
+
+    const existing = await findActorByKeyOrName(ctx, args.adventureId, key, name);
     if (existing) {
       return { ok: false, error: "An actor with that key or name already exists." };
     }
 
-    const debugNpcCount = await countDebugCreatedNpcs(ctx, args.worldId);
+    const debugNpcCount = await countDebugCreatedNpcs(ctx, args.adventureId);
     if (debugNpcCount >= DEBUG_CREATED_NPC_LIMIT) {
       return {
         ok: false,
@@ -1950,21 +2355,23 @@ export const createNpcInternal = internalMutation({
       };
     }
 
-    const world = await ctx.db.get(args.worldId);
-    const player = world?.currentPlayerActorId ? await ctx.db.get(world.currentPlayerActorId) : null;
+    const player = adventure.currentPlayerActorId
+      ? await ctx.db.get(adventure.currentPlayerActorId)
+      : null;
     if (!player) {
       return { ok: false, error: "Player actor could not be found." };
     }
 
     const actorId = await ctx.db.insert("actors", {
-      worldId: args.worldId,
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
       roomId: player.roomId,
       key,
       name: name.slice(0, 120),
       role: "npc",
       description: description.slice(0, 1200),
     });
-    await writeNpcFacts(ctx, args.worldId, key, args.facts);
+    await writeNpcFacts(ctx, adventure.worldId, args.adventureId, key, args.facts);
 
     return { ok: true, actorId };
   },
@@ -1972,33 +2379,34 @@ export const createNpcInternal = internalMutation({
 
 export const resetNpcInternal = internalMutation({
   args: {
-    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
     actorId: v.id("actors"),
   },
   returns: debugNpcWriteResult,
   handler: async (ctx, args) => {
     const actor = await ctx.db.get(args.actorId);
-    if (!actor || actor.worldId !== args.worldId || actor.role !== "npc") {
-      return { ok: false, error: "NPC could not be found in this world." };
+    if (!actor || actor.adventureId !== args.adventureId || actor.role !== "npc") {
+      return { ok: false, error: "NPC could not be found in this Adventure." };
     }
 
     const actorKey = stableActorKey(actor);
     const seededNpc = SEEDED_NPCS.find((npc) => npc.key === actorKey);
     if (!seededNpc) {
-      await deleteActorFacts(ctx, args.worldId, actorKey);
+      await deleteActorFacts(ctx, args.adventureId, actorKey);
       await ctx.db.delete(actor._id);
       return { ok: true };
     }
 
     await restoreSeededNpc(ctx, {
-      worldId: args.worldId,
+      worldId: actor.worldId,
+      adventureId: args.adventureId,
       key: seededNpc.key,
       name: seededNpc.name,
       description: seededNpc.description,
       facts: seededNpc.facts,
       legacyFactKeys: "legacyFactKeys" in seededNpc ? seededNpc.legacyFactKeys : undefined,
     });
-    const room = await findRoomByKey(ctx, args.worldId, seededNpc.roomKey);
+    const room = await findRoomByKey(ctx, args.adventureId, seededNpc.roomKey);
     if (room && actor.roomId !== room._id) {
       await ctx.db.patch(actor._id, { roomId: room._id });
     }
@@ -2010,17 +2418,19 @@ export const resetNpcInternal = internalMutation({
 async function writeNpcFacts(
   ctx: MutationCtx,
   worldId: Id<"worlds">,
+  adventureId: Id<"adventures">,
   actorKey: string,
   facts: Partial<Record<"background" | "persona" | "voice" | "mood" | "status" | "memory" | "knowledge", string>>,
 ) {
   for (const key of NPC_PROFILE_FACT_KEYS_FOR_WRITE) {
     const value = facts[key]?.trim();
     if (!value) {
-      await deleteActorFactByKey(ctx, worldId, actorKey, key);
+      await deleteActorFactByKey(ctx, adventureId, actorKey, key);
       continue;
     }
     await setFact(ctx, {
       worldId,
+      adventureId,
       subjectType: "actor",
       subjectId: actorSubjectId(actorKey),
       key,
@@ -2071,33 +2481,42 @@ function requireServerWrite(token: string | undefined) {
   }
 }
 
-async function countDebugCreatedLocations(ctx: DatabaseCtx, worldId: Id<"worlds">) {
+async function countDebugCreatedLocations(ctx: DatabaseCtx, adventureId: Id<"adventures">) {
   const seededLocationKeys = new Set<string>(SEEDED_ROOMS.map((room) => room.key));
   const locations = await ctx.db
     .query("rooms")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("rooms", locations.length);
   return locations.filter((location) => !seededLocationKeys.has(location.key)).length;
 }
 
-async function countDebugCreatedNpcs(ctx: DatabaseCtx, worldId: Id<"worlds">) {
+async function countDebugCreatedNpcs(ctx: DatabaseCtx, adventureId: Id<"adventures">) {
   const seededNpcKeys = new Set<string>(SEEDED_NPCS.map((npc) => npc.key));
   const actors = await ctx.db
     .query("actors")
-    .withIndex("by_worldId_and_role", (q) => q.eq("worldId", worldId).eq("role", "npc"))
+    .withIndex("by_adventureId_and_role", (q) =>
+      q.eq("adventureId", adventureId).eq("role", "npc"),
+    )
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("actors", actors.length);
   return actors.filter((actor) => !seededNpcKeys.has(stableActorKey(actor))).length;
 }
 
-async function loadCurrentWorld(ctx: QueryCtx, worldId: Id<"worlds">) {
-  const world = await ctx.db.get(worldId);
-  if (!world?.currentPlayerActorId) {
+async function loadCurrentAdventure(ctx: QueryCtx, adventureId: Id<"adventures">) {
+  const adventure = await ctx.db.get(adventureId);
+  if (!adventure?.currentPlayerActorId) {
     return null;
   }
 
-  const player = await ctx.db.get(world.currentPlayerActorId);
+  const [world, worldVersion, player] = await Promise.all([
+    ctx.db.get(adventure.worldId),
+    ctx.db.get(adventure.worldVersionId),
+    ctx.db.get(adventure.currentPlayerActorId),
+  ]);
+  if (!world || !worldVersion) {
+    return null;
+  }
   if (!player) {
     return null;
   }
@@ -2107,13 +2526,19 @@ async function loadCurrentWorld(ctx: QueryCtx, worldId: Id<"worlds">) {
     return null;
   }
 
-  return { world, player, room };
+  if (player.adventureId !== adventureId || room.adventureId !== adventureId) {
+    return null;
+  }
+
+  return { adventure, world, worldVersion, player, room };
 }
 
-async function loadVisibleExits(ctx: QueryCtx, worldId: Id<"worlds">, roomId: Id<"rooms">) {
+async function loadVisibleExits(ctx: QueryCtx, adventureId: Id<"adventures">, roomId: Id<"rooms">) {
   const exits = await ctx.db
     .query("exits")
-    .withIndex("by_worldId_and_fromRoomId", (q) => q.eq("worldId", worldId).eq("fromRoomId", roomId))
+    .withIndex("by_adventureId_and_fromRoomId", (q) =>
+      q.eq("adventureId", adventureId).eq("fromRoomId", roomId),
+    )
     .take(20);
 
   return await Promise.all(
@@ -2131,23 +2556,23 @@ async function loadVisibleExits(ctx: QueryCtx, worldId: Id<"worlds">, roomId: Id
   );
 }
 
-async function loadLocationSummaries(ctx: QueryCtx, worldId: Id<"worlds">) {
+async function loadLocationSummaries(ctx: QueryCtx, adventureId: Id<"adventures">) {
   const [rooms, actors, objects, exits] = await Promise.all([
     ctx.db
       .query("rooms")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .take(100),
     ctx.db
       .query("actors")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .take(100),
     ctx.db
       .query("worldObjects")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .take(100),
     ctx.db
       .query("exits")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .take(100),
   ]);
   const roomsById = new Map(rooms.map((room) => [room._id, room]));
@@ -2182,21 +2607,21 @@ async function loadLocationSummaries(ctx: QueryCtx, worldId: Id<"worlds">) {
   }));
 }
 
-async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
+async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
   const [commands, narrations, events] = await Promise.all([
     ctx.db
       .query("commands")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
     ctx.db
       .query("narrations")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
     ctx.db
       .query("events")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
   ]);
@@ -2232,16 +2657,16 @@ async function loadFeed(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
-async function loadTranscript(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
+async function loadTranscript(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
   const [commands, narrations] = await Promise.all([
     ctx.db
       .query("commands")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
     ctx.db
       .query("narrations")
-      .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
   ]);
@@ -2270,10 +2695,10 @@ async function loadTranscript(ctx: QueryCtx, worldId: Id<"worlds">, limit: numbe
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
-async function loadTurnSummaries(ctx: QueryCtx, worldId: Id<"worlds">, limit: number) {
+async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
   const turns = await ctx.db
     .query("turns")
-    .withIndex("by_worldId_and_sequenceNumber", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId_and_sequenceNumber", (q) => q.eq("adventureId", adventureId))
     .order("desc")
     .take(limit);
 
@@ -2283,19 +2708,27 @@ async function loadTurnSummaries(ctx: QueryCtx, worldId: Id<"worlds">, limit: nu
         turn.commandId ? ctx.db.get(turn.commandId) : Promise.resolve(null),
         ctx.db
           .query("narrations")
-          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .withIndex("by_adventureId_and_turnId", (q) =>
+            q.eq("adventureId", adventureId).eq("turnId", turn._id),
+          )
           .take(20),
         ctx.db
           .query("events")
-          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .withIndex("by_adventureId_and_turnId", (q) =>
+            q.eq("adventureId", adventureId).eq("turnId", turn._id),
+          )
           .take(20),
         ctx.db
           .query("stateDiffs")
-          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .withIndex("by_adventureId_and_turnId", (q) =>
+            q.eq("adventureId", adventureId).eq("turnId", turn._id),
+          )
           .take(20),
         ctx.db
           .query("directorCalls")
-          .withIndex("by_worldId_and_turnId", (q) => q.eq("worldId", worldId).eq("turnId", turn._id))
+          .withIndex("by_adventureId_and_turnId", (q) =>
+            q.eq("adventureId", adventureId).eq("turnId", turn._id),
+          )
           .order("desc")
           .take(1),
       ]);
@@ -2319,10 +2752,10 @@ async function loadTurnSummaries(ctx: QueryCtx, worldId: Id<"worlds">, limit: nu
   );
 }
 
-async function deleteCommands(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteCommands(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("commands")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("commands", rows.length);
   for (const row of rows) {
@@ -2331,10 +2764,10 @@ async function deleteCommands(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteNarrations(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteNarrations(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("narrations")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("narrations", rows.length);
   for (const row of rows) {
@@ -2343,10 +2776,10 @@ async function deleteNarrations(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteEvents(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteEvents(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("events")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("events", rows.length);
   for (const row of rows) {
@@ -2355,10 +2788,10 @@ async function deleteEvents(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteStateDiffs(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteStateDiffs(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("stateDiffs")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("stateDiffs", rows.length);
   for (const row of rows) {
@@ -2367,10 +2800,10 @@ async function deleteStateDiffs(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteDirectorCalls(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteDirectorCalls(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("directorCalls")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("directorCalls", rows.length);
   for (const row of rows) {
@@ -2388,24 +2821,42 @@ async function deleteDemoWorld(ctx: MutationCtx) {
     return;
   }
 
-  await deleteNarrations(ctx, world._id);
-  await deleteEvents(ctx, world._id);
-  await deleteStateDiffs(ctx, world._id);
-  await deleteDirectorCalls(ctx, world._id);
-  await deleteCommands(ctx, world._id);
-  await deleteTurns(ctx, world._id);
-  await deleteFacts(ctx, world._id);
-  await deleteWorldObjects(ctx, world._id);
-  await deleteExits(ctx, world._id);
-  await deleteActors(ctx, world._id);
-  await deleteRooms(ctx, world._id);
+  const adventures = await ctx.db
+    .query("adventures")
+    .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("adventures", adventures.length);
+
+  for (const adventure of adventures) {
+    await deleteNarrations(ctx, adventure._id);
+    await deleteEvents(ctx, adventure._id);
+    await deleteStateDiffs(ctx, adventure._id);
+    await deleteDirectorCalls(ctx, adventure._id);
+    await deleteCommands(ctx, adventure._id);
+    await deleteTurns(ctx, adventure._id);
+    await deleteFacts(ctx, adventure._id);
+    await deleteWorldObjects(ctx, adventure._id);
+    await deleteExits(ctx, adventure._id);
+    await deleteActors(ctx, adventure._id);
+    await deleteRooms(ctx, adventure._id);
+    await ctx.db.delete(adventure._id);
+  }
+
+  const versions = await ctx.db
+    .query("worldVersions")
+    .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("worldVersions", versions.length);
+  for (const version of versions) {
+    await ctx.db.delete(version._id);
+  }
   await ctx.db.delete(world._id);
 }
 
-async function deleteFacts(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteFacts(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("facts")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("facts", rows.length);
   for (const row of rows) {
@@ -2414,10 +2865,10 @@ async function deleteFacts(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteWorldObjects(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteWorldObjects(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("worldObjects")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("worldObjects", rows.length);
   for (const row of rows) {
@@ -2426,10 +2877,10 @@ async function deleteWorldObjects(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteExits(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteExits(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("exits")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("exits", rows.length);
   for (const row of rows) {
@@ -2438,10 +2889,10 @@ async function deleteExits(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteActors(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteActors(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("actors")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("actors", rows.length);
   for (const row of rows) {
@@ -2450,10 +2901,10 @@ async function deleteActors(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteRooms(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteRooms(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("rooms")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("rooms", rows.length);
   for (const row of rows) {
@@ -2462,10 +2913,10 @@ async function deleteRooms(ctx: MutationCtx, worldId: Id<"worlds">) {
   return rows.length;
 }
 
-async function deleteTurns(ctx: MutationCtx, worldId: Id<"worlds">) {
+async function deleteTurns(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("turns")
-    .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("turns", rows.length);
   for (const row of rows) {

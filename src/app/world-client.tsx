@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -46,12 +47,21 @@ type NpcDebugActor = {
   locationName: string;
 };
 type NpcPendingSave = {
-  worldId: Id<"worlds">;
+  adventureId: Id<"adventures">;
   actor: NpcDebugActor;
   payload: NpcDebugSavePayload;
   saveVersion: number;
 };
 type LocationSaveStatus = "idle" | "saving" | "saved" | "error";
+type AdventureListItem = {
+  _id: Id<"adventures">;
+  name: string;
+  worldName: string;
+  sourceVersionNumber: number;
+  currentLocationName?: string;
+  turnCount: number;
+  lastPlayedAt: number;
+};
 
 const NPC_PROFILE_FACT_KEYS = [
   "background",
@@ -71,23 +81,34 @@ const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
     "Keep fleeting gestures and reactions in narration. Only update durable NPC facts when the change should matter after recent context falls away.",
 };
 
-export function WorldClient() {
-  const defaultWorldId = useQuery(api.world.getDefaultWorld);
+export function WorldClient({
+  initialAdventureId = null,
+}: {
+  initialAdventureId?: Id<"adventures"> | null;
+}) {
+  const router = useRouter();
+  const adventures = useQuery(api.world.listAdventures);
   const seedWorld = useMutation(api.world.seedDemoWorld);
+  const createAdventure = useMutation(api.world.createAdventure);
+  const deleteAdventure = useMutation(api.world.deleteAdventure);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
   const updateLocation = useAction(api.world.updateLocation);
   const createLocation = useAction(api.world.createLocation);
   const updateNpc = useAction(api.world.updateNpc);
   const createNpc = useAction(api.world.createNpc);
   const resetNpc = useAction(api.world.resetNpc);
-  const [selectedWorldId, setSelectedWorldId] = useState<Id<"worlds"> | null>(null);
+  const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(
+    initialAdventureId,
+  );
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
+  const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(false);
+  const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
   const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
   const [npcDrafts, setNpcDrafts] = useState<Record<string, NpcDebugDraft>>({});
   const [npcSaveStatus, setNpcSaveStatus] = useState<
@@ -112,12 +133,14 @@ export function WorldClient() {
   const locationActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
   const nextDebugNpcOrdinal = useRef(1);
 
-  const worldId = selectedWorldId ?? defaultWorldId ?? null;
-  const isLoadingDefaultWorld = selectedWorldId === null && defaultWorldId === undefined;
-  const snapshot = useQuery(api.world.getSnapshot, worldId ? { worldId } : "skip");
+  const adventureId = selectedAdventureId;
+  const isLoadingAdventures = selectedAdventureId === null && adventures === undefined;
+  const snapshot = useQuery(api.world.getSnapshot, adventureId ? { adventureId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
-  const topBarWorldName = snapshot?.world.name ?? (worldId ? "Loading world" : "No world");
+  const topBarWorldName = adventureId
+    ? (snapshot?.world.name ?? "Loading world")
+    : "Adventures";
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -147,8 +170,9 @@ export function WorldClient() {
       await cancelQueuedNpcSavesAndWaitForActive();
       await flushActiveLocationSaves();
       setError(null);
-      const seededWorldId = await seedWorld();
-      setSelectedWorldId(seededWorldId);
+      const seededAdventureId = await seedWorld();
+      setSelectedAdventureId(seededAdventureId);
+      router.push(`/adventures/${seededAdventureId}`);
       setNpcDrafts({});
       setNpcSaveStatus({});
       setCollapsedNpcKeys({});
@@ -161,8 +185,74 @@ export function WorldClient() {
     }
   }
 
+  async function handleCreateAdventure() {
+    setError(null);
+    setNotice(null);
+    setIsCreatingAdventure(true);
+    try {
+      const result = await createAdventure({});
+      setSelectedAdventureId(result.adventureId);
+      router.push(`/adventures/${result.adventureId}`);
+      resetLocalDraftState();
+    } catch (createError) {
+      setError(errorMessage(createError));
+    } finally {
+      setIsCreatingAdventure(false);
+    }
+  }
+
+  function handleSelectAdventure(nextAdventureId: Id<"adventures">) {
+    setError(null);
+    setNotice(null);
+    setSelectedAdventureId(nextAdventureId);
+    router.push(`/adventures/${nextAdventureId}`);
+    resetLocalDraftState();
+  }
+
+  async function handleDeleteAdventure(adventure: AdventureListItem) {
+    const confirmed = window.confirm(
+      `Delete "${adventure.name}"? This removes this Adventure's turns, memories, and debug edits. The source World is not changed.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setDeletingAdventureId(adventure._id);
+    try {
+      const result = await deleteAdventure({ adventureId: adventure._id });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setNotice(`Deleted ${adventure.name}.`);
+    } catch (deleteError) {
+      setError(errorMessage(deleteError));
+    } finally {
+      setDeletingAdventureId(null);
+    }
+  }
+
+  async function handleReturnToAdventures() {
+    setError(null);
+    setNotice(null);
+    await flushQueuedNpcSaves();
+    await flushActiveLocationSaves();
+    setSelectedAdventureId(null);
+    router.push("/");
+    resetLocalDraftState();
+  }
+
+  function resetLocalDraftState() {
+    setNpcDrafts({});
+    setNpcSaveStatus({});
+    setCollapsedNpcKeys({});
+    setLocationSaveStatus({});
+  }
+
   async function handleReset() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -173,7 +263,7 @@ export function WorldClient() {
       await cancelQueuedNpcSavesAndWaitForActive();
       await flushActiveLocationSaves();
       setError(null);
-      const result = await resetPlaytestWorld({ worldId });
+      const result = await resetPlaytestWorld({ adventureId });
       setNpcDrafts({});
       setNpcSaveStatus({});
       setCollapsedNpcKeys({});
@@ -192,7 +282,7 @@ export function WorldClient() {
     event.preventDefault();
     const submittedInput = input.trim();
 
-    if (!worldId || !submittedInput || isSubmitting) {
+    if (!adventureId || !submittedInput || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
       return;
     }
 
@@ -212,7 +302,7 @@ export function WorldClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          worldId,
+          adventureId,
           input: submittedInput,
           promptGuidance,
         }),
@@ -246,7 +336,7 @@ export function WorldClient() {
   }
 
   async function addNpc() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -272,7 +362,7 @@ export function WorldClient() {
     setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
     try {
       const result = await createNpc({
-        worldId,
+        adventureId,
         key: actorKey,
         ...payload,
       });
@@ -296,18 +386,18 @@ export function WorldClient() {
   }
 
   function scheduleNpcSave(actor: NpcDebugActor, payload: NpcDebugSavePayload) {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
     npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
     const saveVersion = npcSaveVersions.current[actor.key];
-    const saveWorldId = worldId;
+    const saveAdventureId = adventureId;
 
     setNpcSaveStatus((current) => ({ ...current, [actor.key]: "unsaved" }));
     clearTimeout(npcSaveTimers.current[actor.key]);
     npcPendingSaves.current[actor.key] = {
-      worldId: saveWorldId,
+      adventureId: saveAdventureId,
       actor,
       payload,
       saveVersion,
@@ -315,13 +405,13 @@ export function WorldClient() {
     npcSaveTimers.current[actor.key] = setTimeout(() => {
       delete npcSaveTimers.current[actor.key];
       delete npcPendingSaves.current[actor.key];
-      void startPersistNpc({ worldId: saveWorldId, actor, payload, saveVersion });
+      void startPersistNpc({ adventureId: saveAdventureId, actor, payload, saveVersion });
     }, 700);
   }
 
   function startPersistNpc(pendingSave: NpcPendingSave) {
     const savePromise = persistNpc(
-      pendingSave.worldId,
+      pendingSave.adventureId,
       pendingSave.actor,
       pendingSave.payload,
       pendingSave.saveVersion,
@@ -375,7 +465,7 @@ export function WorldClient() {
   }
 
   async function persistNpc(
-    saveWorldId: Id<"worlds">,
+    saveAdventureId: Id<"adventures">,
     actor: NpcDebugActor,
     payload: NpcDebugSavePayload,
     saveVersion: number,
@@ -385,7 +475,7 @@ export function WorldClient() {
     setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saving" }));
     try {
       const result = await updateNpc({
-        worldId: saveWorldId,
+        adventureId: saveAdventureId,
         actorId: actor._id,
         name: payload.name,
         description: payload.description,
@@ -413,7 +503,7 @@ export function WorldClient() {
   }
 
   async function resetNpcDebugActor(actor: NpcDebugActor) {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
@@ -425,7 +515,7 @@ export function WorldClient() {
     delete npcPendingSaves.current[actor.key];
     npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
     try {
-      const result = await resetNpc({ worldId, actorId: actor._id });
+      const result = await resetNpc({ adventureId, actorId: actor._id });
       if (!result.ok) {
         setError(result.error ?? "Failed to reset NPC.");
         return;
@@ -450,12 +540,12 @@ export function WorldClient() {
     name: string,
     description: string,
   ): Promise<boolean> {
-    if (!worldId) {
+    if (!adventureId) {
       return false;
     }
 
     setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saving" }));
-    const savePromise = persistLocation(worldId, locationId, locationKey, name, description);
+    const savePromise = persistLocation(adventureId, locationId, locationKey, name, description);
     locationActiveSaves.current[locationKey] = [
       ...(locationActiveSaves.current[locationKey] ?? []),
       savePromise,
@@ -474,7 +564,7 @@ export function WorldClient() {
   }
 
   async function persistLocation(
-    saveWorldId: Id<"worlds">,
+    saveAdventureId: Id<"adventures">,
     locationId: Id<"rooms">,
     locationKey: string,
     name: string,
@@ -484,7 +574,7 @@ export function WorldClient() {
     setNotice(null);
     try {
       const result = await updateLocation({
-        worldId: saveWorldId,
+        adventureId: saveAdventureId,
         locationId,
         name,
         description,
@@ -515,14 +605,14 @@ export function WorldClient() {
   }
 
   async function handleCreateLocation() {
-    if (!worldId) {
+    if (!adventureId) {
       return;
     }
 
     setError(null);
     setNotice(null);
     const result = await createLocation({
-      worldId,
+      adventureId,
       key: newLocation.key,
       name: newLocation.name,
       description: newLocation.description,
@@ -559,21 +649,35 @@ export function WorldClient() {
             <span className="px-2 text-zinc-600">-</span>
             <span className="truncate text-zinc-300">{topBarWorldName}</span>
           </div>
-          <button
-            id="debug-panel-toggle"
-            type="button"
-            onClick={() => setIsDebugPanelCollapsed((current) => !current)}
-            aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
-            aria-pressed={!isDebugPanelCollapsed}
-            className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
-              isDebugPanelCollapsed
-                ? "border-zinc-700"
-                : "border-amber-300/70 bg-amber-950/20 text-amber-200"
-            }`}
-            title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
-          >
-            <GearIcon />
-          </button>
+          <div id="top-bar-actions" className="flex items-center gap-2">
+            {adventureId ? (
+              <button
+                id="back-to-adventures-button"
+                type="button"
+                onClick={() => void handleReturnToAdventures()}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                Adventures
+              </button>
+            ) : null}
+            {adventureId ? (
+              <button
+                id="debug-panel-toggle"
+                type="button"
+                onClick={() => setIsDebugPanelCollapsed((current) => !current)}
+                aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+                aria-pressed={!isDebugPanelCollapsed}
+                className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
+                  isDebugPanelCollapsed
+                    ? "border-zinc-700"
+                    : "border-amber-300/70 bg-amber-950/20 text-amber-200"
+                }`}
+                title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
+              >
+                <GearIcon />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
       <div
@@ -585,41 +689,32 @@ export function WorldClient() {
           className="flex h-[calc(100vh-3rem)] min-h-0 flex-col"
         >
           <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
-            {isLoadingDefaultWorld ? (
-              <p id="default-world-loading-state" className="text-zinc-400">
-                Loading world state...
-              </p>
-            ) : !worldId ? (
-              <div
-                id="seed-world-empty-state"
-                className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4"
-              >
-                <p className="max-w-xl text-base leading-7 text-zinc-300">
-                  Seed a fresh demo world to begin the transcript playtest.
-                </p>
-                <button
-                  id="seed-world-button"
-                  type="button"
-                  onClick={handleSeed}
-                  className="rounded-md border border-amber-300 bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200"
-                >
-                  Seed Stormbound Chapel
-                </button>
-              </div>
+            {!adventureId ? (
+              <AdventureLanding
+                adventures={adventures ?? []}
+                isLoading={isLoadingAdventures}
+                isCreatingAdventure={isCreatingAdventure}
+                deletingAdventureId={deletingAdventureId}
+                error={error}
+                notice={notice}
+                onCreateAdventure={() => void handleCreateAdventure()}
+                onSelectAdventure={handleSelectAdventure}
+                onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}
+              />
             ) : snapshot === undefined ? (
-              <p id="world-loading-state" className="text-zinc-400">Loading world state...</p>
+              <p id="adventure-loading-state" className="text-zinc-400">Loading Adventure state...</p>
             ) : snapshot === null ? (
-              <div id="world-missing-state" className="min-h-0 flex-1 space-y-4">
+              <div id="adventure-missing-state" className="min-h-0 flex-1 space-y-4">
                 <p className="text-zinc-300">
-                  The selected world is missing required player or room state.
+                  The selected Adventure is missing required player or location state.
                 </p>
                 <button
-                  id="seed-or-reload-world-button"
+                  id="seed-or-reload-adventure-button"
                   type="button"
                   onClick={handleSeed}
                   className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-950/20"
                 >
-                  Seed or reload demo world
+                  Seed or reload demo Adventure
                 </button>
               </div>
             ) : (
@@ -677,6 +772,7 @@ export function WorldClient() {
                         onKeyDown={handleInputKeyDown}
                         placeholder="Type your response..."
                         rows={2}
+                        disabled={isSeeding || isResetting || isCreatingAdventure}
                         className="mt-1 min-h-12 w-full resize-none bg-transparent text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
                       />
                     </>
@@ -707,16 +803,17 @@ export function WorldClient() {
           </div>
         </section>
 
-        <aside
-          id="debug-panel"
-          className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
-            isDebugPanelCollapsed
-              ? "pointer-events-none translate-x-full"
-              : "translate-x-0"
-          }`}
-          aria-hidden={isDebugPanelCollapsed}
-          inert={isDebugPanelCollapsed ? true : undefined}
-        >
+        {adventureId ? (
+          <aside
+            id="debug-panel"
+            className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
+              isDebugPanelCollapsed
+                ? "pointer-events-none translate-x-full"
+                : "translate-x-0"
+            }`}
+            aria-hidden={isDebugPanelCollapsed}
+            inert={isDebugPanelCollapsed ? true : undefined}
+          >
           <div
             id="debug-panel-header"
             className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col"
@@ -726,7 +823,7 @@ export function WorldClient() {
                 Debug panel
               </h2>
               <p className="mt-2 text-xs leading-5 text-zinc-500">
-                Hidden world state, Game Master calls, validation decisions, events, and state diffs.
+                Hidden Adventure state, Game Master calls, validation decisions, events, and state diffs.
               </p>
             </div>
             <div id="debug-panel-actions" className="flex flex-wrap gap-2">
@@ -740,7 +837,7 @@ export function WorldClient() {
               <DebugActionButton
                 id="rough-reset-button"
                 onClick={handleReset}
-                disabled={!worldId || isResetting || isSeeding}
+                disabled={!adventureId || isResetting || isSeeding}
                 tone="danger"
               >
                 {isResetting ? "Resetting" : "Reset Session"}
@@ -809,6 +906,8 @@ export function WorldClient() {
                   <DebugList
                     title="Scene"
                     items={[
+                      `Adventure: ${snapshot.adventure.name} (${snapshot.adventure._id})`,
+                      `Source WorldVersion: v${snapshot.sourceWorldVersion.versionNumber} (${snapshot.sourceWorldVersion._id})`,
                       `${snapshot.world.name} / ${snapshot.room.name}`,
                       `Player: ${snapshot.player.name} (${snapshot.player.key})`,
                       `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
@@ -847,9 +946,137 @@ export function WorldClient() {
               Seed a world to inspect state.
             </p>
           )}
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </main>
+  );
+}
+
+function AdventureLanding({
+  adventures,
+  isLoading,
+  isCreatingAdventure,
+  deletingAdventureId,
+  error,
+  notice,
+  onCreateAdventure,
+  onSelectAdventure,
+  onDeleteAdventure,
+}: {
+  adventures: AdventureListItem[];
+  isLoading: boolean;
+  isCreatingAdventure: boolean;
+  deletingAdventureId: Id<"adventures"> | null;
+  error: string | null;
+  notice: string | null;
+  onCreateAdventure: () => void;
+  onSelectAdventure: (adventureId: Id<"adventures">) => void;
+  onDeleteAdventure: (adventure: AdventureListItem) => void;
+}) {
+  const worldName = adventures[0]?.worldName ?? "Stormbound Chapel";
+
+  return (
+    <section
+      id="adventure-landing"
+      className="mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 flex-col justify-center px-5 py-8 sm:px-8"
+    >
+      <div id="adventure-landing-header" className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
+            World
+          </p>
+          <h1 id="world-container-title" className="mt-2 text-xl font-semibold text-zinc-100">
+            {worldName}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-500">
+            Continue a saved Adventure or start a fresh copy of the current WorldVersion.
+          </p>
+        </div>
+        <div id="adventure-landing-actions" className="flex flex-wrap gap-2">
+          <button
+            id="create-adventure-button"
+            type="button"
+            onClick={onCreateAdventure}
+            disabled={isCreatingAdventure || deletingAdventureId !== null}
+            className="rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCreatingAdventure ? "Creating" : "New Adventure"}
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <p id="adventure-landing-error" role="alert" className="mb-4 text-sm text-rose-300">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p id="adventure-landing-notice" className="mb-4 text-sm text-emerald-300/80">
+          {notice}
+        </p>
+      ) : null}
+
+      <div id="world-container" className="rounded-md bg-zinc-900/70">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <h2 className="text-sm font-medium text-zinc-200">Adventures</h2>
+          <span className="text-xs text-zinc-500">{adventures.length}</span>
+        </div>
+        {isLoading ? (
+          <p id="adventure-list-loading-state" className="px-4 py-5 text-sm text-zinc-500">
+            Loading Adventures...
+          </p>
+        ) : adventures.length > 0 ? (
+          <div id="adventure-list" className="divide-y divide-zinc-800">
+          {adventures.map((adventure) => (
+            <article
+              id={`adventure-card-${adventure._id}`}
+              key={adventure._id}
+              className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center"
+            >
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-medium text-zinc-100">{adventure.name}</h2>
+                <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-zinc-500">
+                  <div>
+                    <dt className="sr-only">Turns</dt>
+                    <dd>{adventure.turnCount} turns</dd>
+                  </div>
+                  <div>
+                    <dt className="sr-only">Last played</dt>
+                    <dd>{formatAdventureTimestamp(adventure.lastPlayedAt)}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button
+                  id={`continue-adventure-${adventure._id}`}
+                  type="button"
+                  onClick={() => onSelectAdventure(adventure._id)}
+                  disabled={deletingAdventureId === adventure._id}
+                  className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continue
+                </button>
+                <button
+                  id={`delete-adventure-${adventure._id}`}
+                  type="button"
+                  onClick={() => onDeleteAdventure(adventure)}
+                  disabled={deletingAdventureId !== null}
+                  className="rounded-md border border-rose-900/70 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAdventureId === adventure._id ? "Deleting" : "Delete"}
+                </button>
+              </div>
+            </article>
+          ))}
+          </div>
+        ) : (
+        <div id="adventure-list-empty-state" className="px-4 py-5">
+          <p className="text-sm leading-6 text-zinc-400">No Adventures yet.</p>
+        </div>
+      )}
+      </div>
+    </section>
   );
 }
 
@@ -1976,6 +2203,15 @@ function domId(value: string) {
     .replace(/^-+|-+$/g, "");
 
   return normalized || "unknown";
+}
+
+function formatAdventureTimestamp(timestamp: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

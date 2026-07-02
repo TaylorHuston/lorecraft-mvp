@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "read_director_mode",
-      worldId: bodyResult.body.worldId,
+      adventureId: bodyResult.body.adventureId,
       error: modeResult.error,
       httpStatus: 500,
       timingsMs: { total: elapsedSince(startedAt) },
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "create_convex_client",
-      worldId: bodyResult.body.worldId,
+      adventureId: bodyResult.body.adventureId,
       requestSummary: {
         directorMode: modeResult.mode,
       },
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: convexResult.error }, 500);
   }
 
-  const { worldId, input } = bodyResult.body;
+  const { adventureId, input } = bodyResult.body;
   const convex = convexResult.client;
   const directorMode = modeResult.mode;
   const serverWriteToken = process.env.LORECRAFT_SERVER_WRITE_TOKEN?.trim() || undefined;
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "server_write_token",
-      worldId,
+      adventureId,
       requestSummary: {
         directorMode,
       },
@@ -122,14 +122,14 @@ export async function POST(request: Request) {
   try {
     context =
       directorMode === "transcript"
-        ? await convex.query(api.world.getTranscriptDirectorContext, { worldId, ...serverWriteArgs })
-        : await convex.query(api.world.getDirectorContext, { worldId, ...serverWriteArgs });
+        ? await convex.query(api.world.getTranscriptDirectorContext, { adventureId, ...serverWriteArgs })
+        : await convex.query(api.world.getDirectorContext, { adventureId, ...serverWriteArgs });
   } catch (error) {
     const worldLoadError = normalizeWorldLoadError(error);
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "load_context",
-      worldId,
+      adventureId,
       requestSummary: {
         directorMode,
       },
@@ -150,18 +150,18 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "load_context",
-      worldId,
+      adventureId,
       requestSummary: {
         directorMode,
       },
-      error: "The selected world is missing required state.",
+      error: "The selected Adventure is missing required state.",
       httpStatus: 404,
       timingsMs: { total: elapsedSince(startedAt) },
     });
     return json<TurnResponse>(
       {
         ok: false,
-        error: "The selected world is missing required state. Seed or reload the world and try again.",
+        error: "The selected Adventure is missing required state. Seed or reload the Adventure and try again.",
       },
       404,
     );
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "read_config",
-      worldId,
+      adventureId,
       requestSummary: {
         directorMode,
       },
@@ -187,7 +187,7 @@ export async function POST(request: Request) {
   const provider = providerName(configResult.config.baseUrl);
 
   const recorded = await convex.mutation(api.world.recordPlayerInput, {
-    worldId,
+    adventureId,
     input,
     ...serverWriteArgs,
   });
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.rejected",
       stage: "record_player_input",
-      worldId,
+      adventureId,
       provider,
       model: configResult.config.model,
       error: recorded.error,
@@ -231,7 +231,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const providerError = normalizeProviderError(error);
     await convex.mutation(api.world.completeDirectorTurn, {
-      worldId,
+      adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
@@ -248,7 +248,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.unit",
       stage: "provider_request",
-      worldId,
+      adventureId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       playerInput: input,
@@ -273,7 +273,7 @@ export async function POST(request: Request) {
   const parsed = parsePlainProseDirectorOutput(rawOutput);
   if (!parsed.ok) {
     await convex.mutation(api.world.completeDirectorTurn, {
-      worldId,
+      adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
@@ -290,7 +290,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.unit",
       stage: "parse_director_output",
-      worldId,
+      adventureId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       playerInput: input,
@@ -313,7 +313,7 @@ export async function POST(request: Request) {
   }
 
   await convex.mutation(api.world.completeDirectorTurn, {
-    worldId,
+    adventureId,
     ...serverWriteArgs,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
@@ -332,7 +332,7 @@ export async function POST(request: Request) {
   await logDirectorTurn({
     event: "director.turn.unit",
     stage: "complete_director_turn",
-    worldId,
+    adventureId,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
     playerInput: input,
@@ -393,7 +393,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const providerError = normalizeProviderError(error);
     await convex.mutation(api.world.recordNpcStateExtraction, {
-      worldId,
+      adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
@@ -410,7 +410,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.extraction",
       stage: "provider_request",
-      worldId,
+      adventureId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       playerInput: input,
@@ -440,7 +440,7 @@ export async function POST(request: Request) {
   const extractionParsed = parseStateExtractionOutput(extractionRawOutput);
   if (!extractionParsed.ok) {
     await convex.mutation(api.world.recordNpcStateExtraction, {
-      worldId,
+      adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
@@ -457,7 +457,7 @@ export async function POST(request: Request) {
     await logDirectorTurn({
       event: "director.turn.extraction",
       stage: "parse_extraction_output",
-      worldId,
+      adventureId,
       turnId: recorded.turnId,
       commandId: recorded.commandId,
       playerInput: input,
@@ -496,7 +496,7 @@ export async function POST(request: Request) {
     parsed.output.narration,
   );
   await convex.mutation(api.world.recordNpcStateExtraction, {
-    worldId,
+    adventureId,
     ...serverWriteArgs,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
@@ -518,7 +518,7 @@ export async function POST(request: Request) {
   await logDirectorTurn({
     event: "director.turn.extraction",
     stage: "complete_extraction",
-    worldId,
+    adventureId,
     turnId: recorded.turnId,
     commandId: recorded.commandId,
     playerInput: input,
@@ -609,8 +609,8 @@ async function readBody(request: Request) {
     return { ok: false as const, error: "Request body must be a JSON object." };
   }
 
-  if (typeof parsed.worldId !== "string" || parsed.worldId.trim().length === 0) {
-    return { ok: false as const, error: "A worldId is required." };
+  if (typeof parsed.adventureId !== "string" || parsed.adventureId.trim().length === 0) {
+    return { ok: false as const, error: "An adventureId is required." };
   }
 
   const inputResult = validateNarrativeInput(parsed.input);
@@ -626,7 +626,7 @@ async function readBody(request: Request) {
   return {
     ok: true as const,
     body: {
-      worldId: parsed.worldId as Id<"worlds">,
+      adventureId: parsed.adventureId as Id<"adventures">,
       input: inputResult.input,
       promptGuidance: promptGuidance.value,
     },

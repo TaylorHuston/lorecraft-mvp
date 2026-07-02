@@ -6,7 +6,9 @@ type DebugLogEnv = Record<string, string | undefined>;
 export type DirectorDebugLogEntry = {
   event: string;
   stage: string;
+  adventureId?: string;
   worldId?: string;
+  worldVersionId?: string;
   turnId?: string;
   commandId?: string;
   playerInput?: string;
@@ -76,7 +78,9 @@ export function buildDirectorDebugLogRecord(
     ts: now().toISOString(),
     event: entry.event,
     stage: entry.stage,
+    adventureId: entry.adventureId,
     worldId: entry.worldId,
+    worldVersionId: entry.worldVersionId,
     turnId: entry.turnId,
     commandId: entry.commandId,
     playerInput: entry.playerInput,

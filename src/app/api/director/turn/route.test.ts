@@ -41,16 +41,16 @@ describe("Game Master turn route preflight", () => {
     process.env = { ...originalEnv };
   });
 
-  it("returns a structured 400 for malformed world ids before requiring LLM config", async () => {
+  it("returns a structured 400 for malformed Adventure ids before requiring LLM config", async () => {
     mocks.query.mockRejectedValueOnce(
-      new Error('ArgumentValidationError: Value does not match validator for field "worldId"'),
+      new Error('ArgumentValidationError: Value does not match validator for field "adventureId"'),
     );
 
-    const response = await POST(turnRequest({ worldId: "not-a-convex-id" }));
+    const response = await POST(turnRequest({ adventureId: "not-a-convex-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: false,
-      error: "The selected world id is invalid. Seed or reload the world and try again.",
+      error: "The selected Adventure id is invalid. Seed or reload the Adventure and try again.",
     });
     expect(response.status).toBe(400);
     expect(mocks.query).toHaveBeenCalledTimes(1);
@@ -60,7 +60,7 @@ describe("Game Master turn route preflight", () => {
   it("returns setup failure without mutation when config is missing after world context loads", async () => {
     mocks.query.mockResolvedValueOnce({});
 
-    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: false,
@@ -75,7 +75,7 @@ describe("Game Master turn route preflight", () => {
     process.env.NEXT_PUBLIC_CONVEX_URL = "https://lorecraft.example.convex.cloud";
     delete process.env.LORECRAFT_SERVER_WRITE_TOKEN;
 
-    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: false,
@@ -98,7 +98,7 @@ describe("Game Master turn route preflight", () => {
       .mockResolvedValueOnce(providerResponse(JSON.stringify({ npcUpdates: [], actorMoves: [] })));
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
@@ -136,7 +136,7 @@ describe("Game Master turn route preflight", () => {
         .mockResolvedValueOnce(providerResponse("This is not JSON.")),
     );
 
-    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
@@ -171,7 +171,7 @@ describe("Game Master turn route preflight", () => {
         .mockResolvedValueOnce(new Response("model overloaded", { status: 503 })),
     );
 
-    const response = await POST(turnRequest({ worldId: "valid-world-id" }));
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
@@ -193,12 +193,12 @@ describe("Game Master turn route preflight", () => {
   });
 });
 
-function turnRequest({ worldId }: { worldId: string }) {
+function turnRequest({ adventureId }: { adventureId: string }) {
   return new Request("http://localhost/api/director/turn", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      worldId,
+      adventureId,
       input: "I ask Mira about the storm.",
     }),
   });
@@ -225,10 +225,21 @@ function providerResponse(content: string) {
 
 function persistentContext() {
   return {
+    adventure: {
+      id: "adventure-1",
+      name: "Stormbound Chapel",
+      worldId: "world-1",
+      worldVersionId: "world-version-1",
+    },
     world: {
       id: "world-1",
       name: "Stormbound Chapel",
       description: "A chapel under a dangerous storm.",
+    },
+    sourceWorldVersion: {
+      id: "world-version-1",
+      versionNumber: 1,
+      name: "Stormbound Chapel",
     },
     player: {
       id: "actor-player",

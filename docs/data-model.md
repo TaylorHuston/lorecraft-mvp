@@ -5,27 +5,69 @@ modified: 2026-06-30
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports one editable playtest world, a resumable narrative feed, bounded Game Master calls, and a tiny readable NPC state surface.
+The model is intentionally small. It supports one authored demo World, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, bounded Game Master calls, and a tiny readable NPC state surface.
 
 ## World
 
 Table: `worlds`
 
-A world is the top-level container for the current playtest state.
+A World is authored source material. It is not the mutable play session.
 
-For the current MVP, the Stormbound Chapel world is resettable demo data. Reseeding creates a fresh demo world and deletes the previous deterministic demo world plus its dependent rows. Durable world identity and campaign/world-instance persistence are deferred.
+For the current MVP, the Stormbound Chapel World is resettable demo source data. Reseeding creates a fresh World, WorldVersion, and default Adventure for local playtesting.
 
 | Field | Meaning |
 |---|---|
 | `slug` | Human-readable identifier for the seeded demo world. The MVP uses the deterministic slug `stormbound-chapel-default`. |
 | `name` | Display name shown to the player/debug UI. |
 | `description` | Stable baseline description of the world. Used as Game Master context. |
-| `currentPlayerActorId` | The actor currently controlled by the player. Optional so seed/repair flows can create the world before wiring the player. |
+| `currentWorldVersionId` | The current authored version used for future Adventures. |
+| `currentPlayerActorId` | Deprecated compatibility field retained only so old local rows can validate during the MVP migration. Runtime player identity now lives on Adventure. |
 
 Strategy:
 
-- The MVP has one active deterministic demo world at a time.
-- Later, canonical worlds will likely become templates and active play will happen in copied story instances.
+- Worlds are templates/source material.
+- Updating a World by creating a new WorldVersion affects future Adventures only.
+
+## WorldVersion
+
+Table: `worldVersions`
+
+A WorldVersion is an immutable authored baseline that can be copied into Adventures.
+
+| Field | Meaning |
+|---|---|
+| `worldId` | Source World. |
+| `versionNumber` | World-scoped version number. |
+| `name` | Version display name. |
+| `description` | Version summary. |
+| `baseline` | MVP baseline snapshot for rooms, exits, actors, objects, facts, and opening feed rows. |
+
+Strategy:
+
+- The baseline snapshot is acceptable while Stormbound Chapel is small and local-first.
+- If authored content grows, move large baseline collections into child source tables rather than unbounded arrays on one document.
+- Existing Adventures are never patched automatically when a new WorldVersion is created.
+
+## Adventure
+
+Table: `adventures`
+
+An Adventure is a playable copy created from one WorldVersion.
+
+| Field | Meaning |
+|---|---|
+| `slug` | Human-readable local identifier. |
+| `worldId` | Source World. |
+| `worldVersionId` | Source WorldVersion copied at Adventure creation. |
+| `name` | Adventure display name. |
+| `currentPlayerActorId` | Adventure-owned player actor. |
+
+Strategy:
+
+- The default app opens a World container screen for Stormbound Chapel at `/`. The container lists local Adventures with turn count and last played date, and lets the player continue, create, or delete local Adventures. Each opened Adventure has its own URL at `/adventures/<id>`.
+- Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
+- Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
+- Delete Adventure removes that Adventure and its Adventure-owned runtime rows. It does not delete the source World or WorldVersion.
 
 ## Room / Location
 
@@ -35,7 +77,8 @@ A room is the current storage model for a lightweight Location Card. Product-fac
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `key` | Stable location key used by code and seed data, such as `chapel`. |
 | `name` | Player/debug display name. |
 | `description` | Stable baseline location description. |
@@ -58,7 +101,8 @@ An exit connects two rooms.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `fromRoomId` | Room where the exit starts. |
 | `toRoomId` | Room where the exit leads. |
 | `label` | Direction or short affordance, such as `north` or `west`. |
@@ -77,7 +121,8 @@ An actor is a player or NPC in the world.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `roomId` | Current location/room. This can change only through validated actor movement or explicit reset/debug tooling. |
 | `key` | Optional stable actor key, such as `taylor` or `mira`. Used for facts and Game Master updates. |
 | `name` | Display name. |
@@ -99,7 +144,8 @@ A world object is a visible thing in a room.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `roomId` | Room containing the object. |
 | `key` | Stable object key, such as `lantern`. |
 | `name` | Player/debug display name. |
@@ -120,7 +166,8 @@ A fact is a flexible piece of durable state attached to a world, room, actor, ob
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `subjectType` | What kind of thing the fact is attached to: `world`, `room`, `actor`, `object`, or `exit`. |
 | `subjectId` | Stable subject identifier. Actor facts currently use strings like `actor:mira`; object facts may use `object:<id>`. |
 | `key` | Fact name, such as `background`, `persona`, `voice`, `mood`, `status`, `memory`, `knowledge`, or `open`. |
@@ -176,7 +223,8 @@ A command records player input. The name is historical; current MVP inputs are n
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `turnId` | Optional scoped turn that owns this player input. Seed/legacy rows may omit it. |
 | `actorId` | Actor who submitted the input. |
 | `input` | Original trimmed player text. |
@@ -197,8 +245,9 @@ A turn is one persisted narrative exchange: one player intent plus the backend w
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
-| `sequenceNumber` | World-scoped ordering number assigned when the player input becomes persisted history. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
+| `sequenceNumber` | Adventure-scoped ordering number assigned when the player input becomes persisted history. |
 | `actorId` | Actor who initiated the turn. |
 | `commandId` | Optional player input row for the turn. It is patched after the command is created. |
 | `status` | Lifecycle state: `pending`, `succeeded`, or `failed`. |
@@ -210,7 +259,7 @@ Strategy:
 - Turns are the canonical grouping layer for narrative play.
 - A turn is created only after the request is valid enough to become persisted game history.
 - Failed provider/output attempts remain as failed turns with linked command and Game Master call records.
-- Malformed request bodies, missing LLM configuration, invalid world ids, and missing world state are rejected before a turn exists.
+- Malformed request bodies, missing LLM configuration, invalid Adventure ids, and missing Adventure state are rejected before a turn exists.
 - Future rollback should attach snapshots to turn boundaries, but snapshots and restore behavior are deferred.
 
 ## Narration
@@ -221,7 +270,8 @@ A narration is player-facing prose from the engine or Game Master.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `turnId` | Optional scoped turn that caused this narration. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input that caused this narration. |
 | `text` | Player-facing prose. |
@@ -242,7 +292,8 @@ An event is a concise statement that something happened.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `turnId` | Optional scoped turn that caused this event. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the event. |
 | `text` | Concise event text. |
@@ -262,7 +313,8 @@ A state diff records accepted mutations for a turn.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `turnId` | Optional scoped turn that accepted this diff. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the diff. |
 | `source` | `player`, `engine`, `llm`, or `manual`. |
@@ -290,7 +342,8 @@ A Game Master call records provider interaction and validation results.
 
 | Field | Meaning |
 |---|---|
-| `worldId` | Owning world. |
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
 | `turnId` | Optional scoped turn that owns this provider/debug record. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input associated with the call. |
 | `provider` | Provider host/name derived from configuration. |
@@ -324,9 +377,9 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 |---|---|---|
 | `promptGuidance` | Debug UI request input | Per-turn text guidance for style, NPC behavior, and persistence strategy during playtesting. |
 | `aiInstructions` | Editable backend configuration plus per-turn guidance | Story-first behavior, dialogue allowance, post-narration persistence boundary, and current playtest guidance. |
-| `world` | Derived from world, room, exit, object, and player rows | Current world, room, baseline scene description, visible exits, visible objects, and player identity. |
+| `world` | Derived from the source World plus Adventure-owned runtime rows | Current source world, current Adventure location, baseline scene description, visible exits, visible objects, and player identity. |
 | `locationCard` | Derived from the current room/location, room facts, visible objects, exits, and present actors | Canonical current-location card for persistent Game Master context. |
-| `knownLocations` | Derived from existing room rows | Compact list of valid movement destinations for the current world. |
+| `knownLocations` | Derived from Adventure-owned room rows | Compact list of valid movement destinations for the current Adventure. |
 | `npcCards` | Rendered from current-scene NPC profiles | Card-like story memory the Game Master should treat as canonical NPC context. |
 | `recentStory` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
 | `currentInput` | Current request body | The player's narrative intent for this turn. |
@@ -377,7 +430,7 @@ The local debug log is not a Convex table. It is opt-in diagnostic output for lo
 | Request summary | Compact context summary. |
 | Outcome/error | Success, validation failure, provider failure, or route error. |
 | Counts/timings | Accepted update count, ignored update count, response metadata, and timing data. |
-| IDs | World, turn, and command ids when the route has persisted them. |
+| IDs | Adventure, World, WorldVersion, turn, and command ids when the route has persisted them. |
 
 Strategy:
 
@@ -399,6 +452,6 @@ These are likely future objects, but they are not part of the current canonical 
 | `AdjudicationOutcome` | When roll outcomes need durable replay, rollback, audit, or later explanation beyond narration text. |
 | `TimelineEntry` | When derived feed reconstruction plus scoped turns is not enough for replay, branching, streaming, or multiplayer ordering. |
 | `TurnSnapshot` | When rollback needs a concrete world-state restore point at a turn boundary. |
-| `StoryInstance` | When players need independent mutable copies of canonical world templates. |
+| `AdventureUpgrade` | When players need an explicit way to apply newer WorldVersion content to an existing Adventure. |
 
 Do not add these until the current model hits a concrete playtest or implementation failure.

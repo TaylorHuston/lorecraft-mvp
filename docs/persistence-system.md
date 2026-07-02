@@ -14,7 +14,8 @@ The chat transcript is useful history, but it is not enough to make a world cohe
 
 In the MVP, that state is intentionally small:
 
-- Seeded world objects describe the baseline world.
+- WorldVersions describe the authored baseline.
+- Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
 - Commands, narrations, and events reconstruct the visible play feed.
 - Turns group each persisted player intent with the Game Master work it caused.
@@ -23,9 +24,9 @@ In the MVP, that state is intentionally small:
 
 ## Core Strategy
 
-### The Database Is The World
+### The Database Is The Adventure Runtime
 
-Convex stores the current world. If the database says the shutters are closed, the Game Master should treat them as closed. If the Game Master implies otherwise, that implication is just prose unless the backend accepts and stores a state change.
+Convex stores the current Adventure runtime. If the selected Adventure says the shutters are closed, the Game Master should treat them as closed. If the Game Master implies otherwise, that implication is just prose unless the backend accepts and stores a state change.
 
 ### The LLM Reads, The Backend Decides
 
@@ -85,7 +86,7 @@ Current synchronous flow:
 1. The player submits narrative input.
 2. The route validates the request and LLM configuration.
 3. The route loads bounded Game Master context from Convex.
-4. Convex creates a pending turn with the next world-scoped sequence number.
+4. Convex creates a pending turn with the next Adventure-scoped sequence number.
 5. Convex records the player input command and links it to the turn.
 6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded recent story, current input, and output guidance.
 7. The provider returns player-facing story prose.
@@ -102,7 +103,7 @@ The important bit is that the provider does not own continuity. The next turn st
 
 Exact raw request storage is diagnostic evidence only. It can include hidden NPC knowledge, prompt guidance, and player text, so it is omitted by default and should not be treated as canonical game state.
 
-Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid world ids, and missing required world state.
+Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid Adventure ids, and missing required Adventure state.
 
 ## Game Master Modes
 
@@ -118,9 +119,13 @@ This keeps story writing and persistence decisions separate. A future smaller ex
 
 ## Demo World Lifetime
 
-For this MVP experiment, the Stormbound Chapel demo world is not durable product data. The seed mutation creates a fresh deterministic demo world and deletes the prior deterministic demo world plus its rooms, actors, objects, facts, turns, commands, narrations, events, state diffs, and Game Master calls. Use the seed/reset workflow when a playtest needs to return to the initial world setup.
+For this MVP experiment, the Stormbound Chapel demo source is not durable product data. The seed mutation creates a fresh deterministic World, immutable WorldVersion, and default Adventure, then deletes the prior deterministic demo World plus its Adventures, WorldVersions, and runtime rows. Use Reset World when a playtest needs to return to the initial authored setup.
 
-This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. Durable world identity, campaign instances, and long-lived save files are deferred until the core story loop is worth preserving.
+Reset Session is narrower: it deletes the selected Adventure's mutable runtime rows and recopies that Adventure's original source WorldVersion. If the World has a newer current WorldVersion, Reset Session does not upgrade the Adventure to it.
+
+Delete Adventure is narrower than Reset World and broader than Reset Session: it removes one local Adventure and its mutable runtime rows, while leaving the source WorldVersion available for future Adventures.
+
+This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. The MVP has a lightweight local World container screen at `/` that lists Adventures inside Stormbound Chapel for continue/create/delete. Each Adventure opens at `/adventures/<id>`. Polished World management, source patching, branching, and long-lived save files are deferred until the core story loop is worth preserving.
 
 ### Transcript mode
 
@@ -264,16 +269,16 @@ Read-only does not mean player-visible. The Game Master should not mechanically 
 
 The debug panel includes an `NPCs` tab for rough playtest editing. These edits can replace an NPC name, description, or profile fact value in the next persistent-mode Game Master prompt.
 
-Debug NPC edits are canonical Convex demo-world state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Clearing an editable NPC fact removes that manual canonical fact instead of preserving stale prompt context. Reset Session restores seeded NPCs and removes debug-created NPCs; Reset World reseeds the full demo world.
+Debug NPC edits are canonical Convex Adventure state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Clearing an editable NPC fact removes that manual canonical fact instead of preserving stale prompt context. Reset Session restores seeded NPCs from the selected Adventure's source WorldVersion and removes debug-created NPCs; Reset World reseeds the full demo source and default Adventure.
 
-Debug-created NPCs and locations are capped per demo world so ordinary debug use stays resettable within the current bounded deletion limits.
+Debug-created NPCs and locations are capped per Adventure so ordinary debug use stays resettable within the current bounded deletion limits.
 
 ## Prompt Context Strategy
 
 Persistent Game Master requests are still stateless, but the prompt is no longer one flat payload. The request separates:
 
 - Game Master instructions and tone guidance, which are editable configuration.
-- Scene state and visible facts, which come from Convex world data.
+- Scene state and visible facts, which come from Convex Adventure runtime data.
 - Read-only NPC cards, which are rendered from current-scene actor descriptions and actor facts.
 - NPC profiles, which are the typed intermediate shape used to build those cards.
 - Conversation focus, which is a non-durable hint derived from the current target or recent player-addressed NPC for ambiguous follow-up dialogue.
@@ -315,25 +320,25 @@ In persistent mode, a successful turn can now create two provider/debug records:
 
 The extractor is allowed to fail closed. If story narration succeeds but extraction fails or returns invalid JSON, the story turn remains succeeded, no fake state is written, and the extractor failure is inspectable through local logs and `directorCalls`.
 
-These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the world. Accepted extractor updates become canonical only after Convex validates and writes actor-scoped facts or actor `roomId` changes plus turn-scoped state diffs.
+These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the Adventure. Accepted extractor updates become canonical only after Convex validates and writes actor-scoped facts or actor `roomId` changes plus turn-scoped state diffs.
 
 The debug panel also exposes recent turn summaries: sequence number, status, player input, related narration/event/diff counts, and Game Master call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
 
 ## Reset Strategy
 
-The primary MVP reset path is fresh seeding. The seed mutation deletes prior Stormbound Chapel demo worlds and dependent rows, then recreates the world graph from the current seed.
+The primary MVP reset-world path is fresh seeding. The seed mutation deletes the prior deterministic Stormbound Chapel demo World, its WorldVersions, Adventures, and dependent runtime rows, then recreates the WorldVersion plus default Adventure from the current seed.
 
-The debug panel also has a session reset tool for a currently selected world. That clears scoped turns, playtest history, and debug records, restores seeded NPC baseline descriptions/facts, restores actor locations, restores seeded location text, and removes debug-created NPCs and locations. It is a convenience tool for repeating the same demo-world playtest without recreating the whole world row.
+The debug panel also has a session reset tool for the currently selected Adventure. That clears scoped turns, playtest history, and debug records, restores seeded NPC baseline descriptions/facts, restores actor locations, restores seeded location text, and removes debug-created NPCs and locations by recopying the Adventure's original source WorldVersion. It is a convenience tool for repeating the same playtest without changing the authored source World or upgrading the Adventure to a newer WorldVersion.
 
 Full hidden-state/debug snapshot sections are local/debug-oriented. In production mode they are omitted unless the app has an explicit debug/auth design; the current local prototype enables them through `LORECRAFT_ENABLE_DEBUG_ROUTES=1` in a non-production process.
 
-Long term, reset is not the product model. The likely product model is independent story/play-session instances created from world templates, but that is intentionally deferred until the single-world persistence loop proves itself.
+Long term, reset is not the product model. The product model is independent Adventures created from WorldVersions; polished Adventure management, source patching, branching, and rollback are deferred until the core persistence loop proves itself.
 
 ## Rollback Strategy
 
 Rollback is deferred, but turn boundaries are the intended attachment point.
 
-The likely future implementation is snapshot-based: capture or derive a restorable world-state snapshot at a completed turn boundary, then restore the world to that snapshot. Current state diffs are useful audit records, but they are not sufficient rollback machinery because they do not capture all before-state and would become hard to invert safely as operations grow.
+The likely future implementation is snapshot-based: capture or derive a restorable Adventure-state snapshot at a completed turn boundary, then restore the Adventure to that snapshot. Current state diffs are useful audit records, but they are not sufficient rollback machinery because they do not capture all before-state and would become hard to invert safely as operations grow.
 
 This MVP does not add snapshot tables, reverse-diff logic, branching timelines, restore mutations, or rollback UI.
 

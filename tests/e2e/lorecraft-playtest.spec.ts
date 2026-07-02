@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () => {
-  test("runs a deterministic seeded-world browser playtest", async ({ page }) => {
+test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verification", () => {
+  test("runs a deterministic seeded-Adventure browser playtest", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#lorecraft-app")).toBeVisible();
 
@@ -19,26 +19,34 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await expect(page.locator("#director-input")).toHaveValue("");
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
 
     await page.reload();
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+    await openDebugPanel(page);
 
     const debugPanel = page.locator("#debug-panel");
     const debugToggle = page.locator("#debug-panel-toggle");
+    await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
     await debugToggle.click();
     await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
     await expect(debugPanel).toHaveJSProperty("inert", true);
-    await debugToggle.click();
+    await openDebugPanel(page);
     await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 
     await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
     await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: succeeded");
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "lorecraft-fixture-model",
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "story_generation",
+    );
+    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+      "worldVersionId",
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "npc_state_extraction",
@@ -59,6 +67,7 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
 
     await page.reload();
     await expect(page.locator("#story-stream")).toContainText(playerText);
+    await openDebugPanel(page);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
       `Turn #2: failed - ${failureText}`,
@@ -190,7 +199,9 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
     await page.locator("#rough-reset-button").click();
     await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
-    await expect(page.locator("#story-empty-state")).toBeVisible();
+    await expect(page.locator("#story-stream")).toContainText("You stand in the chapel");
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
     await page.locator("#debug-tab-locations").click();
     await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(
@@ -213,6 +224,29 @@ test.describe("LC-001-S11 and LC-001-S12 End To End Playtest Verification", () =
       timeout: 60_000,
     });
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+
+    await page.locator("#back-to-adventures-button").click();
+    await expect(page).toHaveURL("/");
+    await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+    await page.locator("#create-adventure-button").click();
+    await page.waitForURL(/\/adventures\/[^/]+$/);
+    const temporaryAdventureId = page.url().split("/").pop();
+    if (!temporaryAdventureId) {
+      throw new Error("Expected created Adventure URL to include an Adventure id.");
+    }
+    await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#back-to-adventures-button").click();
+    await expect(page).toHaveURL("/");
+    await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+    const temporaryAdventureCard = page.locator(`#adventure-card-${temporaryAdventureId}`);
+    await expect(temporaryAdventureCard).toBeVisible();
+    page.once("dialog", async (dialog) => {
+      expect(dialog.message()).toContain("Delete");
+      await dialog.accept();
+    });
+    await page.locator(`#delete-adventure-${temporaryAdventureId}`).click();
+    await expect(temporaryAdventureCard).toHaveCount(0);
+    await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
   });
 });
 
@@ -220,22 +254,44 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await page.waitForFunction(() =>
     Boolean(
       document.querySelector("#director-input") ??
-        document.querySelector("#seed-world-button") ??
-        document.querySelector("#fresh-seed-button"),
+        document.querySelector("#adventure-landing") ??
+        document.querySelector("#seed-world-button"),
     ),
   );
 
-  const emptySeedButton = page.locator("#seed-world-button");
-  if (await emptySeedButton.isVisible()) {
-    await emptySeedButton.click();
-  } else {
-    await page.locator("#fresh-seed-button").click();
+  if (await page.locator("#adventure-landing").isVisible()) {
+    await expect(page.locator("#adventure-list-loading-state")).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    if (await page.locator("#adventure-list button[id^='continue-adventure-']").first().isVisible()) {
+      await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+      await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+      await openDebugPanel(page);
+      await page.locator("#fresh-seed-button").click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+    } else {
+      await page.locator("#create-adventure-button").click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+    }
+  } else if (await page.locator("#seed-world-button").isVisible()) {
+    await page.locator("#seed-world-button").click();
+    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
   }
 
   await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#director-input")).toBeEnabled({ timeout: 30_000 });
+  await expect(page.locator("#director-input")).toHaveValue("");
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function openDebugPanel(page: import("@playwright/test").Page) {
+  const debugPanel = page.locator("#debug-panel");
+  await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
+  await page.locator("#debug-panel-toggle").click();
+  await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 }
 
 async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {
