@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Status: implementation and verification complete; local commit pending.
+- Status: implementation and verification complete; committed locally and ready for /sdd-review.
 - Branch: `change/lc-001-epic-verify-fixes`.
 - Source report: `docs/epics/lc-001-provider-agnostic-chat-experience/reviews/2026-07-01-0254-epic-verify.md`.
-- Next action: commit the verified remediation, then run `/sdd-review`.
+- Next action: run `/sdd-review` as the independent local gate.
 
 ## Discovery
 
@@ -58,11 +58,11 @@
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-01 | Discovery and change setup | main | `docs/changes/2026-07-01-lc-001-epic-verify-fixes/` | Created remediation change from Epic-verify report | commit pending |
-| 2026-07-01 | Route contract and focused tests | main; read-only test strategy subagent `Bohr` | `src/app/api/director/turn/route.ts`, `src/app/api/director/turn/route.test.ts`, `vitest.config.ts` | Moved LLM config read after world-context load so malformed `worldId` returns structured `400`; added route tests for malformed world ID, missing config, no-update extraction, invalid extractor output, and extractor provider failure | commit pending |
-| 2026-07-01 | Deterministic E2E failure/empty coverage | main; read-only test strategy subagent `Bohr` | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | Added fixture story-provider failure trigger and browser assertions for error display, previous-story preservation, reloadable failed-turn debug evidence, near-bottom anchoring, and empty story state after reset | commit pending |
-| 2026-07-01 | Epic and closed-artifact reconciliation | main | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, selected closed change artifacts | Reconciled read-only story generation vs extractor mutation wording, scenario-mapped verification evidence, S12 topical-order note, manual status vocabulary, and stale closed-design placeholders | commit pending |
-| 2026-07-01 | Apply-side implementation self-check remediation | main; read-only self-check subagent `Boole` | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, this ledger | Remediated self-check findings by converting remaining S1/S3/S6/S7/S8/S9/S10/S12 evidence into scenario-mapped entries and replacing the remaining stale S3 memory mutation phrase | commit pending |
+| 2026-07-01 | Discovery and change setup | main | `docs/changes/2026-07-01-lc-001-epic-verify-fixes/` | Created remediation change from Epic-verify report | 887bb2a |
+| 2026-07-01 | Route contract and focused tests | main; read-only test strategy subagent `Bohr` | `src/app/api/director/turn/route.ts`, `src/app/api/director/turn/route.test.ts`, `vitest.config.ts` | Moved LLM config read after world-context load so malformed `worldId` returns structured `400`; added route tests for malformed world ID, missing config, no-update extraction, invalid extractor output, and extractor provider failure | 887bb2a |
+| 2026-07-01 | Deterministic E2E failure/empty coverage | main; read-only test strategy subagent `Bohr` | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | Added fixture story-provider failure trigger and browser assertions for error display, previous-story preservation, reloadable failed-turn debug evidence, near-bottom anchoring, and empty story state after reset | 887bb2a |
+| 2026-07-01 | Epic and closed-artifact reconciliation | main | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, selected closed change artifacts | Reconciled read-only story generation vs extractor mutation wording, scenario-mapped verification evidence, S12 topical-order note, manual status vocabulary, and stale closed-design placeholders | 887bb2a |
+| 2026-07-01 | Apply-side implementation self-check remediation | main; read-only self-check subagent `Boole` | `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, this ledger | Remediated self-check findings by converting remaining S1/S3/S6/S7/S8/S9/S10/S12 evidence into scenario-mapped entries and replacing the remaining stale S3 memory mutation phrase | 887bb2a |
 
 ## Verification Ledger
 
@@ -107,6 +107,6 @@
 - Review record: pending `/sdd-review`.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: no public entry required.
-- PR / merge state: unmerged branch.
+- PR / merge state: unmerged branch with local remediation commit `887bb2a`.
 - Deferred gaps accepted: live-provider model-quality/movement judgment remains empirical; transcript-mode browser-specific Playwright coverage remains deferred until transcript mode is a regular browser target.
 - Folder state: active.
