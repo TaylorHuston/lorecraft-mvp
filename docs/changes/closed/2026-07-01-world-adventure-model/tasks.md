@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: Review pass completed; dev server running; ready for closeout/merge authorization
-- Last completed action: ran `sdd-review`, refreshed stale Epic verification evidence, and reran `npm run ci:required`
-- Next action: close and merge after user authorization
+- Current state: Closing after user authorization
+- Last completed action: user authorized close and merge
+- Next action: move this change folder under `docs/changes/closed/`, commit, and merge to `develop`
 - Active branch/ref: `change/world-adventure-model`
 - Expected dirty files: none in app repo
 - Known blockers: none identified
@@ -74,8 +74,8 @@
 - [x] 5.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 5.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 5.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 5.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 5.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 5.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 5.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -181,6 +181,6 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - `review.md` findings resolved: not applicable; no unresolved findings.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
-- PR / merge state: implementation, manual feedback slices, and review artifact refresh committed on `change/world-adventure-model`; no PR/merge yet.
+- PR / merge state: user authorized local merge from `change/world-adventure-model` to `develop`.
 - Deferred scope accepted: polished World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
-- Change moved to `docs/changes/closed/`: no; pending review and closeout authorization.
+- Change moved to `docs/changes/closed/`: yes.
