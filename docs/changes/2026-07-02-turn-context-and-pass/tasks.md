@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: implemented; ready for `/sdd-review`
-- Last completed action: read-only self-check feedback integrated, focused checks passed, `ci:required` passed, and deterministic E2E remains previously passed for this slice.
-- Next action: run `/sdd-review`.
+- Current state: review follow-up cleanup applied; ready for `/sdd-review` rerun
+- Last completed action: deletion cleanup was committed, Act-expanded input UI/test updates were retained in scope, and stale manual-feedback artifacts were updated.
+- Next action: commit the remaining scoped files, then rerun `/sdd-review`.
 - Active branch/ref: `change/turn-context-and-pass`
 - Expected dirty files: implementation/docs/tests listed in the implementation ledger plus this change folder
-- Known blockers: none identified for implementation. Manual UI confirmation remains pending Taylor.
+- Known blockers: none known before review rerun. Manual UI confirmation remains pending Taylor.
 
 ## Task Checklist
 
@@ -76,9 +76,9 @@
 ### 6. Review And Closeout
 
 - [x] 6.1 Update root `CHANGELOG.md` under `Unreleased`.
-- [ ] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
-- [ ] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
-- [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
+- [x] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
+- [x] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [x] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
@@ -96,6 +96,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-02 | LC-001-S1/R4, LC-001-S6/R4/R5, LC-001-S7/R10-R12 | main implementation with Convex, Next route, prompt, and browser verification guidance | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `src/lib/director/*`, fixture and E2E tests | Added `act`/`pass` turn triggers, commandless Pass turns, narration-only story-visible history for persistent story/extraction prompts, Pass UI, debug trigger visibility, fixture support, and deterministic coverage. | e40a145 |
 | 2026-07-02 | Artifact reconciliation | main | LC-001 Epic, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, this task ledger | Updated Epic Requirements/Scenarios/Implemented By/Verified By, public docs, canonical data model, persistence strategy, and changelog to match implementation. | e40a145 |
 | 2026-07-02 | Apply-side self-check fixes | main plus read-only subagents Jason, Turing, and Godel | `convex/world.ts`, `docs/architecture.md`, LC-001 Epic, `design.md`, this task ledger | Tightened pending-turn and trigger/command validation for commandless Pass completion/extraction; corrected stale design/Epic wording; recorded existing destructive client mutation exposure as a follow-up risk instead of broadening this change. | e40a145 |
+| 2026-07-02 | Review follow-up cleanup | main | `.agents/`, `.claude/`, `.llm/`, `src/app/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, this task ledger | Committed unrelated vendored-skill deletions separately, retained Taylor's Act-expanded input feedback as in-scope UI behavior, and updated E2E helpers to open Act before typing. | 35770a1 / pending |
 
 ## Verification Ledger
 
@@ -114,6 +115,8 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | `npm test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts --run` after self-check fixes | focused automated tests | Prompt/route coverage still passes after validation and artifact changes. | passed: 49 tests |
 | 2026-07-02 | `npm run ci:required` after self-check fixes | broad supporting gate | Lint, unit tests, typecheck, and production build still pass. | passed |
 | 2026-07-02 | `npm run e2e` after self-check fixes | deterministic E2E rerun attempt | Rerun was blocked because the user-requested dev server kept local Convex active on port 3210 and Playwright is configured to start its own Convex with `reuseExistingServer: false`; earlier E2E pass remains the browser evidence for this slice. | blocked by existing dev server, accepted for apply handoff |
+| 2026-07-02 | `/sdd-review`; `npm run ci:required`; `git merge-tree --write-tree develop HEAD` | local PR-style review | Required CI passed and committed branch merges cleanly, but `review.md` recorded changes-requested because the app repo has uncommitted scoped UI changes, unrelated tracked deletions, and stale manual-feedback artifacts. | changes-requested |
+| 2026-07-02 | Artifact follow-up inspection | artifact verification | `review.md` findings were addressed by committing deletion cleanup separately and updating this ledger for the Act-expanded input behavior. Latest E2E files now exercise clicking Act before typing. | ready for review rerun |
 
 ## Manual Feedback
 
@@ -124,6 +127,7 @@ Record the user's manual testing feedback after implementation starts.
 | 2026-07-02 | A turn starts when the Game Master asks what the player does, can include other player-side interactions, and ends after the player action or Pass is resolved by Game Master narration. | requirement refinement | Reframed turn as a resolved story beat with explicit triggers and deferred broader turn interactions. | incorporated |
 | 2026-07-02 | Future Game Master context should read previous narration blocks plus canonical state, not raw commands/events, to reduce confusion. | requirement refinement | Added story-visible history policy for story generation and extraction. | incorporated |
 | 2026-07-02 | Add Pass, equivalent to AI Dungeon Continue but game-framed. Retry should wait until snapshots/supersession exist. | requirement refinement | Added Pass trigger and deferred Retry. | incorporated |
+| 2026-07-02 | Make the prompt read `What do you do?` above `Act` and `Pass`; clicking `Act` should expand into the text bubble and hide sibling buttons. | manual UI refinement | Kept the Act-expanded input behavior in this change, updated E2E submit helpers to click Act before typing, and refreshed manual UI confirmation steps. | incorporated |
 
 ## Planning Updates
 
@@ -138,14 +142,15 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Status: pending Taylor
 - App URL / route: `http://localhost:3000/adventures/<id>`
 - Required setup or test data: seeded Stormbound Chapel WorldVersion and at least one Adventure
-- Steps for the user: open an Adventure, click Pass, confirm the story stream shows new Game Master narration without a player-side Pass message, inspect the debug panel for Pass turn metadata, then submit a normal action and confirm action turns still work.
-- Expected result: Pass advances the story as a turn trigger, action turns still show player input, the debug turn list labels `Act` and `Pass`, and future persistent-mode GM context is less chat-like.
+- Steps for the user: open an Adventure, confirm `What do you do?` appears above the `Act` and `Pass` buttons, click `Act`, confirm the buttons are replaced by the text bubble, submit a normal action, then click `Pass` and confirm the story stream shows new Game Master narration without a player-side Pass message. Inspect the debug panel for `Act` and `Pass` turn metadata.
+- Expected result: `Act` opens the text input only when needed, action turns still show player input, `Pass` advances the story as a turn trigger without story-prose player text, the debug turn list labels `Act` and `Pass`, and future persistent-mode GM context is less chat-like.
 - Feedback that would change artifacts: desire to label the button Continue, show Pass in the story stream, support Retry now, hide events from the player stream, or treat typed `pass` as a command.
 
 ## Blockers / Open Questions
 
 - None identified for this change.
 - Follow-up risk: existing client-callable destructive Convex mutations (`seedDemoWorld`, `deleteAdventure`, `resetPlaytestWorld`) should move behind the same server/local guard policy before shared deployment. This predates the Pass work and is not required for this slice's behavior.
+- Prior review blockers: see `docs/changes/2026-07-02-turn-context-and-pass/review.md`; follow-up cleanup has been applied and should be verified by rerunning `/sdd-review`.
 
 ## Closeout
 
@@ -156,9 +161,9 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes; older recent-feed wording was narrowed where it referred to future GM prompt context.
 - ADR status: not applicable for this slice; Retry/snapshot architecture may need a future ADR.
 - Changelog current: yes.
-- `sdd-review` verdict: pending.
-- Review record: pending.
-- `review.md` findings resolved: pending.
+- `sdd-review` verdict: changes-requested.
+- Review record: `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
+- `review.md` findings resolved: follow-up applied; pending review rerun.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
 - PR / merge state: not started; local implementation commit `e40a145` created; ledger updated in follow-up commit.

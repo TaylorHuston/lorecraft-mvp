@@ -8,7 +8,7 @@ That creates a useful debug trail, but it also makes future prompt context more 
 
 - A turn is a resolved story beat.
 - The Game Master asks "What do you do?" implicitly by opening the next decision point.
-- The player may act or pass.
+- The player may click `Act` to open the text input, or click `Pass` to yield the beat.
 - The Game Master resolves the beat into narration and any validated consequences.
 - Future story context should continue from accepted narration blocks plus canonical state.
 
@@ -17,6 +17,7 @@ That creates a useful debug trail, but it also makes future prompt context more 
 **Goals:**
 
 - Add `Pass` as a dedicated player-facing control.
+- Add `Act` as the player-facing way to open the narrative input.
 - Treat Pass as a turn trigger, not player prose.
 - Keep Pass out of the visible story stream as a player entry.
 - Let Pass turns produce Game Master narration and bounded validated consequences.
@@ -39,6 +40,7 @@ That creates a useful debug trail, but it also makes future prompt context more 
 - User decisions:
   - Use a button for Pass.
   - Label the button `Pass`, not Continue.
+  - Label the action button `Act`; clicking it expands into the text input and hides sibling turn buttons while typing.
   - Do not show Pass as a visible player story entry.
   - Leave events visible to the player/debug UI for now, but exclude them from future GM prompt context.
   - Switch the extractor to the same filtered story-visible history.
@@ -102,11 +104,19 @@ That creates a useful debug trail, but it also makes future prompt context more 
 
 #### Story LC-001-S1: Narrative Play Feed And Unified Input
 
-As a playtester, I want one narrative input plus a simple Pass control, so that I can either act or let the Game Master continue without turning the interface into a command parser.
+As a playtester, I want a simple decision surface with Act and Pass, so that I can either open the narrative input or let the Game Master continue without turning the interface into a command parser.
 
 ##### Requirement R4: Pass Control
 
-The system SHALL provide a dedicated Pass control near the narrative input.
+The system SHALL provide dedicated Act and Pass controls at the decision point.
+
+###### Scenario R4-S0: Player opens the action input
+
+- WHEN an Adventure is open
+- THEN the system shows `What do you do?` above the `Act` and `Pass` controls
+- WHEN the player clicks `Act`
+- THEN the system replaces the controls with the narrative input
+- AND the player can submit a normal action
 
 ###### Scenario R4-S1: Player passes the turn
 
@@ -126,7 +136,7 @@ The system SHALL provide a dedicated Pass control near the narrative input.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders the Pass control, submits Pass without narrative input, keeps Pass out of player-side story prose, and exposes trigger metadata in debug summaries. | Recheck when this Story changes or the listed path changes. |
+| `src/app/world-client.tsx` | renders the Act/Pass decision surface, expands Act into narrative input, submits Pass without narrative input, keeps Pass out of player-side story prose, and exposes trigger metadata in debug summaries. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | accepts `act` and `pass` trigger requests and routes Pass through the commandless turn path. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | stores Pass as a turn trigger without creating a command row. | Recheck when this Story changes or the listed path changes. |
 
@@ -134,7 +144,7 @@ The system SHALL provide a dedicated Pass control near the narrative input.
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| LC-001-S1/R4-S1 and R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove clicking Pass starts a commandless turn, returns Game Master narration, and does not render/store player-side Pass prose. | Passed |
+| LC-001-S1/R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove the browser opens action input through Act, clicking Pass starts a commandless turn, returns Game Master narration, and does not render/store player-side Pass prose. | Passed |
 
 ##### Verification Gaps
 

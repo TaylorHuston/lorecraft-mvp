@@ -17,7 +17,7 @@ Introduce an explicit turn-context policy and Pass trigger:
 - Prior player commands remain persisted as history/debug records, but they are not included in normal future Game Master story context.
 - Prior events remain persisted and visible/debuggable for now, but they are not included in normal future Game Master story context.
 - The post-narration extractor uses the same filtered story-visible history policy as story generation.
-- Add a player-facing `Pass` button near the input. Pass creates a turn that advances the story without creating a player command or visible player story entry.
+- Add player-facing `Act` and `Pass` controls at the decision point. `Act` expands into the text input for a committed action; `Pass` advances the story without creating a player command or visible player story entry.
 - Pass turns may still run narration, extraction, bounded validation, state diffs, and debug records.
 - Retry is explicitly deferred until turn snapshots, reversible diffs, or supersession semantics exist.
 
@@ -48,6 +48,8 @@ Introduce an explicit turn-context policy and Pass trigger:
 ## Scope Decisions
 
 - Confirmed:
+  - The decision prompt should read `What do you do?` above the available turn controls.
+  - The player-facing action control should be labeled `Act` and expand into the text input when selected.
   - The player-facing control should be labeled `Pass`.
   - Pass is a button, not a typed command and not a slash command.
   - Pass is not shown as a player story entry.

@@ -63,10 +63,10 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 Status: draft
 Created: 2026-07-01
-Modified: 2026-07-01
+Modified: 2026-07-02
 Last verified:
 
-As a playtester, I want one narrative input, a simple Pass control, and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
+As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 
 #### Requirements And Scenarios
 
@@ -122,7 +122,15 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 
 ##### Requirement R4: Pass Control
 
-The system SHALL provide a dedicated Pass control near the narrative input.
+The system SHALL provide dedicated Act and Pass controls at the decision point.
+
+###### Scenario R4-S0: Player opens the action input
+
+- WHEN an Adventure is open
+- THEN the system shows `What do you do?` above the `Act` and `Pass` controls
+- WHEN the player clicks `Act`
+- THEN the system replaces the controls with the narrative input
+- AND the player can submit a normal action
 
 ###### Scenario R4-S1: Player passes the turn
 
@@ -142,7 +150,7 @@ The system SHALL provide a dedicated Pass control near the narrative input.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders the narrative-only split layout, one unified textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/app/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
 
@@ -155,7 +163,7 @@ The system SHALL provide a dedicated Pass control near the narrative input.
 | R2-S1 and R2-S2 | `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed persisted player input, Game Master narration, and event feed entries ordered from durable rows. | As described in the evidence cell. | Recorded |
 | R3-S1 | `npm run e2e` and browser verification | prove pending state disables duplicate submission for the in-flight turn while keeping progress visible. | Recorded |
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
-| R4-S1 and R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
+| R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps

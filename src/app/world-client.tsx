@@ -104,6 +104,7 @@ export function WorldClient({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isActInputOpen, setIsActInputOpen] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
@@ -126,6 +127,7 @@ export function WorldClient({
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
+  const directorInputRef = useRef<HTMLTextAreaElement | null>(null);
   const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const npcSaveVersions = useRef<Record<string, number>>({});
   const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
@@ -151,6 +153,14 @@ export function WorldClient({
 
     storyScroller.scrollTop = storyScroller.scrollHeight;
   }, [feedLength, isSubmitting, error]);
+
+  useEffect(() => {
+    if (!isActInputOpen || isSubmitting) {
+      return;
+    }
+
+    directorInputRef.current?.focus();
+  }, [isActInputOpen, isSubmitting]);
 
   useEffect(() => {
     const timers = npcSaveTimers.current;
@@ -282,11 +292,29 @@ export function WorldClient({
     event.preventDefault();
     const submittedInput = input.trim();
 
-    if (!adventureId || !submittedInput || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+    if (
+      !adventureId ||
+      !isActInputOpen ||
+      !submittedInput ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      isCreatingAdventure
+    ) {
       return;
     }
 
     await submitTurn({ trigger: "act", input: submittedInput });
+  }
+
+  function handleAct() {
+    if (isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setIsActInputOpen(true);
   }
 
   async function handlePass() {
@@ -330,14 +358,19 @@ export function WorldClient({
       if (!response.ok || !result.ok) {
         setError(result.ok ? "The Game Master turn failed." : result.error);
         if (turn.trigger === "act") {
+          setIsActInputOpen(true);
           setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
         }
         return;
       }
 
+      if (turn.trigger === "act") {
+        setIsActInputOpen(false);
+      }
     } catch (submitError) {
       setError(errorMessage(submitError));
       if (turn.trigger === "act") {
+        setIsActInputOpen(true);
         setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
       }
     } finally {
@@ -781,33 +814,47 @@ export function WorldClient({
                     <TurnPendingPlaceholder />
                   ) : (
                     <>
-                      <label
-                        htmlFor="director-input"
-                        className="block text-sm font-medium leading-6 text-zinc-100"
+                      <p
+                        id="turn-action-prompt"
+                        className="block text-left text-sm italic leading-6 text-zinc-300"
                       >
-                        What do you do next?
-                      </label>
-                      <textarea
-                        id="director-input"
-                        value={input}
-                        onChange={(event) => setInput(event.target.value)}
-                        onKeyDown={handleInputKeyDown}
-                        placeholder="Type your response..."
-                        rows={2}
-                        disabled={isSeeding || isResetting || isCreatingAdventure}
-                        className="mt-1 min-h-12 w-full resize-none bg-transparent text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
-                      />
-                      <div id="turn-controls" className="mt-2 flex justify-end">
-                        <button
-                          id="pass-turn-button"
-                          type="button"
-                          onClick={handlePass}
+                        What do you do?
+                      </p>
+                      {isActInputOpen ? (
+                        <textarea
+                          id="director-input"
+                          ref={directorInputRef}
+                          aria-labelledby="turn-action-prompt"
+                          value={input}
+                          onChange={(event) => setInput(event.target.value)}
+                          onKeyDown={handleInputKeyDown}
+                          placeholder="Type your response..."
+                          rows={2}
                           disabled={isSeeding || isResetting || isCreatingAdventure}
-                          className="rounded-full bg-zinc-700/80 px-4 py-1.5 text-xs font-semibold text-zinc-100 transition hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Pass
-                        </button>
-                      </div>
+                          className="mt-3 min-h-16 w-full resize-none rounded-xl bg-zinc-700/45 px-4 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-700/65"
+                        />
+                      ) : (
+                        <div id="turn-controls" className="mt-3 flex justify-start gap-2">
+                          <button
+                            id="act-turn-button"
+                            type="button"
+                            onClick={handleAct}
+                            disabled={isSeeding || isResetting || isCreatingAdventure}
+                            className="flex size-14 items-center justify-center rounded-xl bg-amber-300 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Act
+                          </button>
+                          <button
+                            id="pass-turn-button"
+                            type="button"
+                            onClick={handlePass}
+                            disabled={isSeeding || isResetting || isCreatingAdventure}
+                            className="flex size-14 items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Pass
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                   <div
