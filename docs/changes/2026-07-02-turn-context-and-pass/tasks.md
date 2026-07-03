@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: review follow-up cleanup applied; ready for `/sdd-review` rerun
-- Last completed action: deletion cleanup was committed, Act-expanded input UI/test updates were retained in scope, and stale manual-feedback artifacts were updated.
-- Next action: commit the remaining scoped files, then rerun `/sdd-review`.
+- Current state: reviewed; changes requested
+- Last completed action: `/sdd-review` was rerun after follow-up commits; required CI passed and merge-tree is clean, but deterministic E2E is blocked by the running local Convex dev server on port `3210`.
+- Next action: stop the live dev server / free port `3210`, run `npm run e2e`, record the result, then rerun `/sdd-review`; or explicitly accept the E2E gap before merge.
 - Active branch/ref: `change/turn-context-and-pass`
 - Expected dirty files: implementation/docs/tests listed in the implementation ledger plus this change folder
-- Known blockers: none known before review rerun. Manual UI confirmation remains pending Taylor.
+- Known blockers: deterministic E2E has not run on the latest committed Act-expanded UI because port `3210` is occupied. Manual UI confirmation remains pending Taylor.
 
 ## Task Checklist
 
@@ -96,7 +96,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-02 | LC-001-S1/R4, LC-001-S6/R4/R5, LC-001-S7/R10-R12 | main implementation with Convex, Next route, prompt, and browser verification guidance | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `src/lib/director/*`, fixture and E2E tests | Added `act`/`pass` turn triggers, commandless Pass turns, narration-only story-visible history for persistent story/extraction prompts, Pass UI, debug trigger visibility, fixture support, and deterministic coverage. | e40a145 |
 | 2026-07-02 | Artifact reconciliation | main | LC-001 Epic, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, this task ledger | Updated Epic Requirements/Scenarios/Implemented By/Verified By, public docs, canonical data model, persistence strategy, and changelog to match implementation. | e40a145 |
 | 2026-07-02 | Apply-side self-check fixes | main plus read-only subagents Jason, Turing, and Godel | `convex/world.ts`, `docs/architecture.md`, LC-001 Epic, `design.md`, this task ledger | Tightened pending-turn and trigger/command validation for commandless Pass completion/extraction; corrected stale design/Epic wording; recorded existing destructive client mutation exposure as a follow-up risk instead of broadening this change. | e40a145 |
-| 2026-07-02 | Review follow-up cleanup | main | `.agents/`, `.claude/`, `.llm/`, `src/app/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, this task ledger | Committed unrelated vendored-skill deletions separately, retained Taylor's Act-expanded input feedback as in-scope UI behavior, and updated E2E helpers to open Act before typing. | 35770a1 / pending |
+| 2026-07-02 | Review follow-up cleanup | main | `.agents/`, `.claude/`, `.llm/`, `src/app/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, this task ledger | Committed unrelated vendored-skill deletions separately, retained Taylor's Act-expanded input feedback as in-scope UI behavior, and updated E2E helpers to open Act before typing. | 35770a1 / 5d2093e |
 
 ## Verification Ledger
 
@@ -117,6 +117,9 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | `npm run e2e` after self-check fixes | deterministic E2E rerun attempt | Rerun was blocked because the user-requested dev server kept local Convex active on port 3210 and Playwright is configured to start its own Convex with `reuseExistingServer: false`; earlier E2E pass remains the browser evidence for this slice. | blocked by existing dev server, accepted for apply handoff |
 | 2026-07-02 | `/sdd-review`; `npm run ci:required`; `git merge-tree --write-tree develop HEAD` | local PR-style review | Required CI passed and committed branch merges cleanly, but `review.md` recorded changes-requested because the app repo has uncommitted scoped UI changes, unrelated tracked deletions, and stale manual-feedback artifacts. | changes-requested |
 | 2026-07-02 | Artifact follow-up inspection | artifact verification | `review.md` findings were addressed by committing deletion cleanup separately and updating this ledger for the Act-expanded input behavior. Latest E2E files now exercise clicking Act before typing. | ready for review rerun |
+| 2026-07-02 | `npm run ci:required` during review rerun | broad supporting gate | Lint, unit tests, typecheck, and production build pass on the committed review branch. | passed |
+| 2026-07-02 | `git merge-tree --write-tree develop HEAD` during review rerun | branch readiness | The committed branch merges cleanly into `develop`. | passed: `3ca22fa4ada63875bc4c4bedf8cac28cbc80f235` |
+| 2026-07-02 | `npm run e2e` during review rerun | deterministic E2E | Attempted to verify the latest Act-expanded UI through Playwright. | blocked: local Convex dev server already listening on port `3210` |
 
 ## Manual Feedback
 
@@ -150,7 +153,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 - None identified for this change.
 - Follow-up risk: existing client-callable destructive Convex mutations (`seedDemoWorld`, `deleteAdventure`, `resetPlaytestWorld`) should move behind the same server/local guard policy before shared deployment. This predates the Pass work and is not required for this slice's behavior.
-- Prior review blockers: see `docs/changes/2026-07-02-turn-context-and-pass/review.md`; follow-up cleanup has been applied and should be verified by rerunning `/sdd-review`.
+- Review blocker: see `docs/changes/2026-07-02-turn-context-and-pass/review.md`; deterministic E2E must run after freeing port `3210` or be explicitly accepted as a temporary gap.
 
 ## Closeout
 
@@ -163,7 +166,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Changelog current: yes.
 - `sdd-review` verdict: changes-requested.
 - Review record: `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
-- `review.md` findings resolved: follow-up applied; pending review rerun.
+- `review.md` findings resolved: no; deterministic E2E blocker remains.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
 - PR / merge state: not started; local implementation commit `e40a145` created; ledger updated in follow-up commit.
