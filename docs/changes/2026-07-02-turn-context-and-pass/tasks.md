@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: reviewed; changes requested
-- Last completed action: `/sdd-review` was rerun after follow-up commits; required CI passed and merge-tree is clean, but deterministic E2E is blocked by the running local Convex dev server on port `3210`.
-- Next action: stop the live dev server / free port `3210`, run `npm run e2e`, record the result, then rerun `/sdd-review`; or explicitly accept the E2E gap before merge.
+- Current state: reviewed; ready for merge confirmation
+- Last completed action: `/sdd-review` was rerun after stopping the dev server; required CI, deterministic E2E, and merge-tree checks passed.
+- Next action: ask Taylor whether to perform the policy-defined merge-and-close into `develop`.
 - Active branch/ref: `change/turn-context-and-pass`
 - Expected dirty files: implementation/docs/tests listed in the implementation ledger plus this change folder
-- Known blockers: deterministic E2E has not run on the latest committed Act-expanded UI because port `3210` is occupied. Manual UI confirmation remains pending Taylor.
+- Known blockers: none. Manual UI confirmation remains pending Taylor.
 
 ## Task Checklist
 
@@ -120,6 +120,7 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-02 | `npm run ci:required` during review rerun | broad supporting gate | Lint, unit tests, typecheck, and production build pass on the committed review branch. | passed |
 | 2026-07-02 | `git merge-tree --write-tree develop HEAD` during review rerun | branch readiness | The committed branch merges cleanly into `develop`. | passed: `3ca22fa4ada63875bc4c4bedf8cac28cbc80f235` |
 | 2026-07-02 | `npm run e2e` during review rerun | deterministic E2E | Attempted to verify the latest Act-expanded UI through Playwright. | blocked: local Convex dev server already listening on port `3210` |
+| 2026-07-02 | `npm run e2e` after stopping dev server | deterministic E2E | Browser verifies Act opens the input, action turns submit, Pass advances without player prose, debug turn metadata is visible, and existing reset/travel/adventure flows still work. | passed: 1 test |
 
 ## Manual Feedback
 
@@ -153,7 +154,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 - None identified for this change.
 - Follow-up risk: existing client-callable destructive Convex mutations (`seedDemoWorld`, `deleteAdventure`, `resetPlaytestWorld`) should move behind the same server/local guard policy before shared deployment. This predates the Pass work and is not required for this slice's behavior.
-- Review blocker: see `docs/changes/2026-07-02-turn-context-and-pass/review.md`; deterministic E2E must run after freeing port `3210` or be explicitly accepted as a temporary gap.
+- None blocking for review; see `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
 
 ## Closeout
 
@@ -164,9 +165,9 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes; older recent-feed wording was narrowed where it referred to future GM prompt context.
 - ADR status: not applicable for this slice; Retry/snapshot architecture may need a future ADR.
 - Changelog current: yes.
-- `sdd-review` verdict: changes-requested.
+- `sdd-review` verdict: ready.
 - Review record: `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
-- `review.md` findings resolved: no; deterministic E2E blocker remains.
+- `review.md` findings resolved: yes.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
 - PR / merge state: not started; local implementation commit `e40a145` created; ledger updated in follow-up commit.
