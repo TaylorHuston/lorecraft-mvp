@@ -91,11 +91,11 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-02 | Planning | main with `/sdd-propose` | `docs/changes/2026-07-02-turn-context-and-pass/` | Proposal, design, and task ledger drafted after interview on turn framing, story-visible history, and Pass semantics. | uncommitted |
-| 2026-07-02 | Discovery | main orchestrator; read `sdd-apply`, project `AGENTS.md`, `developer-guide.md`, Convex generated guidance, Next route docs; read-only subagent Newton (`019f25eb-8b28-76a1-9f8c-0dd75b88d0ee`) | Convex schema/functions, route handler, prompt assembly, UI, fixture, tests, docs | Confirmed player/debug feed should remain separate from GM story-visible history; commandless Pass needs a turn trigger and optional command handling in completion/extraction. | uncommitted |
-| 2026-07-02 | LC-001-S1/R4, LC-001-S6/R4/R5, LC-001-S7/R10-R12 | main implementation with Convex, Next route, prompt, and browser verification guidance | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `src/lib/director/*`, fixture and E2E tests | Added `act`/`pass` turn triggers, commandless Pass turns, narration-only story-visible history for persistent story/extraction prompts, Pass UI, debug trigger visibility, fixture support, and deterministic coverage. | uncommitted |
-| 2026-07-02 | Artifact reconciliation | main | LC-001 Epic, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, this task ledger | Updated Epic Requirements/Scenarios/Implemented By/Verified By, public docs, canonical data model, persistence strategy, and changelog to match implementation. | uncommitted |
-| 2026-07-02 | Apply-side self-check fixes | main plus read-only subagents Jason, Turing, and Godel | `convex/world.ts`, `docs/architecture.md`, LC-001 Epic, `design.md`, this task ledger | Tightened pending-turn and trigger/command validation for commandless Pass completion/extraction; corrected stale design/Epic wording; recorded existing destructive client mutation exposure as a follow-up risk instead of broadening this change. | uncommitted |
+| 2026-07-02 | Planning | main with `/sdd-propose` | `docs/changes/2026-07-02-turn-context-and-pass/` | Proposal, design, and task ledger drafted after interview on turn framing, story-visible history, and Pass semantics. | e40a145 |
+| 2026-07-02 | Discovery | main orchestrator; read `sdd-apply`, project `AGENTS.md`, `developer-guide.md`, Convex generated guidance, Next route docs; read-only subagent Newton (`019f25eb-8b28-76a1-9f8c-0dd75b88d0ee`) | Convex schema/functions, route handler, prompt assembly, UI, fixture, tests, docs | Confirmed player/debug feed should remain separate from GM story-visible history; commandless Pass needs a turn trigger and optional command handling in completion/extraction. | e40a145 |
+| 2026-07-02 | LC-001-S1/R4, LC-001-S6/R4/R5, LC-001-S7/R10-R12 | main implementation with Convex, Next route, prompt, and browser verification guidance | `convex/schema.ts`, `convex/world.ts`, `src/app/api/director/turn/route.ts`, `src/app/world-client.tsx`, `src/lib/director/*`, fixture and E2E tests | Added `act`/`pass` turn triggers, commandless Pass turns, narration-only story-visible history for persistent story/extraction prompts, Pass UI, debug trigger visibility, fixture support, and deterministic coverage. | e40a145 |
+| 2026-07-02 | Artifact reconciliation | main | LC-001 Epic, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, this task ledger | Updated Epic Requirements/Scenarios/Implemented By/Verified By, public docs, canonical data model, persistence strategy, and changelog to match implementation. | e40a145 |
+| 2026-07-02 | Apply-side self-check fixes | main plus read-only subagents Jason, Turing, and Godel | `convex/world.ts`, `docs/architecture.md`, LC-001 Epic, `design.md`, this task ledger | Tightened pending-turn and trigger/command validation for commandless Pass completion/extraction; corrected stale design/Epic wording; recorded existing destructive client mutation exposure as a follow-up risk instead of broadening this change. | e40a145 |
 
 ## Verification Ledger
 
@@ -161,6 +161,6 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - `review.md` findings resolved: pending.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
-- PR / merge state: not started; local implementation commit pending.
+- PR / merge state: not started; local implementation commit `e40a145` created; ledger updated in follow-up commit.
 - Deferred scope accepted: Retry, snapshots, rollback, reversible diffs, turn supersession, event feed redesign, multiplayer turn ordering, and broader turn interactions.
 - Change moved to `docs/changes/closed/`: no.
