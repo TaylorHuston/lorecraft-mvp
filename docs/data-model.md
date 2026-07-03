@@ -241,7 +241,7 @@ Strategy:
 
 Table: `turns`
 
-A turn is one persisted narrative exchange: one player intent plus the backend work caused by that intent.
+A turn is one persisted resolved story beat. It may be triggered by player action text or by Pass.
 
 | Field | Meaning |
 |---|---|
@@ -249,7 +249,8 @@ A turn is one persisted narrative exchange: one player intent plus the backend w
 | `adventureId` | Owning Adventure runtime state. |
 | `sequenceNumber` | Adventure-scoped ordering number assigned when the player input becomes persisted history. |
 | `actorId` | Actor who initiated the turn. |
-| `commandId` | Optional player input row for the turn. It is patched after the command is created. |
+| `commandId` | Optional player input row for action turns. Pass turns do not create command rows. |
+| `trigger` | Optional trigger for local compatibility: `act` or `pass`. New turns write this explicitly; old rows without it should be read as `act`. |
 | `status` | Lifecycle state: `pending`, `succeeded`, or `failed`. |
 | `error` | Optional failure message when provider or output handling fails after the turn exists. |
 | `completedAt` | Optional timestamp set when the turn reaches a terminal state. |
@@ -258,7 +259,8 @@ Strategy:
 
 - Turns are the canonical grouping layer for narrative play.
 - A turn is created only after the request is valid enough to become persisted game history.
-- Failed provider/output attempts remain as failed turns with linked command and Game Master call records.
+- Failed provider/output attempts remain as failed turns with linked Game Master call records and, for action turns, linked commands.
+- A Pass turn advances the story without storing fake player prose.
 - Malformed request bodies, missing LLM configuration, invalid Adventure ids, and missing Adventure state are rejected before a turn exists.
 - Future rollback should attach snapshots to turn boundaries, but snapshots and restore behavior are deferred.
 
@@ -381,8 +383,8 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 | `locationCard` | Derived from the current room/location, room facts, visible objects, exits, and present actors | Canonical current-location card for persistent Game Master context. |
 | `knownLocations` | Derived from Adventure-owned room rows | Compact list of valid movement destinations for the current Adventure. |
 | `npcCards` | Rendered from current-scene NPC profiles | Card-like story memory the Game Master should treat as canonical NPC context. |
-| `recentStory` | Derived from commands, narrations, and events | Bounded recent story context without internal turn or command IDs. |
-| `currentInput` | Current request body | The player's narrative intent for this turn. |
+| `recentStory` | Derived from successful narrations plus seed narration | Bounded story-visible history without prior player commands, event records, internal turn IDs, or command IDs. |
+| `currentInput` | Current request body and turn trigger | The player's narrative intent for action turns, or an explicit Pass directive for pass turns. |
 | `gameMasterNarration` | Completed story-generation call | Extractor-only input containing the player-facing narration to inspect for durable NPC changes. |
 | `output` | Backend output contract | Story generation asks for player-facing prose only; state extraction asks for JSON `npcUpdates` and `actorMoves`. |
 
@@ -393,6 +395,8 @@ Strategy:
 - Generation settings are developer configuration and are summarized in Game Master call debug metadata.
 - Persistent story generation now uses `outputContract: "plain_prose"` and requests player-facing narration only. The backend wraps that prose as a parsed response with an empty `npcUpdates` array.
 - Structured mutation lives in a separate extractor step so story prose and state-diff JSON can use different prompts, settings, or models.
+- Prior commands and event records remain persisted and visible/debuggable, but they are not part of normal persistent-mode future Game Master story context.
+- The post-narration extractor uses the same `recentStory` policy as story generation.
 - Persistent prompt priority is explicit: `currentInput` comes first; `locationCard`, `knownLocations`, `npcCards`, and `world` are canonical current scene truth; `recentStory` is lower-priority continuity and may contain stale prose.
 - If `recentStory` conflicts with `locationCard`, `knownLocations`, `npcCards`, or `world`, the Game Master should follow the canonical card/world context.
 - Required scene beats should stay narrow until playtesting proves broader automation is needed. They currently belong to the persistent mode path, not transcript mode.

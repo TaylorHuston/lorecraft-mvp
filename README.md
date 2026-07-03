@@ -9,6 +9,7 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 ## Current Features
 
 - Narrative-only story input and a resumable player-facing story stream.
+- `Pass` turns for letting the Game Master continue the scene without adding player prose.
 - Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
 - Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
 - Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
@@ -28,7 +29,7 @@ Lorecraft's product thesis is state-first storytelling:
 - The Game Master writes prose.
 - Convex stores world truth.
 - LLM output is untrusted until backend validation accepts a bounded state change.
-- Each turn is rebuilt from canonical state plus recent story context.
+- Each turn is rebuilt from canonical state plus recent successful narration context, with prior commands and debug events kept out of normal future story prompts.
 
 This is meant to explore a middle ground between freeform AI storytelling and rigid text RPGs. The player should interact naturally, while the engine keeps enough structured state to prevent the world from drifting when old transcript context falls away.
 
@@ -99,7 +100,7 @@ I ask Mira what she knows about the storm.
 
 ## Game Master Modes
 
-Persistent mode is the default. It sends canonical world, location, NPC, and recent-story context to the Game Master. Story generation returns plain prose; a separate extraction pass may propose bounded state changes that Convex validates before saving.
+Persistent mode is the default. It sends canonical world, location, NPC, and recent successful narration context to the Game Master. Story generation returns plain prose; a separate extraction pass may propose bounded state changes that Convex validates before saving.
 
 Transcript mode is a comparison mode for story-only generation from the opening seed plus transcript. It does not include live canonical world state and does not apply NPC fact changes, actor movement, state diffs, or LLM-authored world events.
 
@@ -152,7 +153,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, submit narrative input with Enter, receive a persisted Game Master response, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset Adventure location state.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset Adventure location state.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 

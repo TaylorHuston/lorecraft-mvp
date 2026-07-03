@@ -140,6 +140,7 @@ export default defineSchema({
     sequenceNumber: v.number(),
     actorId: v.id("actors"),
     commandId: v.optional(v.id("commands")),
+    trigger: v.optional(v.union(v.literal("act"), v.literal("pass"))),
     status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
     error: v.optional(v.string()),
     completedAt: v.optional(v.number()),

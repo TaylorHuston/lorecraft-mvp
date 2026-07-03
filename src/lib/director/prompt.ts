@@ -9,6 +9,7 @@ import {
   type RequiredSceneBeat,
   type SceneBeatSource,
   type TranscriptDirectorContext,
+  type TurnTrigger,
 } from "./types";
 import { validateNarrativeInput } from "./input";
 import { buildNpcProfiles } from "./npc-profiles";
@@ -43,18 +44,20 @@ const TRANSCRIPT_DIRECTOR_INSTRUCTIONS = [
 
 export function buildDirectorRequest(
   context: DirectorContext,
-  playerInput: string,
+  playerInput: string | null,
   options: {
     generationSettings?: DirectorGenerationSettingsSummary;
     promptGuidance?: DirectorPromptGuidance;
     requiredSceneBeat?: RequiredSceneBeat;
     sceneBeatSource?: SceneBeatSource;
     sceneBeatReason?: string;
+    turnTrigger?: TurnTrigger;
   } = {},
 ): DirectorRequest {
   const prompt = buildPromptComponents(context, playerInput, {
     promptGuidance: options.promptGuidance,
     requiredSceneBeat: options.requiredSceneBeat,
+    turnTrigger: options.turnTrigger,
   });
   const generationSettings = options.generationSettings
     ? { ...options.generationSettings, responseFormat: "text" as const }
@@ -74,7 +77,8 @@ export function buildDirectorRequest(
       worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: context.room.key,
-      playerInputLength: playerInput.length,
+      turnTrigger: prompt.turnTrigger,
+      playerInputLength: playerInput?.length ?? 0,
       recentFeedCount: prompt.recentFeed.length,
       actorKeys: context.actors.map((actor) => actor.key),
       npcFactKeys: NPC_FACT_KEYS.filter((key) =>
@@ -104,7 +108,7 @@ export function buildDirectorRequest(
 
 export function buildNpcStateExtractionRequest(
   context: DirectorContext,
-  playerInput: string,
+  playerInput: string | null,
   narration: string,
   options: {
     generationSettings?: DirectorGenerationSettingsSummary;
@@ -112,11 +116,13 @@ export function buildNpcStateExtractionRequest(
     requiredSceneBeat?: RequiredSceneBeat;
     sceneBeatSource?: SceneBeatSource;
     sceneBeatReason?: string;
+    turnTrigger?: TurnTrigger;
   } = {},
 ): DirectorRequest {
   const prompt = buildPromptComponents(context, playerInput, {
     promptGuidance: options.promptGuidance,
     requiredSceneBeat: options.requiredSceneBeat,
+    turnTrigger: options.turnTrigger,
   });
   const generationSettings = options.generationSettings
     ? { ...options.generationSettings, responseFormat: "json_object" as const }
@@ -127,6 +133,7 @@ export function buildNpcStateExtractionRequest(
     npcCards: prompt.components.npcCards,
     recentFeed: prompt.components.recentFeed,
     playerInput,
+    turnTrigger: prompt.turnTrigger,
     narration,
     requiredSceneBeat: prompt.requiredSceneBeat,
   });
@@ -152,7 +159,8 @@ export function buildNpcStateExtractionRequest(
       worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: context.room.key,
-      playerInputLength: playerInput.length,
+      turnTrigger: prompt.turnTrigger,
+      playerInputLength: playerInput?.length ?? 0,
       recentFeedCount: prompt.recentFeed.length,
       actorKeys: context.actors.map((actor) => actor.key),
       npcFactKeys: NPC_FACT_KEYS.filter((key) =>
@@ -191,20 +199,26 @@ export function buildNpcStateExtractionRequest(
 
 export function buildTranscriptDirectorRequest(
   context: TranscriptDirectorContext,
-  playerInput: string,
+  playerInput: string | null,
   options: {
     generationSettings?: DirectorGenerationSettingsSummary;
     promptGuidance?: DirectorPromptGuidance;
+    turnTrigger?: TurnTrigger;
   } = {},
 ): DirectorRequest {
+  const turnTrigger = options.turnTrigger ?? "act";
+  const actionInput = playerInput ?? "";
   const transcript = sanitizeTranscript(context.transcript).slice(-RECENT_FEED_LIMIT);
   const immediateContext = transcript.slice(-IMMEDIATE_CONTEXT_LIMIT);
   const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const lastAction = {
-    rawInput: playerInput,
-    inferredMode: inferPlayerInputMode(playerInput),
+    trigger: turnTrigger,
+    rawInput: actionInput,
+    inferredMode: turnTrigger === "pass" ? ("pass" as const) : inferPlayerInputMode(actionInput),
     directive:
-      "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
+      turnTrigger === "pass"
+        ? "The player passes. Continue the scene from the transcript without inventing a new player action."
+        : "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
   };
   const sceneDirective = buildTranscriptSceneDirective(lastAction.inferredMode);
   const components = {
@@ -235,13 +249,14 @@ export function buildTranscriptDirectorRequest(
       worldVersionId: context.sourceWorldVersion.id,
       worldName: context.world.name,
       roomKey: "transcript",
-      playerInputLength: playerInput.length,
+      turnTrigger,
+      playerInputLength: playerInput?.length ?? 0,
       recentFeedCount: transcript.length,
       actorKeys: [],
       npcFactKeys: [],
       readOnlyKnowledgeKeys: [],
       requiredSceneBeat: {
-        kind: "player_action",
+        kind: turnTrigger === "pass" ? "pass" : "player_action",
         expectsNpcResponse: false,
         allowsNpcUpdates: false,
       },
@@ -272,10 +287,14 @@ function inferPlayerInputMode(input: string) {
   return "storylike" as const;
 }
 
-function buildTranscriptSceneDirective(inferredMode: ReturnType<typeof inferPlayerInputMode>) {
+function buildTranscriptSceneDirective(inferredMode: ReturnType<typeof inferPlayerInputMode> | "pass") {
   const base = [
-    "Resolve Current Input in the scene established by Recent Story.",
-    "Player input is intent for the Game Master to resolve, not already-canonical story prose.",
+    inferredMode === "pass"
+      ? "Resolve Current Input as a Pass in the scene established by Recent Story."
+      : "Resolve Current Input in the scene established by Recent Story.",
+    inferredMode === "pass"
+      ? "The player has not added a new action; advance the scene without inventing one."
+      : "Player input is intent for the Game Master to resolve, not already-canonical story prose.",
     "Do not copy Current Input verbatim as the next story paragraph unless it is quoted dialogue.",
     "Keep the response concise and avoid replaying earlier setup.",
     "Do not decide new player actions, thoughts, feelings, or dialogue beyond the submitted input.",
@@ -336,20 +355,29 @@ function toTranscriptPromptEntry(entry: DirectorFeedEntry) {
 
 function buildPromptComponents(
   context: DirectorContext,
-  playerInput: string,
+  playerInput: string | null,
   options: {
     promptGuidance?: DirectorPromptGuidance;
     requiredSceneBeat?: RequiredSceneBeat;
+    turnTrigger?: TurnTrigger;
   },
 ) {
-  const recentFeed = context.recentFeed.slice(-RECENT_FEED_LIMIT);
-  const requiredSceneBeat = options.requiredSceneBeat ?? deriveRequiredSceneBeat(context, playerInput);
+  const turnTrigger = options.turnTrigger ?? "act";
+  const actionInput = playerInput ?? "";
+  const storyVisibleHistory = (context.storyVisibleHistory ?? context.recentFeed.filter((entry) => entry.kind === "director")).slice(
+    -RECENT_FEED_LIMIT,
+  );
+  const requiredSceneBeat =
+    options.requiredSceneBeat ?? (turnTrigger === "pass" ? passSceneBeat() : deriveRequiredSceneBeat(context, actionInput));
   const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const lastAction = {
-    rawInput: playerInput,
-    inferredMode: inferPlayerInputMode(playerInput),
+    trigger: turnTrigger,
+    rawInput: actionInput,
+    inferredMode: turnTrigger === "pass" ? ("pass" as const) : inferPlayerInputMode(actionInput),
     directive:
-      "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
+      turnTrigger === "pass"
+        ? "The player passes. Continue the scene from accepted narration and canonical state without inventing a new player action."
+        : "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
   };
   const npcProfiles = context.npcProfiles ?? buildNpcProfiles(context.actors);
   const npcCards = npcProfiles.map(toNpcCard);
@@ -364,7 +392,7 @@ function buildPromptComponents(
         description: context.room.description,
       },
     ];
-  const conversationFocus = buildConversationFocus(context.actors, recentFeed, requiredSceneBeat);
+  const conversationFocus = buildConversationFocus(context.actors, context.recentFeed, requiredSceneBeat);
   const readOnlyKnowledgeKeys = npcProfiles.flatMap((profile) =>
     profile.attributes
       .filter((attribute) => HIDDEN_NPC_KNOWLEDGE_KEYS.has(attribute.key))
@@ -403,7 +431,7 @@ function buildPromptComponents(
     knownLocations,
     npcCards,
     conversationFocus,
-    recentFeed: recentFeed.map((entry) => ({
+    recentFeed: storyVisibleHistory.map((entry) => ({
       kind: entry.kind,
       text: entry.text,
       source: entry.source,
@@ -418,8 +446,9 @@ function buildPromptComponents(
     components,
     userPrompt,
     promptSectionKeys,
-    recentFeed,
+    recentFeed: storyVisibleHistory,
     requiredSceneBeat,
+    turnTrigger,
     promptGuidanceKeys: Object.keys(promptGuidance),
     npcProfiles,
     knownLocations,
@@ -502,7 +531,9 @@ function buildPersistentAiInstructions({
     "Use present tense, second person, concrete sensory detail, and lifelike dialogue.",
     "Write one complete short story beat, usually 1-2 paragraphs.",
     "Prefer complete sentences and a clean stopping point over extra detail.",
-    "Resolve Current Input before advancing; do not merely restate it.",
+    requiredSceneBeat.kind === "pass"
+      ? "The player has passed. Advance the scene without inventing a new player action."
+      : "Resolve Current Input before advancing; do not merely restate it.",
     "Stop after resolving the current input; do not continue into the player's next action.",
     "Treat Location Cards as canonical scene truth. Known Locations are the only valid movement destinations; do not invent new locations.",
     "Treat NPC Cards as canonical story memory, including descriptions, personality, voice, current status, memory, and private knowledge.",
@@ -542,7 +573,7 @@ function buildPersistentUserPrompt(components: {
   knownLocations: NonNullable<DirectorContext["knownLocations"]>;
   npcCards: PromptNpcCard[];
   recentFeed: PromptFeedEntry[];
-  lastAction: { rawInput: string };
+  lastAction: { trigger: TurnTrigger; rawInput: string; directive: string };
 }) {
   return buildSectionedPrompt([
     ["AI Instructions", bulletList(components.aiInstructions)],
@@ -551,7 +582,7 @@ function buildPersistentUserPrompt(components: {
     ["Known Locations", formatKnownLocations(components.knownLocations)],
     ["NPC Cards", formatNpcCards(components.npcCards)],
     ["Recent Story", formatRecentStory(components.recentFeed)],
-    ["Current Input", `> ${components.lastAction.rawInput}`],
+    ["Current Input", formatCurrentInput(components.lastAction)],
     ["Output", "Return player-facing story prose only."],
   ]);
 }
@@ -561,7 +592,8 @@ function buildNpcStateExtractionUserPrompt(components: {
   knownLocations: NonNullable<DirectorContext["knownLocations"]>;
   npcCards: PromptNpcCard[];
   recentFeed: PromptFeedEntry[];
-  playerInput: string;
+  playerInput: string | null;
+  turnTrigger: TurnTrigger;
   narration: string;
   requiredSceneBeat: RequiredSceneBeat;
 }) {
@@ -590,7 +622,17 @@ function buildNpcStateExtractionUserPrompt(components: {
     ["Known Locations", formatKnownLocations(components.knownLocations)],
     ["NPC Cards", formatNpcCards(components.npcCards)],
     ["Recent Story", formatRecentStory(components.recentFeed)],
-    ["Current Input", `> ${components.playerInput}`],
+    [
+      "Current Input",
+      formatCurrentInput({
+        trigger: components.turnTrigger,
+        rawInput: components.playerInput ?? "",
+        directive:
+          components.turnTrigger === "pass"
+            ? "The player passed this turn."
+            : "The player acted this turn.",
+      }),
+    ],
     ["Game Master Narration", components.narration],
     [
       "Output",
@@ -620,7 +662,7 @@ function buildTranscriptUserPrompt(components: {
     initialSeed: string;
   };
   transcript: PromptFeedEntry[];
-  lastAction: { rawInput: string };
+  lastAction: { trigger: TurnTrigger; rawInput: string; directive: string };
   sceneDirective: string;
 }) {
   const instructions = [
@@ -641,7 +683,7 @@ function buildTranscriptUserPrompt(components: {
       : []),
     ["World Seed", formatWorldSeed(components.worldSeed)],
     ["Recent Story", formatRecentStory(components.transcript)],
-    ["Current Input", `> ${components.lastAction.rawInput}`],
+    ["Current Input", formatCurrentInput(components.lastAction)],
   ]);
 }
 
@@ -783,6 +825,22 @@ function formatRecentStory(feed: PromptFeedEntry[]) {
   return feed.map(formatRecentStoryEntry).join("\n");
 }
 
+function formatCurrentInput(currentTurn: {
+  trigger: TurnTrigger;
+  rawInput: string;
+  directive: string;
+}) {
+  if (currentTurn.trigger === "pass") {
+    return [
+      "Turn trigger: Pass.",
+      currentTurn.directive,
+      "Continue from Recent Story and canonical cards. Do not invent a new player action, thought, feeling, or dialogue.",
+    ].join("\n");
+  }
+
+  return [`Turn trigger: Act.`, `> ${currentTurn.rawInput}`, currentTurn.directive].join("\n");
+}
+
 function formatRecentStoryEntry(entry: PromptFeedEntry) {
   if (entry.kind === "player") {
     return `> ${entry.text}`;
@@ -833,7 +891,7 @@ function buildConversationFocus(
 
 function buildPersistentSceneDirective(
   sceneBeat: RequiredSceneBeat,
-  inferredMode: ReturnType<typeof inferPlayerInputMode>,
+  inferredMode: ReturnType<typeof inferPlayerInputMode> | "pass",
   npcProfiles: ReturnType<typeof buildNpcProfiles>,
 ) {
   const targetProfile = sceneBeat.targetActorKey
@@ -849,16 +907,21 @@ function buildPersistentSceneDirective(
 
   return {
     priority: "highest",
-    task: "Resolve currentTurn.playerInput now before advancing the scene.",
+    task:
+      inferredMode === "pass"
+        ? "Resolve currentTurn.pass by continuing the scene from accepted narration and canonical state."
+        : "Resolve currentTurn.playerInput now before advancing the scene.",
     lastActionMode: inferredMode,
     targetActorKey: sceneBeat.targetActorKey,
     targetActorName: sceneBeat.targetActorName,
     mustUse,
     conflictPolicy:
-      "currentTurn and sceneDirective override recentFeed. npcCards, npcProfiles, and visibleFacts are canonical current scene truth; when they conflict with recentFeed, use the canonical card/profile/fact context.",
+      "currentTurn and sceneDirective override Recent Story. npcCards, npcProfiles, and visibleFacts are canonical current scene truth; when they conflict with Recent Story, use the canonical card/profile/fact context.",
     responseRequirement: sceneBeat.expectsNpcResponse
       ? "The target NPC must answer, refuse, deflect, warn, lie, ask back, act, or intentionally stay silent in this response. Do not stop after setup or repeat the player's question without resolution."
-      : "Resolve the player's intent directly. Do not replay setup or copy player input as the whole response.",
+      : inferredMode === "pass"
+        ? "Advance the scene one short beat from existing tension, NPC agenda, environment, or consequences. Do not invent a new player action."
+        : "Resolve the player's intent directly. Do not replay setup or copy player input as the whole response.",
     npcAttributePolicy:
       "If the player asks about an NPC's appearance, identity, background, personality, voice, mood, status, memory, or knowledge, answer from npcCards/npcProfiles instead of inventing conflicting details.",
     playerAgency:
@@ -938,6 +1001,16 @@ export function deriveRequiredSceneBeat(
     allowsNpcUpdates: true,
     instruction:
       "The player performs or describes the current action. Narrate this action's immediate consequences and observable reactions, but do not continue a previous dialogue beat, force NPC speech, or create durable fact changes for trivial physical actions.",
+  };
+}
+
+function passSceneBeat(): RequiredSceneBeat {
+  return {
+    kind: "pass",
+    expectsNpcResponse: false,
+    allowsNpcUpdates: true,
+    instruction:
+      "The player passes. Continue the scene one short beat from accepted narration and canonical state without inventing a new player action.",
   };
 }
 

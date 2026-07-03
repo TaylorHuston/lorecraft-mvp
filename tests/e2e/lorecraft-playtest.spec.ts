@@ -38,7 +38,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
     await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
-    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: succeeded");
+    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: Act succeeded");
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "lorecraft-fixture-model",
     );
@@ -55,6 +55,21 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
     );
 
+    await page.locator("#debug-panel-toggle").click();
+    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+    await page.locator("#pass-turn-button").click();
+    await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
+    await expect(page.locator("#director-input")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#story-stream")).toContainText(
+      "rain presses harder against the chapel roof",
+    );
+    await expect(page.locator("#story-feed [data-story-kind='player']")).not.toContainText("Pass");
+    await openDebugPanel(page);
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #2: Pass succeeded");
+    await page.locator("#debug-panel-toggle").click();
+    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+
     const failureText = "I trigger a fixture provider failure.";
     const failureInput = page.locator("#director-input");
     await failureInput.fill(failureText);
@@ -70,7 +85,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await openDebugPanel(page);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
-      `Turn #2: failed - ${failureText}`,
+      `Turn #3: Act failed - ${failureText}`,
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "provider_error",
