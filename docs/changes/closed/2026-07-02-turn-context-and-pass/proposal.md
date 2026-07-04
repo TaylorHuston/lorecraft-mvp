@@ -74,7 +74,6 @@ Introduce an explicit turn-context policy and Pass trigger:
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-07-02-turn-context-and-pass/`
 - Closed location: `docs/changes/closed/2026-07-02-turn-context-and-pass/`
 
 ## Impact

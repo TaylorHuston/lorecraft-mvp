@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: reviewed; ready for merge confirmation
-- Last completed action: `/sdd-review` was rerun after stopping the dev server; required CI, deterministic E2E, and merge-tree checks passed.
-- Next action: ask Taylor whether to perform the policy-defined merge-and-close into `develop`.
-- Active branch/ref: `change/turn-context-and-pass`
-- Expected dirty files: implementation/docs/tests listed in the implementation ledger plus this change folder
+- Current state: closed on `develop`
+- Last completed action: Taylor authorized close-and-merge, `change/turn-context-and-pass` was locally merged into `develop` with merge commit `e897b54`, and this change folder was moved to `docs/changes/closed/`.
+- Next action: none for local closeout; push remains separate and unauthorized.
+- Active branch/ref: `develop`
+- Expected dirty files: this change folder move only
 - Known blockers: none. Manual UI confirmation remains pending Taylor.
 
 ## Task Checklist
@@ -82,8 +82,8 @@
 - [x] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -154,7 +154,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 - None identified for this change.
 - Follow-up risk: existing client-callable destructive Convex mutations (`seedDemoWorld`, `deleteAdventure`, `resetPlaytestWorld`) should move behind the same server/local guard policy before shared deployment. This predates the Pass work and is not required for this slice's behavior.
-- None blocking for review; see `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
+- None blocking for review; see `docs/changes/closed/2026-07-02-turn-context-and-pass/review.md`.
 
 ## Closeout
 
@@ -166,10 +166,10 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - ADR status: not applicable for this slice; Retry/snapshot architecture may need a future ADR.
 - Changelog current: yes.
 - `sdd-review` verdict: ready.
-- Review record: `docs/changes/2026-07-02-turn-context-and-pass/review.md`.
+- Review record: `docs/changes/closed/2026-07-02-turn-context-and-pass/review.md`.
 - `review.md` findings resolved: yes.
 - Planning updates resolved: none.
 - Manual UI confirmation status: pending Taylor.
-- PR / merge state: not started; local implementation commit `e40a145` created; ledger updated in follow-up commit.
+- PR / merge state: locally merged to `develop` with merge commit `e897b54`; no remote PR created.
 - Deferred scope accepted: Retry, snapshots, rollback, reversible diffs, turn supersession, event feed redesign, multiplayer turn ordering, and broader turn interactions.
-- Change moved to `docs/changes/closed/`: no.
+- Change moved to `docs/changes/closed/`: yes.
