@@ -182,12 +182,21 @@ const context: DirectorContext = {
   ],
   recentFeed: Array.from({ length: 15 }, (_, index) => ({
     id: `entry-${index}`,
-    kind: index % 2 === 0 ? ("player" as const) : ("director" as const),
+    kind: index % 3 === 0 ? ("player" as const) : index % 3 === 1 ? ("event" as const) : ("director" as const),
     text: `feed entry ${index}`,
-    source: index % 2 === 0 ? "player" : "llm",
+    source: index % 3 === 0 ? "player" : index % 3 === 1 ? "llm" : "llm",
     createdAt: index,
     turnId: `turn-${index}`,
     commandId: `command-${index}`,
+  })),
+  storyVisibleHistory: Array.from({ length: 15 }, (_, index) => ({
+    id: `story-entry-${index}`,
+    kind: "director" as const,
+    text: `accepted narration ${index}`,
+    source: "llm",
+    createdAt: index,
+    turnId: `turn-${index}`,
+    ...(index % 2 === 0 ? { commandId: `command-${index}` } : {}),
   })),
 };
 
@@ -356,8 +365,9 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain(
       "Private knowledge: Mira knows the storm began after the chapel bell rang at midnight",
     );
-    expect(userMessage?.content).toContain("feed entry 14");
-    expect(userMessage?.content).not.toContain("feed entry 0");
+    expect(userMessage?.content).toContain("accepted narration 14");
+    expect(userMessage?.content).not.toContain("accepted narration 0");
+    expect(userMessage?.content).not.toContain("feed entry");
     expect(userMessage?.content).not.toContain("turn-14");
     expect(userMessage?.content).not.toContain("command-14");
     expect(userMessage?.content).not.toContain("outputShape");
@@ -443,9 +453,31 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain("Known Locations:");
     expect(userMessage?.content).toContain("NPC CARD: Mira (mira)");
     expect(userMessage?.content).toContain("> I ask Mira about the storm.");
+    expect(userMessage?.content).toContain("accepted narration 14");
+    expect(userMessage?.content).not.toContain("feed entry");
     expect(userMessage?.content).toContain("Mira's hand tightens around the pew");
     expect(userMessage?.content).toContain('{"npcUpdates":[],"actorMoves":[]}');
     expect(userMessage?.content).toContain("Do not update description, background, persona");
+  });
+
+  it("builds a Pass request without turning Pass into player story prose", () => {
+    const request = buildDirectorRequest(context, null, { turnTrigger: "pass" });
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary).toMatchObject({
+      turnTrigger: "pass",
+      playerInputLength: 0,
+      requiredSceneBeat: {
+        kind: "pass",
+        expectsNpcResponse: false,
+        allowsNpcUpdates: true,
+      },
+    });
+    expect(userMessage?.content).toContain("Turn trigger: Pass.");
+    expect(userMessage?.content).toContain("The player passes.");
+    expect(userMessage?.content).toContain("accepted narration 14");
+    expect(userMessage?.content).not.toContain("> Pass");
+    expect(userMessage?.content).not.toContain("feed entry");
   });
 
   it("uses canonical NPC actor and fact values in persistent prompt context without changing transcript mode", () => {

@@ -104,6 +104,7 @@ export function WorldClient({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isActInputOpen, setIsActInputOpen] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
@@ -126,6 +127,7 @@ export function WorldClient({
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
+  const directorInputRef = useRef<HTMLTextAreaElement | null>(null);
   const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const npcSaveVersions = useRef<Record<string, number>>({});
   const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
@@ -151,6 +153,14 @@ export function WorldClient({
 
     storyScroller.scrollTop = storyScroller.scrollHeight;
   }, [feedLength, isSubmitting, error]);
+
+  useEffect(() => {
+    if (!isActInputOpen || isSubmitting) {
+      return;
+    }
+
+    directorInputRef.current?.focus();
+  }, [isActInputOpen, isSubmitting]);
 
   useEffect(() => {
     const timers = npcSaveTimers.current;
@@ -282,19 +292,54 @@ export function WorldClient({
     event.preventDefault();
     const submittedInput = input.trim();
 
-    if (!adventureId || !submittedInput || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+    if (
+      !adventureId ||
+      !isActInputOpen ||
+      !submittedInput ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      isCreatingAdventure
+    ) {
+      return;
+    }
+
+    await submitTurn({ trigger: "act", input: submittedInput });
+  }
+
+  function handleAct() {
+    if (isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
       return;
     }
 
     setError(null);
     setNotice(null);
+    setIsActInputOpen(true);
+  }
+
+  async function handlePass() {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+      return;
+    }
+
+    await submitTurn({ trigger: "pass" });
+  }
+
+  async function submitTurn(turn: { trigger: "act"; input: string } | { trigger: "pass" }) {
+    const submittedInput = turn.trigger === "act" ? turn.input : "";
+    setError(null);
+    setNotice(null);
     setIsSubmitting(true);
-    setInput("");
+    if (turn.trigger === "act") {
+      setInput("");
+    }
     try {
       const npcSavesFlushed = await flushQueuedNpcSaves();
       const locationSavesFlushed = await flushActiveLocationSaves();
       if (!npcSavesFlushed || !locationSavesFlushed) {
-        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+        if (turn.trigger === "act") {
+          setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+        }
         return;
       }
 
@@ -303,7 +348,8 @@ export function WorldClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adventureId,
-          input: submittedInput,
+          trigger: turn.trigger,
+          ...(turn.trigger === "act" ? { input: submittedInput } : {}),
           promptGuidance,
         }),
       });
@@ -311,13 +357,22 @@ export function WorldClient({
 
       if (!response.ok || !result.ok) {
         setError(result.ok ? "The Game Master turn failed." : result.error);
-        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+        if (turn.trigger === "act") {
+          setIsActInputOpen(true);
+          setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+        }
         return;
       }
 
+      if (turn.trigger === "act") {
+        setIsActInputOpen(false);
+      }
     } catch (submitError) {
       setError(errorMessage(submitError));
-      setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+      if (turn.trigger === "act") {
+        setIsActInputOpen(true);
+        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -759,22 +814,47 @@ export function WorldClient({
                     <TurnPendingPlaceholder />
                   ) : (
                     <>
-                      <label
-                        htmlFor="director-input"
-                        className="block text-sm font-medium leading-6 text-zinc-100"
+                      <p
+                        id="turn-action-prompt"
+                        className="block text-left text-sm italic leading-6 text-zinc-300"
                       >
-                        What do you do next?
-                      </label>
-                      <textarea
-                        id="director-input"
-                        value={input}
-                        onChange={(event) => setInput(event.target.value)}
-                        onKeyDown={handleInputKeyDown}
-                        placeholder="Type your response..."
-                        rows={2}
-                        disabled={isSeeding || isResetting || isCreatingAdventure}
-                        className="mt-1 min-h-12 w-full resize-none bg-transparent text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
-                      />
+                        What do you do?
+                      </p>
+                      {isActInputOpen ? (
+                        <textarea
+                          id="director-input"
+                          ref={directorInputRef}
+                          aria-labelledby="turn-action-prompt"
+                          value={input}
+                          onChange={(event) => setInput(event.target.value)}
+                          onKeyDown={handleInputKeyDown}
+                          placeholder="Type your response..."
+                          rows={2}
+                          disabled={isSeeding || isResetting || isCreatingAdventure}
+                          className="mt-3 min-h-16 w-full resize-none rounded-xl bg-zinc-700/45 px-4 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-700/65"
+                        />
+                      ) : (
+                        <div id="turn-controls" className="mt-3 flex justify-start gap-2">
+                          <button
+                            id="act-turn-button"
+                            type="button"
+                            onClick={handleAct}
+                            disabled={isSeeding || isResetting || isCreatingAdventure}
+                            className="flex size-14 items-center justify-center rounded-xl bg-amber-300 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Act
+                          </button>
+                          <button
+                            id="pass-turn-button"
+                            type="button"
+                            onClick={handlePass}
+                            disabled={isSeeding || isResetting || isCreatingAdventure}
+                            className="flex size-14 items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Pass
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                   <div
@@ -1134,7 +1214,7 @@ function StoryEntry({
 
   if (kind === "player") {
     return (
-      <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+      <StoryEntryShell id={entryDomId} kind={kind} turnNumber={turnNumber}>
         <article id={`${entryDomId}-player-input`} className="border-l-2 border-amber-300/70 pl-4 text-amber-50">
           <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-amber-300/80">
             Player
@@ -1147,7 +1227,7 @@ function StoryEntry({
 
   if (kind === "event") {
     return (
-      <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+      <StoryEntryShell id={entryDomId} kind={kind} turnNumber={turnNumber}>
         <aside
           id={`${entryDomId}-world-event`}
           className="mx-auto max-w-xl rounded border border-emerald-900/60 bg-emerald-950/10 px-3 py-2 text-center text-xs leading-5 text-emerald-300/60"
@@ -1159,7 +1239,7 @@ function StoryEntry({
   }
 
   return (
-    <StoryEntryShell id={entryDomId} turnNumber={turnNumber}>
+    <StoryEntryShell id={entryDomId} kind={kind} turnNumber={turnNumber}>
       <article id={`${entryDomId}-game-master-narration`}>
         <p className="whitespace-pre-wrap text-[1.08rem] leading-8 text-zinc-200 text-justify">
           {text}
@@ -1171,16 +1251,19 @@ function StoryEntry({
 
 function StoryEntryShell({
   id,
+  kind,
   turnNumber,
   children,
 }: {
   id: string;
+  kind: "player" | "director" | "event";
   turnNumber?: number;
   children: React.ReactNode;
 }) {
   return (
     <div
       id={id}
+      data-story-kind={kind}
       className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.25rem_minmax(0,1fr)]"
     >
       <div id={`${id}-turn-number`} className="pt-1 text-right text-xs tabular-nums text-zinc-700">
@@ -2163,6 +2246,7 @@ function turnSummaryItems(turns: unknown[]) {
     const sequenceNumber =
       typeof turn.sequenceNumber === "number" ? `#${turn.sequenceNumber}` : "Unsequenced";
     const status = typeof turn.status === "string" ? turn.status : "unknown";
+    const trigger = turn.trigger === "pass" ? "Pass" : "Act";
     const input = typeof turn.playerInput === "string" ? ` - ${turn.playerInput}` : "";
     const counts = [
       countLabel(turn.narrationCount, "narration"),
@@ -2172,7 +2256,7 @@ function turnSummaryItems(turns: unknown[]) {
     const directorStatus =
       typeof turn.directorCallStatus === "string" ? `; Game Master: ${turn.directorCallStatus}` : "";
 
-    return [`Turn ${sequenceNumber}: ${status}${input} (${counts}${directorStatus})`];
+    return [`Turn ${sequenceNumber}: ${trigger} ${status}${input} (${counts}${directorStatus})`];
   });
 }
 

@@ -115,6 +115,7 @@ export type DirectorContext = {
   locationCard?: DirectorLocationCard;
   knownLocations?: DirectorKnownLocation[];
   recentFeed: DirectorFeedEntry[];
+  storyVisibleHistory?: DirectorFeedEntry[];
 };
 
 export type TranscriptDirectorContext = {
@@ -144,6 +145,7 @@ export type DirectorMessage = {
 };
 
 export type DirectorMode = "persistent" | "transcript";
+export type TurnTrigger = "act" | "pass";
 export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
 export type DirectorCallRole = "story_generation" | "npc_state_extraction";
 export type SceneBeatSource = "engine" | "llm" | "fallback";
@@ -157,6 +159,7 @@ export type DirectorRequestSummary = {
   worldVersionId?: string;
   worldName: string;
   roomKey: string;
+  turnTrigger?: TurnTrigger;
   playerInputLength: number;
   recentFeedCount: number;
   actorKeys: string[];
@@ -185,6 +188,7 @@ export type DirectorRequest = {
 };
 
 export type SceneBeatKind =
+  | "pass"
   | "direct_npc_question"
   | "direct_npc_address"
   | "scene_question"

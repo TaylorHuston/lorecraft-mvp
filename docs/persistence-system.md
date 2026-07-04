@@ -2,7 +2,7 @@
 
 Lorecraft is built around one product idea: the world should remember because the world has state, not because an LLM transcript happens to include the right sentence.
 
-The Game Master is allowed to narrate and interpret player intent. Convex remains the canonical source of truth. Every provider call is rebuilt from persisted state plus a bounded recent feed, so Lorecraft does not depend on hidden provider sessions, assistant threads, or remote memory.
+The Game Master is allowed to narrate and interpret player intent. Convex remains the canonical source of truth. Persistent-mode provider calls are rebuilt from canonical state plus bounded story-visible narration history, so Lorecraft does not depend on hidden provider sessions, assistant threads, or remote memory.
 
 For the canonical object and field reference, see [`data-model.md`](data-model.md).
 
@@ -18,7 +18,7 @@ In the MVP, that state is intentionally small:
 - Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
 - Commands, narrations, and events reconstruct the visible play feed.
-- Turns group each persisted player intent with the Game Master work it caused.
+- Turns group each resolved story beat with the Game Master work it caused.
 - State diffs record accepted mutations.
 - Game Master calls and local logs explain what happened during LLM/provider interactions.
 
@@ -34,13 +34,13 @@ Game Master output is untrusted model output. The story-generation step returns 
 
 Persistent mode gives the Game Master current Location Cards, known locations, and current-scene NPC Cards as canonical read context. The model can write story prose from that context, but prose is not accepted as state by itself.
 
-Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the player input, completed narration, current Location Card, Known Locations, NPC Cards, and recent story, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
+Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the current action or Pass trigger, completed narration, current Location Card, Known Locations, NPC Cards, and the same story-visible narration history as story generation, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 
 The Game Master may not directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations can change only through the bounded extractor and Convex validation.
 
 ### Recent Context Is Not Durable Truth
 
-Recent feed context helps the Game Master write coherent prose. It should not be the only place important state exists.
+Recent story-visible narration helps the Game Master write coherent prose. It should not be the only place important state exists.
 
 The practical rule:
 
@@ -83,12 +83,12 @@ Do not add character stats, inventory, combat rounds, relationship scores, spell
 
 Current synchronous flow:
 
-1. The player submits narrative input.
+1. The player either submits narrative input or clicks Pass.
 2. The route validates the request and LLM configuration.
 3. The route loads bounded Game Master context from Convex.
-4. Convex creates a pending turn with the next Adventure-scoped sequence number.
-5. Convex records the player input command and links it to the turn.
-6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded recent story, current input, and output guidance.
+4. Convex creates a pending turn with the next Adventure-scoped sequence number and a trigger of `act` or `pass`.
+5. For action turns, Convex records the player input command and links it to the turn. Pass turns do not create command rows or fake player prose.
+6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded story-visible narration history, current input or Pass directive, and output guidance.
 7. The provider returns player-facing story prose.
 8. The backend parses the prose into a normalized turn result with `narration` and an empty `npcUpdates` array.
 9. Convex records the Game Master call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
@@ -96,7 +96,7 @@ Current synchronous flow:
 11. Persistent mode runs a separate JSON state extraction request after successful narration.
 12. The backend validates proposed NPC updates and actor moves. Accepted NPC updates can change `mood`, `status`, and `memory`; accepted actor moves can move the player or current-scene NPCs to existing locations.
 13. Convex records accepted mutations as canonical facts or actor `roomId` changes plus turn-scoped state diffs. Ignored proposals remain debug evidence.
-14. On provider or output failure after the turn exists, Convex keeps the command and Game Master call, marks the turn `failed`, and does not store fake narration or state changes.
+14. On provider or output failure after the turn exists, Convex keeps the turn and Game Master call, keeps the command for action turns, marks the turn `failed`, and does not store fake narration or state changes.
 15. The UI updates from Convex state.
 
 The important bit is that the provider does not own continuity. The next turn starts from Convex again.
@@ -283,17 +283,17 @@ Persistent Game Master requests are still stateless, but the prompt is no longer
 - NPC profiles, which are the typed intermediate shape used to build those cards.
 - Conversation focus, which is a non-durable hint derived from the current target or recent player-addressed NPC for ambiguous follow-up dialogue.
 - Hidden NPC knowledge, which comes from current-scene `knowledge` facts.
-- Recent feed, which is bounded history and omits internal turn and command IDs.
-- Player input, which is the current narrative intent.
-- Required scene beat, which is deterministic guidance derived from player input and present actors in persistent mode.
-- Last action, which frames the current player input as intent the Game Master must resolve rather than prose to copy.
+- Recent Story, which is bounded story-visible history from successful narrations plus seed narration. Prior player commands and event records are intentionally excluded from normal persistent-mode future story context.
+- Current Input, which is either the current narrative action text or an explicit Pass directive.
+- Required scene beat, which is deterministic guidance derived from player input and present actors in persistent mode, or a Pass beat when the player yields the turn.
+- Last action, which frames the current player input as intent the Game Master must resolve rather than prose to copy, or frames Pass as a request to continue without inventing player action.
 - Scene directive, which is near-output guidance for prompt priority, target NPC, conflict handling, response requirements, and NPC attribute questions.
 
-Persistent prompt priority is explicit: current turn, last action, and scene directive outrank the rest of the context; NPC cards, NPC profiles, and visible facts are canonical current scene truth; recent feed is lower-priority history that may include stale model prose. If recent feed conflicts with NPC cards, profiles, or visible facts, the Game Master should follow the canonical card/profile/fact context.
+Persistent prompt priority is explicit: current turn, last action, and scene directive outrank the rest of the context; NPC cards, NPC profiles, and visible facts are canonical current scene truth; Recent Story is lower-priority history that may include stale model prose. If Recent Story conflicts with NPC cards, profiles, or visible facts, the Game Master should follow the canonical card/profile/fact context.
 
 The first required scene-beat rules are deliberately narrow: direct questions to a present NPC should produce a meaningful NPC response or choice, while trivial physical actions such as `I jump.` should not force speech. Quoted questions to the sole present NPC are treated as direct NPC questions. Game Master-authored fact churn is constrained to the extractor and currently limited to `mood`, `status`, and `memory`.
 
-Transcript Game Master requests are simpler. They separate only editable Game Master/tone guidance, the canonical opening seed, the bounded transcript, and the current player input. They intentionally omit current scene state, visible facts, hidden NPC knowledge, and required scene beats.
+Transcript Game Master requests are simpler. They separate only editable Game Master/tone guidance, the canonical opening seed, the bounded transcript, and the current player input or Pass directive. They intentionally omit current scene state, visible facts, hidden NPC knowledge, and persistent-mode required scene beats.
 
 ## Feed Strategy
 
@@ -322,7 +322,7 @@ The extractor is allowed to fail closed. If story narration succeeds but extract
 
 These records are evidence. They help explain why a turn behaved a certain way. They should not become the source of truth for the Adventure. Accepted extractor updates become canonical only after Convex validates and writes actor-scoped facts or actor `roomId` changes plus turn-scoped state diffs.
 
-The debug panel also exposes recent turn summaries: sequence number, status, player input, related narration/event/diff counts, and Game Master call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
+The debug panel also exposes recent turn summaries: sequence number, trigger, status, player input when one exists, related narration/event/diff counts, and Game Master call status. This is the first place to inspect whether a failed provider/output attempt was persisted correctly.
 
 ## Reset Strategy
 

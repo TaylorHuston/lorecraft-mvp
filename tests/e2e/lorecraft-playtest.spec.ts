@@ -7,16 +7,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
 
     await seedFreshWorld(page);
 
-    const input = page.locator("#director-input");
     const playerText = "Mira, what do you know about the storm?";
-    await expect(input).toBeVisible();
-    await input.fill(playerText);
-    await input.press("Enter");
+    await submitAct(page, playerText);
 
     await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
-    await expect(input).toBeHidden();
-    await expect(page.locator("#director-input")).toBeVisible({ timeout: 60_000 });
-    await expect(page.locator("#director-input")).toHaveValue("");
+    await expect(page.locator("#director-input")).toBeHidden();
+    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
     await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
@@ -38,7 +34,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
     await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
-    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: succeeded");
+    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: Act succeeded");
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "lorecraft-fixture-model",
     );
@@ -55,10 +51,23 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
     );
 
+    await page.locator("#debug-panel-toggle").click();
+    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+    await page.locator("#pass-turn-button").click();
+    await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
+    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#story-stream")).toContainText(
+      "rain presses harder against the chapel roof",
+    );
+    await expect(page.locator("#story-feed [data-story-kind='player']")).not.toContainText("Pass");
+    await openDebugPanel(page);
+    await page.locator("#debug-tab-state").click();
+    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #2: Pass succeeded");
+    await page.locator("#debug-panel-toggle").click();
+    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+
     const failureText = "I trigger a fixture provider failure.";
-    const failureInput = page.locator("#director-input");
-    await failureInput.fill(failureText);
-    await failureInput.press("Enter");
+    await submitAct(page, failureText);
     await expect(page.locator("#turn-error-message")).toContainText(
       "LLM provider returned HTTP 503.",
       { timeout: 60_000 },
@@ -70,7 +79,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await openDebugPanel(page);
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-turns-items")).toContainText(
-      `Turn #2: failed - ${failureText}`,
+      `Turn #3: Act failed - ${failureText}`,
     );
     await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
       "provider_error",
@@ -103,9 +112,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "actor:mira.knowledge",
     );
 
-    const npcContextInput = page.locator("#director-input");
-    await npcContextInput.fill("I look at Mira.");
-    await npcContextInput.press("Enter");
+    await submitAct(page, "I look at Mira.");
     await expect(page.locator("#story-stream")).toContainText("I look at Mira.", {
       timeout: 60_000,
     });
@@ -139,9 +146,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.locator("#create-location-button").click();
     await expect(page.locator("#location-card-bell-annex")).toContainText("Bell Annex");
 
-    const travelInput = page.locator("#director-input");
-    await travelInput.fill("I go to the vestry.");
-    await travelInput.press("Enter");
+    await submitAct(page, "I go to the vestry.");
     await expect(page.locator("#story-stream")).toContainText("I go to the vestry.", {
       timeout: 60_000,
     });
@@ -163,9 +168,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "Bell Annex",
     );
 
-    const annexInput = page.locator("#director-input");
-    await annexInput.fill("I go to the bell annex.");
-    await annexInput.press("Enter");
+    await submitAct(page, "I go to the bell annex.");
     await expect(page.locator("#story-stream")).toContainText("I go to the bell annex.", {
       timeout: 60_000,
     });
@@ -178,9 +181,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "Taylor: moved to Bell Annex.",
     );
 
-    const blockedTravelInput = page.locator("#director-input");
-    await blockedTravelInput.fill("I go to the bell tower.");
-    await blockedTravelInput.press("Enter");
+    await submitAct(page, "I go to the bell tower.");
     await expect(page.locator("#story-stream")).toContainText("I go to the bell tower.", {
       timeout: 60_000,
     });
@@ -197,7 +198,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#location-card-bell-tower")).toHaveCount(0);
 
     await page.locator("#rough-reset-button").click();
-    await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#story-stream")).not.toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("You stand in the chapel");
     await page.locator("#debug-tab-state").click();
@@ -217,9 +218,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       "A local woman in practical rain-dark clothes, with damp dark hair and watchful eyes.",
     );
 
-    const followupInput = page.locator("#director-input");
-    await followupInput.fill("I listen to the rain.");
-    await followupInput.press("Enter");
+    await submitAct(page, "I listen to the rain.");
     await expect(page.locator("#story-stream")).toContainText("I listen to the rain.", {
       timeout: 60_000,
     });
@@ -234,7 +233,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     if (!temporaryAdventureId) {
       throw new Error("Expected created Adventure URL to include an Adventure id.");
     }
-    await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
     await page.locator("#back-to-adventures-button").click();
     await expect(page).toHaveURL("/");
     await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
@@ -254,6 +253,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await page.waitForFunction(() =>
     Boolean(
       document.querySelector("#director-input") ??
+        document.querySelector("#act-turn-button") ??
         document.querySelector("#adventure-landing") ??
         document.querySelector("#seed-world-button"),
     ),
@@ -266,7 +266,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     if (await page.locator("#adventure-list button[id^='continue-adventure-']").first().isVisible()) {
       await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
-      await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
       await openDebugPanel(page);
       await page.locator("#fresh-seed-button").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
@@ -279,12 +279,20 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
   }
 
-  await expect(page.locator("#director-input")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator("#director-input")).toBeEnabled({ timeout: 30_000 });
-  await expect(page.locator("#director-input")).toHaveValue("");
+  await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#act-turn-button")).toBeEnabled({ timeout: 30_000 });
+  await expect(page.locator("#director-input")).toHaveCount(0);
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function submitAct(page: import("@playwright/test").Page, input: string) {
+  await page.locator("#act-turn-button").click();
+  const directorInput = page.locator("#director-input");
+  await expect(directorInput).toBeVisible();
+  await directorInput.fill(input);
+  await directorInput.press("Enter");
 }
 
 async function openDebugPanel(page: import("@playwright/test").Page) {

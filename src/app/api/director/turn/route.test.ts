@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "../../../../../convex/_generated/api";
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -122,6 +123,80 @@ describe("Game Master turn route preflight", () => {
     );
   });
 
+  it("records a successful Pass turn without a command id", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    mocks.mutation
+      .mockResolvedValueOnce({ ok: true, turnId: "turn-pass-1", sequenceNumber: 1 })
+      .mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(providerResponse("Rain thickens against the chapel shutters."))
+      .mockResolvedValueOnce(providerResponse(JSON.stringify({ npcUpdates: [], actorMoves: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(
+      turnRequest({ adventureId: "valid-adventure-id", trigger: "pass" }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      narration: "Rain thickens against the chapel shutters.",
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      1,
+      api.world.recordPassTurn,
+      expect.objectContaining({ adventureId: "valid-adventure-id" }),
+    );
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      2,
+      api.world.completeDirectorTurn,
+      expect.not.objectContaining({ commandId: expect.anything() }),
+    );
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      3,
+      api.world.recordNpcStateExtraction,
+      expect.objectContaining({
+        requestSummary: expect.objectContaining({ turnTrigger: "pass" }),
+      }),
+    );
+  });
+
+  it("persists a failed Pass turn without fake command or narration", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    mocks.mutation
+      .mockResolvedValueOnce({ ok: true, turnId: "turn-pass-1", sequenceNumber: 1 })
+      .mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response("model down", { status: 503 })));
+
+    const response = await POST(
+      turnRequest({ adventureId: "valid-adventure-id", trigger: "pass" }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "LLM provider returned HTTP 503.",
+    });
+    expect(response.status).toBe(502);
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      2,
+      api.world.completeDirectorTurn,
+      expect.objectContaining({
+        turnId: "turn-pass-1",
+        status: "provider_error",
+      }),
+    );
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      2,
+      api.world.completeDirectorTurn,
+      expect.not.objectContaining({ commandId: expect.anything(), narration: expect.anything() }),
+    );
+  });
+
   it("records invalid extraction output while preserving the successful narration", async () => {
     configureLlmEnv();
     mocks.query.mockResolvedValueOnce(persistentContext());
@@ -193,13 +268,20 @@ describe("Game Master turn route preflight", () => {
   });
 });
 
-function turnRequest({ adventureId }: { adventureId: string }) {
+function turnRequest({
+  adventureId,
+  trigger = "act",
+}: {
+  adventureId: string;
+  trigger?: "act" | "pass";
+}) {
   return new Request("http://localhost/api/director/turn", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       adventureId,
-      input: "I ask Mira about the storm.",
+      trigger,
+      ...(trigger === "act" ? { input: "I ask Mira about the storm." } : {}),
     }),
   });
 }

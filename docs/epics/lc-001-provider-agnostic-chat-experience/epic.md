@@ -2,8 +2,8 @@
 id: LC-001
 status: draft
 created: 2026-07-01
-modified: 2026-07-01
-last_verified:
+modified: 2026-07-02
+last_verified: 2026-07-02
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -63,10 +63,10 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 Status: draft
 Created: 2026-07-01
-Modified: 2026-07-01
+Modified: 2026-07-02
 Last verified:
 
-As a playtester, I want one narrative input and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
+As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 
 #### Requirements And Scenarios
 
@@ -120,13 +120,39 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 - THEN the system does not call the LLM
 - AND the player sees an actionable message to seed or reload the Adventure
 
+##### Requirement R4: Pass Control
+
+The system SHALL provide dedicated Act and Pass controls at the decision point.
+
+###### Scenario R4-S0: Player opens the action input
+
+- WHEN an Adventure is open
+- THEN the system shows `What do you do?` above the `Act` and `Pass` controls
+- WHEN the player clicks `Act`
+- THEN the system replaces the controls with the narrative input
+- AND the player can submit a normal action
+
+###### Scenario R4-S1: Player passes the turn
+
+- WHEN an Adventure is open
+- AND the player clicks `Pass`
+- THEN the system starts a turn with a Pass trigger
+- AND the player is not required to type anything into the narrative input
+
+###### Scenario R4-S2: Pass is not story prose
+
+- WHEN a Pass turn resolves
+- THEN the main story stream shows the Game Master narration
+- AND it does not show a player-side `Pass` message as story content
+- AND turn/debug metadata still makes the Pass trigger inspectable
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders the narrative-only split layout, one unified textarea, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
-| `src/app/api/director/turn/route.ts` | receives narrative input from the client and routes it through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | records player inputs, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
+| `src/app/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -137,6 +163,7 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 | R2-S1 and R2-S2 | `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed persisted player input, Game Master narration, and event feed entries ordered from durable rows. | As described in the evidence cell. | Recorded |
 | R3-S1 | `npm run e2e` and browser verification | prove pending state disables duplicate submission for the in-flight turn while keeping progress visible. | Recorded |
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
+| R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -216,13 +243,13 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 ###### Scenario R3-S1: Game Master request is built
 
 - WHEN the backend builds a Game Master request
-- THEN it includes the current player message, current structured scene/NPC state, and a small recent feed window
+- THEN it includes the current player message or Pass directive, current structured scene/NPC state, and a bounded recent story-visible narration window
 - AND it does not send secrets, raw database dumps, or unrelated debug state
 
 ###### Scenario R3-S2: Multiple narrative turns
 
 - WHEN the player sends multiple turns
-- THEN each provider request is independently constructed from current persisted state and recent feed context
+- THEN each provider request is independently constructed from current persisted state and recent story-visible narration context
 - AND the system does not depend on a provider conversation ID, assistant thread, or hidden remote memory
 
 #### Implemented By
@@ -230,7 +257,7 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/app/api/director/turn/route.ts` | is the synchronous Next.js Route Handler orchestration boundary. | Recheck when this Story changes or the listed path changes. |
-| `src/lib/director/prompt.ts` | builds stateless bounded Game Master requests from current scene/NPC/feed context. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/director/prompt.ts` | builds stateless bounded Game Master requests from current scene/NPC context and story-visible narration history. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/provider.ts` | reads `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` and calls OpenAI-compatible chat completions through `fetch`. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | parses plain prose for current story generation and retains strict JSON NPC-update parsing/validation for structured extraction. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | remains the only persistence path for commands, narrations, facts, state diffs, events, and Game Master call records. | Recheck when this Story changes or the listed path changes. |
@@ -243,7 +270,7 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 | R1-S2 and R3-S1/R3-S2 | `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers bounded request construction, missing config handling, OpenAI-compatible response extraction, and no-mutation setup failure behavior. | As described in the evidence cell. | Recorded |
 | R1-S4 | `src/app/api/director/turn/route.test.ts` | proves malformed `worldId` returns a structured `400` before LLM config is required and without recording player input. | Recorded |
 | R2-S1 and R2-S2 | Runtime POST to `/api/director/turn` with `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` succeeded, proving the provider adapter contract against local Ollama. | As described in the evidence cell. | Passing |
-| R3-S1 and R3-S2 | Game Master request construction tests | prove each provider request is built from current persisted state and recent bounded feed context rather than provider-managed remote session state. | Recorded |
+| R3-S1 and R3-S2 | Game Master request construction tests | prove each provider request is built from current persisted state and recent bounded narration context rather than provider-managed remote session state. | Recorded |
 | Supporting gate | `npm run ci:required` and `npm run convex:once` passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -609,7 +636,7 @@ Created: 2026-07-01
 Modified: 2026-07-01
 Last verified:
 
-As a developer-playtester, I want each narrative exchange to be stored as a scoped turn, so that story history, debug records, and future rollback boundaries have one durable unit of progression.
+As a developer-playtester, I want each resolved story beat to be stored as a scoped turn with an explicit trigger, so that action turns, Pass turns, debug records, and future rollback boundaries have one durable unit of progression.
 
 #### Requirements And Scenarios
 
@@ -653,11 +680,11 @@ The system SHALL expose turn scope in persisted history without making the playe
 - THEN recent turns show sequence, status, player input, related narration/event/diff counts, and related Game Master call status
 - AND failed turns can be distinguished from successful turns after reload
 
-###### Scenario R2-S3: Seed rows remain outside player turns
+###### Scenario R2-S3: Seed rows remain outside triggered turns
 
 - WHEN the demo Adventure is seeded
 - THEN seed narration and seed events may remain unscoped
-- AND narrative turns still begin with the first persisted player intent
+- AND triggered turns begin with the first player action or Pass
 
 ##### Requirement R3: Reset And Future Rollback Boundary
 
@@ -681,14 +708,49 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 - THEN it states that future rollback should attach snapshots to turn boundaries
 - AND this change does not add snapshot capture, reverse-diff logic, branching, or restore behavior
 
+##### Requirement R4: Turn Triggers
+
+The system SHALL distinguish how a turn was triggered.
+
+###### Scenario R4-S1: Action turn uses committed player input
+
+- WHEN the player submits narrative text
+- THEN the system records an action turn
+- AND the turn links to the command record for that committed input
+- AND the Game Master resolves that input first
+
+###### Scenario R4-S2: Pass turn has no command
+
+- WHEN the player clicks Pass
+- THEN the system records a Pass turn
+- AND the turn does not create a command record in the target model
+- AND the turn can still link Game Master calls, narration, accepted state diffs, events, and failure state
+
+###### Scenario R4-S3: Pass failure is debuggable
+
+- WHEN a Pass turn is created and the provider fails or returns invalid output
+- THEN the turn remains persisted with failed status
+- AND related Game Master call/debug evidence remains linked to the Pass turn
+- AND no fake narration or unaccepted state change is stored
+
+##### Requirement R5: Retry Remains Deferred
+
+The system SHALL NOT implement Retry until the app has a safe snapshot, reversible-diff, or supersession mechanism.
+
+###### Scenario R5-S1: Retry is not exposed as a player control
+
+- WHEN this change is implemented
+- THEN the player does not see a Retry/regenerate control
+- AND docs record Retry as deferred because it can otherwise desynchronize narration and canonical state
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `convex/schema.ts` | defines `turns` plus optional `turnId` links on commands, narrations, events, state diffs, and Game Master calls. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | creates pending turns with Adventure-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during Adventure reset. | Recheck when this Story changes or the listed path changes. |
-| `src/app/api/director/turn/route.ts` | passes `turnId` through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/Adventure-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
-| `src/lib/director/debug-log.ts` | includes optional `turnId` in local JSONL debug records. | Recheck when this Story changes or the listed path changes. |
+| `convex/schema.ts` | defines `turns.trigger` plus optional `turnId` links on commands, narrations, events, state diffs, and Game Master calls. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts` | creates pending action and Pass turns with Adventure-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during Adventure reset. | Recheck when this Story changes or the listed path changes. |
+| `src/app/api/director/turn/route.ts` | passes `turnId`, optional `commandId`, and trigger metadata through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/Adventure-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/director/debug-log.ts` | includes optional `turnId`, optional `commandId`, and trigger metadata in local JSONL debug records. | Recheck when this Story changes or the listed path changes. |
 | `src/app/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
 | `docs/data-model.md`, `docs/persistence-system.md` | document scoped turns and defer snapshot rollback. | Recheck when this Story changes or the listed path changes. |
 
@@ -700,8 +762,11 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 | R1-S2 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove provider-failed turns remain persisted as failed/debuggable without fake narration or accepted state changes. | Recorded |
 | R1-S3 | Route tests | prove pre-persistence malformed or missing-configuration failures do not record player input. | Recorded |
 | R2-S1 and R2-S2 | `npm run e2e` | proves reload preserves turn-scoped feed/debug evidence, including failed-turn status after reload. | Recorded |
-| R2-S3 | Seed/reset flows leave seed rows outside player turns while narrative turns begin with the first persisted player intent. | As described in the evidence cell. | Recorded |
+| R2-S3 | Seed/reset flows leave seed rows outside triggered turns while action or Pass turns begin player-triggered progression. | As described in the evidence cell. | Recorded |
 | R3-S1 through R3-S3 | `npm run e2e`, focused director tests, `docs/data-model.md`, and `docs/persistence-system.md` | prove rough reset clears turn history, accepted diffs remain turn-scoped audit records, and snapshot rollback remains deferred. | Recorded |
+| R4-S1 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove action turns still create commands and resolve current input. | Recorded |
+| R4-S2 and R4-S3 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove Pass turns complete or fail without command rows while remaining debug-visible. | Recorded |
+| R5-S1 | Source inspection of `src/app/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, and the prior local PR gate passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -717,8 +782,8 @@ The system SHALL keep turn persistence compatible with rough reset now and snaps
 
 Status: draft
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-02
+Last verified: 2026-07-02
 
 As a playtester, I want the Game Master to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
 
@@ -731,14 +796,14 @@ The system SHALL assemble Game Master prompts from explicit components with clea
 ###### Scenario R1-S1: Prompt separates instructions from state and history
 
 - WHEN the backend builds a Game Master request
-- THEN the request distinguishes Game Master instructions, scene state, visible facts, hidden NPC knowledge, recent feed, current player input, and required scene beat
-- AND the recent feed remains bounded and does not include internal turn or command IDs
+- THEN the request distinguishes Game Master instructions, scene state, visible facts, hidden NPC knowledge, Recent Story, current input or Pass directive, and required scene beat
+- AND Recent Story remains bounded and does not include prior player commands, events, internal turn IDs, or command IDs in normal persistent-mode story context
 
 ###### Scenario R1-S2: Editable and derived components have clear ownership
 
 - WHEN prompt components are documented or inspected in tests
 - THEN Game Master instructions, author/tone guidance, and model settings are treated as editable configuration
-- AND scene state, visible facts, hidden NPC knowledge, recent feed, and required scene beat are derived from Convex state, player input, and engine logic
+- AND scene state, visible facts, hidden NPC knowledge, Recent Story, current input, and required scene beat are derived from Convex state, player input, and engine logic
 
 ##### Requirement R2: Read-Only Knowledge Context
 
@@ -874,13 +939,67 @@ The system SHALL make local Game Master logs inspectable by turn rather than by 
 - AND the exact raw LLM response is omitted unless `LORECRAFT_DEBUG_LOG_RAW_LLM=1` is set
 - AND pre-turn validation/configuration failures may still write `director.turn.rejected` records because no concrete turn exists yet
 
+##### Requirement R10: Story-Visible History
+
+The system SHALL build future Game Master story context from story-visible history rather than raw feed history.
+
+###### Scenario R10-S1: Prior commands are excluded from future story context
+
+- WHEN the backend builds a Game Master story-generation request after prior successful turns
+- THEN prior player commands are not included in the recent story/history section
+- AND the current committed action, if present, is included separately as the current turn input
+
+###### Scenario R10-S2: Prior events are excluded from future story context
+
+- WHEN the backend builds a Game Master story-generation request
+- THEN prior event records are not included in the recent story/history section
+- AND event records remain available to existing player/debug surfaces for now
+
+###### Scenario R10-S3: Prior successful narrations are included
+
+- WHEN the backend builds a Game Master story-generation request
+- THEN recent successful Game Master narrations are included as story-visible history
+- AND canonical Location Cards, NPC Cards, facts, actor locations, objects, and known locations remain available as current truth
+
+##### Requirement R11: Pass Prompt Context
+
+The system SHALL give the Game Master an explicit Pass directive when the player passes.
+
+###### Scenario R11-S1: Pass continues the scene
+
+- WHEN the player clicks Pass
+- THEN the Game Master request includes canonical state and recent successful narrations
+- AND the current turn directive tells the Game Master to continue the scene without a new player action
+
+###### Scenario R11-S2: Pass can produce bounded consequences
+
+- WHEN a Pass narration clearly changes durable state that the MVP currently allows
+- THEN the extractor may propose bounded NPC updates or actor moves
+- AND Convex validates those proposals with the same rules used for action turns
+
+##### Requirement R12: Extractor Uses The Same History Policy
+
+The system SHALL use the same story-visible history policy for state extraction that it uses for story generation.
+
+###### Scenario R12-S1: Extractor excludes prior commands and events
+
+- WHEN the post-narration extractor request is built
+- THEN prior player commands and events are not included as recent story context
+- AND current committed action and current Game Master narration remain available to the extractor
+
+###### Scenario R12-S2: Extractor remains grounded in canonical state
+
+- WHEN the extractor evaluates a possible state change
+- THEN it uses canonical current state plus recent successful narrations
+- AND accepted mutations still require backend validation before they become canonical
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/lib/director/prompt.ts` | builds explicit Game Master prompt components, derives required scene beats including `trivial_player_action`, separates mutable NPC facts from read-only hidden NPC knowledge, and records compact request-summary metadata. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/director/prompt.ts` | builds explicit Game Master prompt components, derives required scene beats including `trivial_player_action` and `pass`, separates mutable NPC facts from read-only hidden NPC knowledge, uses story-visible narration history for story/extraction prompts, and records compact request-summary metadata. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/provider.ts` | parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings. | Recheck when this Story changes or the listed path changes. |
-| `src/app/api/director/turn/route.ts` | passes effective generation settings and validated debug prompt guidance into Game Master request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled. | Recheck when this Story changes or the listed path changes. |
+| `src/app/api/director/turn/route.ts` | passes effective generation settings, trigger metadata, and validated debug prompt guidance into Game Master request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes. | Recheck when this Story changes or the listed path changes. |
 | `src/app/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
@@ -892,7 +1011,7 @@ The system SHALL make local Game Master logs inspectable by turn rather than by 
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| R1-S1 and R1-S2 | Focused director tests | prove prompt component separation, editable prompt guidance inclusion, derived scene state/feed ownership, and no internal turn/command IDs in the recent feed prompt surface. | Recorded |
+| R1-S1 and R1-S2 | Focused director tests | prove prompt component separation, editable prompt guidance inclusion, derived scene state/story-history ownership, and no prior command/event rows in the persistent Recent Story prompt surface. | Recorded |
 | R2-S1 and R2-S2 | Focused director tests | prove hidden read-only NPC knowledge reaches the prompt and read-only fields are rejected if proposed as mutations by the extractor. | Recorded |
 | R3-S1 and R3-S2 | Focused director tests | prove direct-question and trivial-action scene-beat derivation. | Recorded |
 | R4-S1 and R4-S2 | Local route playtest with Ollama `llama3.1:8b` produced Mira dialogue for a direct storm question, and focused prompt tests permit attributed dialogue in player-facing narration. | As described in the evidence cell. | Recorded |
@@ -901,11 +1020,15 @@ The system SHALL make local Game Master logs inspectable by turn rather than by 
 | R7-S1 and R7-S2 | Focused director tests | prove prompt guidance sections affect the next turn and are summarized in debug metadata. | Recorded |
 | R8-S1 and R8-S2 | Focused raw-request tests | prove exact request persistence is gated and omitted by default. | Recorded |
 | R9-S1 and R9-S2 | Local debug-log tests | prove one turn-unit record per recorded turn attempt and gated raw request/response artifacts. | Recorded |
+| R10-S1 through R10-S3 | `src/lib/director/director.test.ts` | proves persistent story-generation prompts include successful narration history while excluding prior commands and events from Recent Story. | Recorded |
+| R11-S1 and R11-S2 | `src/lib/director/director.test.ts`, `src/app/api/director/turn/route.test.ts`, and `npm run e2e` | prove Pass prompts include a continue directive, Pass turns resolve through the same route/extractor path, and no player Pass prose is stored. | Recorded |
+| R12-S1 and R12-S2 | `src/lib/director/director.test.ts` | proves extraction requests use the same filtered narration-history policy while retaining canonical cards/state and current narration. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, local Convex snapshot inspection, and local route playtests passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
 
 - Broader provider-specific behavior for LM Studio, OpenRouter, Vercel AI Gateway, or direct hosted providers remains future playtest coverage.
+- Deterministic Pass-specific accepted mutation coverage remains future work; current tests prove the shared route/extractor path for Pass and existing bounded mutation validation separately.
 
 
 #### Story Notes

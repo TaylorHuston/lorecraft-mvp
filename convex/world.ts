@@ -7,7 +7,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
 type FactValue = string | number | boolean | null;
@@ -301,6 +301,7 @@ const SEEDED_NPCS = [
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
 const feedKind = v.union(v.literal("player"), v.literal("director"), v.literal("event"));
+const turnTrigger = v.union(v.literal("act"), v.literal("pass"));
 const directorStatus = v.union(
   v.literal("success"),
   v.literal("provider_error"),
@@ -759,7 +760,7 @@ async function applyAcceptedNpcUpdates(
     worldId: Id<"worlds">;
     adventureId: Id<"adventures">;
     turnId: Id<"turns">;
-    commandId: Id<"commands">;
+    commandId?: Id<"commands">;
     acceptedUpdates: AcceptedNpcUpdateForWrite[];
   },
 ) {
@@ -804,7 +805,7 @@ async function applyAcceptedNpcUpdates(
       worldId: args.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       text: eventText,
       source: "llm",
     });
@@ -816,7 +817,7 @@ async function applyAcceptedNpcUpdates(
       worldId: args.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       source: "llm",
       operations,
     });
@@ -831,7 +832,7 @@ async function applyAcceptedActorMoves(
     worldId: Id<"worlds">;
     adventureId: Id<"adventures">;
     turnId: Id<"turns">;
-    commandId: Id<"commands">;
+    commandId?: Id<"commands">;
     acceptedMoves: AcceptedActorMoveForWrite[];
   },
 ) {
@@ -873,7 +874,7 @@ async function applyAcceptedActorMoves(
       worldId: args.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       source: "llm",
       operations,
     });
@@ -1324,6 +1325,7 @@ export const getSnapshot = query({
           sequenceNumber: v.number(),
           actorId: v.id("actors"),
           commandId: v.optional(v.id("commands")),
+          trigger: v.optional(turnTrigger),
           status: turnStatus,
           error: v.optional(v.string()),
           completedAt: v.optional(v.number()),
@@ -1593,6 +1595,7 @@ export const getDirectorContext = query({
         }),
       ),
       recentFeed: v.array(feedEntry),
+      storyVisibleHistory: v.array(feedEntry),
     }),
   ),
   handler: async (ctx, args) => {
@@ -1606,7 +1609,7 @@ export const getDirectorContext = query({
     }
 
     const { adventure, world, worldVersion, player, room } = loaded;
-    const [exits, actors, objects, facts, recentFeed, allRooms] = await Promise.all([
+    const [exits, actors, objects, facts, recentFeed, storyVisibleHistory, allRooms] = await Promise.all([
       loadVisibleExits(ctx, args.adventureId, room._id),
       ctx.db
         .query("actors")
@@ -1625,6 +1628,7 @@ export const getDirectorContext = query({
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .take(100),
       loadFeed(ctx, args.adventureId, 20),
+      loadStoryVisibleHistory(ctx, args.adventureId, 20),
       ctx.db
         .query("rooms")
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
@@ -1718,6 +1722,7 @@ export const getDirectorContext = query({
         description: knownRoom.description,
       })),
       recentFeed,
+      storyVisibleHistory,
     };
   },
 });
@@ -1860,6 +1865,7 @@ export const recordPlayerInput = mutation({
       adventureId: args.adventureId,
       sequenceNumber,
       actorId: player._id,
+      trigger: "act",
       status: "pending",
     });
 
@@ -1878,12 +1884,79 @@ export const recordPlayerInput = mutation({
   },
 });
 
+export const recordPassTurn = mutation({
+  args: { adventureId: v.id("adventures"), serverWriteToken: v.optional(v.string()) },
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      turnId: v.id("turns"),
+      sequenceNumber: v.number(),
+    }),
+    v.object({ ok: v.literal(false), error: v.string() }),
+  ),
+  handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return { ok: false as const, error: "Server write access is not configured." };
+    }
+
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure?.currentPlayerActorId) {
+      return { ok: false as const, error: "No active player exists in this Adventure yet." };
+    }
+
+    const player = await ctx.db.get(adventure.currentPlayerActorId);
+    if (!player) {
+      return { ok: false as const, error: "The active player could not be loaded." };
+    }
+
+    const previousTurn = await ctx.db
+      .query("turns")
+      .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+        q.eq("adventureId", args.adventureId),
+      )
+      .order("desc")
+      .take(1);
+    const sequenceNumber = (previousTurn[0]?.sequenceNumber ?? 0) + 1;
+    const turnId = await ctx.db.insert("turns", {
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
+      sequenceNumber,
+      actorId: player._id,
+      trigger: "pass",
+      status: "pending",
+    });
+
+    return { ok: true as const, turnId, sequenceNumber };
+  },
+});
+
+function requireTurnMatchesCommand(
+  turn: NonNullable<Doc<"turns">>,
+  commandId: Id<"commands"> | undefined,
+  allowedStatuses: readonly Doc<"turns">["status"][],
+) {
+  if (!allowedStatuses.includes(turn.status)) {
+    throw new Error("Turn is not in the expected status.");
+  }
+
+  if ((turn.trigger ?? "act") === "pass") {
+    if (turn.commandId || commandId) {
+      throw new Error("Pass turns must not reference a command.");
+    }
+    return;
+  }
+
+  if (!turn.commandId || !commandId || turn.commandId !== commandId) {
+    throw new Error("Action turns require a matching command.");
+  }
+}
+
 export const completeDirectorTurn = mutation({
   args: {
     adventureId: v.id("adventures"),
     serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
-    commandId: v.id("commands"),
+    commandId: v.optional(v.id("commands")),
     provider: v.string(),
     model: v.string(),
     requestSummary: v.any(),
@@ -1907,15 +1980,16 @@ export const completeDirectorTurn = mutation({
 
     const adventure = await ctx.db.get(args.adventureId);
     const turn = await ctx.db.get(args.turnId);
-    if (!adventure || !turn || turn.adventureId !== args.adventureId || turn.commandId !== args.commandId) {
+    if (!adventure || !turn || turn.adventureId !== args.adventureId) {
       throw new Error("Turn, Adventure, and command do not match.");
     }
+    requireTurnMatchesCommand(turn, args.commandId, ["pending"]);
 
     const directorCall = {
       worldId: adventure.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       provider: args.provider,
       model: args.model,
       requestSummary: args.requestSummary,
@@ -1942,7 +2016,7 @@ export const completeDirectorTurn = mutation({
       worldId: adventure.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       text: args.narration.trim(),
       source: "llm",
     });
@@ -1971,7 +2045,7 @@ export const recordNpcStateExtraction = mutation({
     adventureId: v.id("adventures"),
     serverWriteToken: v.optional(v.string()),
     turnId: v.id("turns"),
-    commandId: v.id("commands"),
+    commandId: v.optional(v.id("commands")),
     provider: v.string(),
     model: v.string(),
     requestSummary: v.any(),
@@ -1995,9 +2069,10 @@ export const recordNpcStateExtraction = mutation({
 
     const adventure = await ctx.db.get(args.adventureId);
     const turn = await ctx.db.get(args.turnId);
-    if (!adventure || !turn || turn.adventureId !== args.adventureId || turn.commandId !== args.commandId) {
+    if (!adventure || !turn || turn.adventureId !== args.adventureId) {
       throw new Error("Turn, Adventure, and command do not match.");
     }
+    requireTurnMatchesCommand(turn, args.commandId, ["succeeded"]);
 
     const acceptedMoveUpdates = (args.acceptedMoves ?? []).map((move) => ({
       type: "actorMove",
@@ -2011,7 +2086,7 @@ export const recordNpcStateExtraction = mutation({
       worldId: adventure.worldId,
       adventureId: args.adventureId,
       turnId: args.turnId,
-      commandId: args.commandId,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
       provider: args.provider,
       model: args.model,
       requestSummary: args.requestSummary,
@@ -2657,6 +2732,34 @@ async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, limit: num
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
+async function loadStoryVisibleHistory(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
+  const narrations = await ctx.db
+    .query("narrations")
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
+    .order("desc")
+    .take(limit);
+  const turnIds = [...new Set(narrations.flatMap((narration) => (narration.turnId ? [narration.turnId] : [])))];
+  const turns = await Promise.all(turnIds.map((turnId) => ctx.db.get(turnId)));
+  const successfulTurnIds = new Set(
+    turns
+      .filter((turn): turn is NonNullable<typeof turn> => turn?.status === "succeeded")
+      .map((turn) => turn._id),
+  );
+
+  return narrations
+    .filter((narration) => narration.source === "seed" || !narration.turnId || successfulTurnIds.has(narration.turnId))
+    .map((narration) => ({
+      id: `narration:${narration._id}`,
+      kind: "director" as const,
+      text: narration.text,
+      source: narration.source,
+      createdAt: narration._creationTime,
+      ...(narration.turnId ? { turnId: narration.turnId } : {}),
+      ...(narration.commandId ? { commandId: narration.commandId } : {}),
+    }))
+    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+}
+
 async function loadTranscript(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
   const [commands, narrations] = await Promise.all([
     ctx.db
@@ -2738,6 +2841,7 @@ async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, l
         _creationTime: turn._creationTime,
         sequenceNumber: turn.sequenceNumber,
         actorId: turn.actorId,
+        trigger: turn.trigger,
         status: turn.status,
         narrationCount: narrations.length,
         eventCount: events.length,

@@ -13,9 +13,9 @@ Lorecraft MVP is a Next.js + Convex persistent-world prototype. It tests whether
 
 ## Game Master Flow
 
-1. The UI submits player narrative input for the selected Adventure.
-2. The Next route validates input and loads current Convex Adventure context plus source WorldVersion metadata.
-3. Persistent mode builds a bounded prompt from canonical state, recent feed, NPC profiles, and location context.
+1. The UI submits player narrative input or a Pass trigger for the selected Adventure.
+2. The Next route validates the request and loads current Convex Adventure context plus source WorldVersion metadata.
+3. Persistent mode builds a bounded prompt from canonical state, recent successful narration history, NPC profiles, and location context.
 4. The provider returns player-facing narration.
 5. A separate extractor may propose bounded state changes.
 6. Convex validates accepted mutations before storing canonical state.

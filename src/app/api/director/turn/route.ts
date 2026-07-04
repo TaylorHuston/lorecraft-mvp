@@ -19,7 +19,7 @@ import { ProviderError, readLlmConfig, requestOpenAICompatibleChat } from "@/lib
 import { validateNarrativeInput } from "@/lib/director/input";
 import { rawDirectorRequestForStorage } from "@/lib/director/raw-request";
 import { normalizeWorldLoadError } from "@/lib/director/turn-errors";
-import type { DirectorContext, TranscriptDirectorContext } from "@/lib/director/types";
+import type { DirectorContext, TranscriptDirectorContext, TurnTrigger } from "@/lib/director/types";
 
 export const runtime = "nodejs";
 
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     return json<TurnResponse>({ ok: false, error: convexResult.error }, 500);
   }
 
-  const { adventureId, input } = bodyResult.body;
+  const { adventureId, input, turnTrigger } = bodyResult.body;
   const convex = convexResult.client;
   const directorMode = modeResult.mode;
   const serverWriteToken = process.env.LORECRAFT_SERVER_WRITE_TOKEN?.trim() || undefined;
@@ -186,15 +186,21 @@ export async function POST(request: Request) {
 
   const provider = providerName(configResult.config.baseUrl);
 
-  const recorded = await convex.mutation(api.world.recordPlayerInput, {
-    adventureId,
-    input,
-    ...serverWriteArgs,
-  });
+  const recorded =
+    turnTrigger === "pass"
+      ? await convex.mutation(api.world.recordPassTurn, {
+          adventureId,
+          ...serverWriteArgs,
+        })
+      : await convex.mutation(api.world.recordPlayerInput, {
+          adventureId,
+          input: input ?? "",
+          ...serverWriteArgs,
+        });
   if (!recorded.ok) {
     await logDirectorTurn({
       event: "director.turn.rejected",
-      stage: "record_player_input",
+      stage: turnTrigger === "pass" ? "record_pass_turn" : "record_player_input",
       adventureId,
       provider,
       model: configResult.config.model,
@@ -204,6 +210,9 @@ export async function POST(request: Request) {
     });
     return json<TurnResponse>({ ok: false, error: recorded.error }, 409);
   }
+  const commandId = ("commandId" in recorded ? recorded.commandId : undefined) as
+    | Id<"commands">
+    | undefined;
 
   const generationSettings = {
     ...configResult.config.generationSettings,
@@ -214,10 +223,12 @@ export async function POST(request: Request) {
       ? buildTranscriptDirectorRequest(context as TranscriptDirectorContext, input, {
           generationSettings,
           promptGuidance: bodyResult.body.promptGuidance,
+          turnTrigger,
         })
       : buildDirectorRequest(persistentContext ?? (context as unknown as DirectorContext), input, {
           generationSettings,
           promptGuidance: bodyResult.body.promptGuidance,
+          turnTrigger,
         });
   const rawRequest = rawDirectorRequestForStorage(directorRequest.messages);
 
@@ -234,7 +245,7 @@ export async function POST(request: Request) {
       adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
+      ...commandArgs(commandId),
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
@@ -250,8 +261,9 @@ export async function POST(request: Request) {
       stage: "provider_request",
       adventureId,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
-      playerInput: input,
+      ...commandArgs(commandId),
+      turnTrigger,
+      playerInput: input ?? undefined,
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
@@ -276,7 +288,7 @@ export async function POST(request: Request) {
       adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
+      ...commandArgs(commandId),
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
@@ -292,8 +304,9 @@ export async function POST(request: Request) {
       stage: "parse_director_output",
       adventureId,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
-      playerInput: input,
+      ...commandArgs(commandId),
+      turnTrigger,
+      playerInput: input ?? undefined,
       provider,
       model: configResult.config.model,
       requestSummary: directorRequest.requestSummary,
@@ -316,7 +329,7 @@ export async function POST(request: Request) {
     adventureId,
     ...serverWriteArgs,
     turnId: recorded.turnId,
-    commandId: recorded.commandId,
+    ...commandArgs(commandId),
     provider,
     model: configResult.config.model,
     requestSummary: directorRequest.requestSummary,
@@ -334,8 +347,9 @@ export async function POST(request: Request) {
     stage: "complete_director_turn",
     adventureId,
     turnId: recorded.turnId,
-    commandId: recorded.commandId,
-    playerInput: input,
+    ...commandArgs(commandId),
+    turnTrigger,
+    playerInput: input ?? undefined,
     provider,
     model: configResult.config.model,
     requestSummary: directorRequest.requestSummary,
@@ -373,6 +387,7 @@ export async function POST(request: Request) {
     {
       generationSettings: extractionGenerationSettings,
       promptGuidance: bodyResult.body.promptGuidance,
+      turnTrigger,
       requiredSceneBeat: {
         ...directorRequest.requestSummary.requiredSceneBeat,
         instruction: "",
@@ -396,7 +411,7 @@ export async function POST(request: Request) {
       adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
+      ...commandArgs(commandId),
       provider,
       model: configResult.config.model,
       requestSummary: extractionRequest.requestSummary,
@@ -412,8 +427,9 @@ export async function POST(request: Request) {
       stage: "provider_request",
       adventureId,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
-      playerInput: input,
+      ...commandArgs(commandId),
+      turnTrigger,
+      playerInput: input ?? undefined,
       provider,
       model: configResult.config.model,
       requestSummary: extractionRequest.requestSummary,
@@ -443,7 +459,7 @@ export async function POST(request: Request) {
       adventureId,
       ...serverWriteArgs,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
+      ...commandArgs(commandId),
       provider,
       model: configResult.config.model,
       requestSummary: extractionRequest.requestSummary,
@@ -459,8 +475,9 @@ export async function POST(request: Request) {
       stage: "parse_extraction_output",
       adventureId,
       turnId: recorded.turnId,
-      commandId: recorded.commandId,
-      playerInput: input,
+      ...commandArgs(commandId),
+      turnTrigger,
+      playerInput: input ?? undefined,
       provider,
       model: configResult.config.model,
       requestSummary: extractionRequest.requestSummary,
@@ -492,14 +509,14 @@ export async function POST(request: Request) {
     extractionParsed.actorMoves,
     persistentContext.actors,
     persistentContext.knownLocations ?? [],
-    input,
+    input ?? "",
     parsed.output.narration,
   );
   await convex.mutation(api.world.recordNpcStateExtraction, {
     adventureId,
     ...serverWriteArgs,
     turnId: recorded.turnId,
-    commandId: recorded.commandId,
+    ...commandArgs(commandId),
     provider,
     model: configResult.config.model,
     requestSummary: extractionRequest.requestSummary,
@@ -520,8 +537,9 @@ export async function POST(request: Request) {
     stage: "complete_extraction",
     adventureId,
     turnId: recorded.turnId,
-    commandId: recorded.commandId,
-    playerInput: input,
+    ...commandArgs(commandId),
+    turnTrigger,
+    playerInput: input ?? undefined,
     provider,
     model: configResult.config.model,
     requestSummary: extractionRequest.requestSummary,
@@ -613,9 +631,18 @@ async function readBody(request: Request) {
     return { ok: false as const, error: "An adventureId is required." };
   }
 
-  const inputResult = validateNarrativeInput(parsed.input);
-  if (!inputResult.ok) {
-    return inputResult;
+  const turnTrigger = readTurnTrigger(parsed.trigger);
+  if (!turnTrigger.ok) {
+    return turnTrigger;
+  }
+
+  let input: string | null = null;
+  if (turnTrigger.value === "act") {
+    const inputResult = validateNarrativeInput(parsed.input);
+    if (!inputResult.ok) {
+      return inputResult;
+    }
+    input = inputResult.input;
   }
 
   const promptGuidance = readPromptGuidance(parsed.promptGuidance);
@@ -627,10 +654,25 @@ async function readBody(request: Request) {
     ok: true as const,
     body: {
       adventureId: parsed.adventureId as Id<"adventures">,
-      input: inputResult.input,
+      input,
+      turnTrigger: turnTrigger.value,
       promptGuidance: promptGuidance.value,
     },
   };
+}
+
+function readTurnTrigger(value: unknown): { ok: true; value: TurnTrigger } | { ok: false; error: string } {
+  if (value === undefined || value === "act") {
+    return { ok: true, value: "act" };
+  }
+  if (value === "pass") {
+    return { ok: true, value: "pass" };
+  }
+  return { ok: false, error: 'trigger must be "act" or "pass" when provided.' };
+}
+
+function commandArgs(commandId: Id<"commands"> | undefined) {
+  return commandId ? { commandId } : {};
 }
 
 function readPromptGuidance(value: unknown) {

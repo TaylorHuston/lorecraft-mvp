@@ -11,6 +11,7 @@ export type DirectorDebugLogEntry = {
   worldVersionId?: string;
   turnId?: string;
   commandId?: string;
+  turnTrigger?: "act" | "pass";
   playerInput?: string;
   provider?: string;
   model?: string;
@@ -83,6 +84,7 @@ export function buildDirectorDebugLogRecord(
     worldVersionId: entry.worldVersionId,
     turnId: entry.turnId,
     commandId: entry.commandId,
+    turnTrigger: entry.turnTrigger,
     playerInput: entry.playerInput,
     provider: entry.provider,
     model: entry.model,
