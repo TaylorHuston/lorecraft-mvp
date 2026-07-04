@@ -16,6 +16,8 @@ vi.mock("convex/browser", () => ({
   }),
 }));
 
+vi.mock("server-only", () => ({}));
+
 vi.mock("@/lib/director/debug-log", () => ({
   writeDirectorDebugLog: mocks.writeDirectorDebugLog,
 }));

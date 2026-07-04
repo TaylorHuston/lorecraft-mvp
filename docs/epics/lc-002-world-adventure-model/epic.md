@@ -103,7 +103,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 | `convex/world.ts` | Builds the Stormbound Chapel baseline, lists local Adventures, creates new Adventures from the current WorldVersion, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
 | `src/app/page.tsx` | Hosts the World container route at `/`. | Recheck when startup routing changes. |
 | `src/app/adventures/[adventureId]/page.tsx` | Hosts direct Adventure URLs at `/adventures/<id>`. | Recheck when Adventure routing changes. |
-| `src/app/world-client.tsx` | Shows the startup World container screen, lists Adventures inside Stormbound Chapel, navigates to Adventure URLs, creates and deletes local Adventures, and loads the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
+| `src/features/play/world-client.tsx` | Shows the startup World container screen, lists Adventures inside Stormbound Chapel, navigates to Adventure URLs, creates and deletes local Adventures, and loads the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
 
 #### Verified By
 
@@ -160,7 +160,7 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 |---|---|---|
 | `convex/world.ts` | Reads/writes commands, turns, narrations, events, facts, state diffs, Game Master calls, actor moves, NPC edits, location edits, and feed reconstruction by Adventure. | Recheck when persistence, debug editing, movement, reset, or feed behavior changes. |
 | `src/app/api/director/turn/route.ts` | Accepts `adventureId`, loads Adventure context, records turn artifacts against the Adventure, and passes Adventure/source-version metadata into logs. | Recheck when Game Master route input or turn orchestration changes. |
-| `src/app/world-client.tsx` | Sends `adventureId` for turns and debug mutations, shows Adventure/source WorldVersion in debug state, and reloads snapshot/feed from selected Adventure state. | Recheck when UI state identity changes. |
+| `src/features/play/world-client.tsx` | Sends `adventureId` for turns and debug mutations, shows Adventure/source WorldVersion in debug state, and reloads snapshot/feed from selected Adventure state. | Recheck when UI state identity changes. |
 | `src/lib/director/types.ts`, `src/lib/director/prompt.ts`, `src/lib/director/debug-log.ts`, `src/lib/director/turn-errors.ts` | Carry Adventure/source-version identity through prompts, summaries, logs, and user-facing load errors. | Recheck when prompt/log/error contracts change. |
 
 #### Verified By
@@ -262,7 +262,7 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `convex/world.ts` | Deletes selected Adventure runtime rows and recopies the Adventure's original source WorldVersion baseline. | Recheck when reset semantics, seeded baseline shape, or Adventure ownership changes. |
-| `src/app/world-client.tsx` | Wires Reset Session to the selected Adventure. | Recheck when reset UI wording or selected identity changes. |
+| `src/features/play/world-client.tsx` | Wires Reset Session to the selected Adventure. | Recheck when reset UI wording or selected identity changes. |
 
 #### Verified By
 

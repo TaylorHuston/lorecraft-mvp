@@ -150,7 +150,7 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
 
@@ -393,7 +393,7 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 | `convex/world.ts` | seeds Taylor and Mira with stable actor keys and initializes Mira's `mood`, `status`, and `memory` facts. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | retains structured NPC-update parsing/validation for extractor-style mutation, ignores unknown/offscreen NPC updates, partially accepts valid fields, and caps `memory` at 500 characters. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/prompt.ts` | sends current-scene NPC facts as hidden Game Master guidance. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows hidden NPC facts only in the debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows hidden NPC facts only in the debug panel. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -502,7 +502,7 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 | `convex/world.ts` | persists Game Master call audit records, accepted NPC fact diffs, generic world events, and rough reset behavior. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM` and raw provider request text behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST`. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records pre-turn rejection logs and one local `director.turn.unit` log entry for each recorded provider-error, invalid-output, or successful Game Master turn when `LORECRAFT_DEBUG_LOG=1` is enabled. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | renders hidden facts, events, narrations, state diffs, and Game Master calls in the debug panel and exposes rough reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders hidden facts, events, narrations, state diffs, and Game Master calls in the debug panel and exposes rough reset. | Recheck when this Story changes or the listed path changes. |
 | `.gitignore`, `package.json`, `README.md` | document and support the local-only debug log path. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -605,9 +605,9 @@ The system SHALL keep empty, pending, and error states understandable without re
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders persisted feed rows as a prose-first story stream, with Game Master narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders persisted feed rows as a prose-first story stream, with Game Master narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -751,7 +751,7 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 | `convex/world.ts` | creates pending action and Pass turns with Adventure-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during Adventure reset. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | passes `turnId`, optional `commandId`, and trigger metadata through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/Adventure-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | includes optional `turnId`, optional `commandId`, and trigger metadata in local JSONL debug records. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
 | `docs/data-model.md`, `docs/persistence-system.md` | document scoped turns and defer snapshot rollback. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -766,7 +766,7 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 | R3-S1 through R3-S3 | `npm run e2e`, focused director tests, `docs/data-model.md`, and `docs/persistence-system.md` | prove rough reset clears turn history, accepted diffs remain turn-scoped audit records, and snapshot rollback remains deferred. | Recorded |
 | R4-S1 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove action turns still create commands and resolve current input. | Recorded |
 | R4-S2 and R4-S3 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove Pass turns complete or fail without command rows while remaining debug-visible. | Recorded |
-| R5-S1 | Source inspection of `src/app/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
+| R5-S1 | Source inspection of `src/features/play/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, and the prior local PR gate passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -1002,7 +1002,7 @@ The system SHALL use the same story-visible history policy for state extraction 
 | `src/app/api/director/turn/route.ts` | passes effective generation settings, trigger metadata, and validated debug prompt guidance into Game Master request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/raw-request.ts` | gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/director.test.ts` | covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, raw request storage gating, and local turn-unit debug log shape. | Recheck when this Story changes or the listed path changes. |
 | `scripts/director-playtest.mjs` | runs the repeatable local Game Master playtest against a running dev server. | Recheck when this Story changes or the listed path changes. |
@@ -1176,7 +1176,7 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 | `src/lib/director/output.ts` | parses transcript plain prose as narration with no NPC updates. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | branches backend Game Master orchestration by startup mode, loads transcript context for transcript mode, and sends transcript completions through a no-mutation path. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | seeds a fresh deterministic demo world, stores successful transcript narrations and Game Master calls, and skips NPC fact writes, LLM events, and state diffs. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows the latest Game Master mode and output contract in the debug summary. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows the latest Game Master mode and output contract in the debug summary. | Recheck when this Story changes or the listed path changes. |
 | `scripts/director-transcript-playtest.mjs` | verifies the local transcript no-mutation smoke path. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1327,7 +1327,7 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 | `src/lib/director/prompt.ts` | renders current Location Card and Known Locations prompt sections in persistent mode while keeping transcript mode seed-plus-transcript only. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | parses state extraction output with `npcUpdates` and `actorMoves`, validates movement against current-scene actors, existing known locations, clear travel input, narration-confirmed arrival, and explicit NPC movement narration. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records validated actor moves through the post-narration extractor path and skips movement extraction in transcript mode. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | adds the debug `Locations` tab with canonical location inspection, edit, create, and actor/object/exit summaries. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | adds the debug `Locations` tab with canonical location inspection, edit, create, and actor/object/exit summaries. | Recheck when this Story changes or the listed path changes. |
 | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | cover deterministic fixture-backed movement in browser E2E. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1427,7 +1427,7 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 | `convex/world.ts` | seeds Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; it also exposes debug-gated canonical NPC create/update/reset actions, clears blank debug fact values, and caps debug-created NPC/location counts. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/prompt.ts` | renders `npcProfiles` into canonical `npcCards`, includes `conversationFocus`, `lastAction`, and `sceneDirective` as persistent-mode prompt components; records `npcProfileKeys` and `npcMutationMode: "bounded_updates"` in request summaries; and keeps read-only NPC cards/profiles higher priority than recent feed prose. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | reads canonical Convex NPC context for persistent Game Master turns and leaves transcript mode unchanged. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | adds a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flushes queued NPC autosaves before player turn submission; and cancels queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | adds a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flushes queued NPC autosaves before player turn submission; and cancels queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/director.test.ts` | covers persistent NPC profile prompt context, prompt priority/scene directive context, direct-NPC question targeting, canonical debug-created NPC context, transcript exclusion, and the bounded mutation boundary. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1713,7 +1713,7 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 | `scripts/llm-fixture-server.mjs` | provides the deterministic OpenAI-compatible chat completions fixture for story-generation and NPC-state extraction calls. | Recheck when this Story changes or the listed path changes. |
 | `scripts/e2e-next-server.mjs` | builds and runs the Next app on the E2E test port with signal handling for clean Playwright shutdown. | Recheck when this Story changes or the listed path changes. |
 | `tests/e2e/lorecraft-playtest.spec.ts` | drives the browser through seeding/reset, narrative input, pending state, persisted reload state, debug drawer toggling, turn evidence, and reset reuse. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E. | Recheck when this Story changes or the listed path changes. |
 | `vitest.config.ts` | keeps Playwright specs out of the Vitest unit-test suite. | Recheck when this Story changes or the listed path changes. |
 | `package.json` | exposes `npm run e2e`, `npm run e2e:install`, fixture, Convex, and Next startup scripts while leaving `npm run ci:required` unchanged. | Recheck when this Story changes or the listed path changes. |
 

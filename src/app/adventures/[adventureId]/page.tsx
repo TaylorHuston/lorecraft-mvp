@@ -1,4 +1,4 @@
-import { WorldClient } from "../../world-client";
+import { WorldClient } from "@/features/play/world-client";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 export default async function AdventurePage({

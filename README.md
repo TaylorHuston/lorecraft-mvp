@@ -168,10 +168,13 @@ npm run e2e:install
 | Path | Purpose |
 |---|---|
 | `convex/schema.ts` | World, WorldVersion, Adventure, runtime table, and index definitions. |
-| `convex/world.ts` | Demo World/Adventure seed/reset/copy, feed reconstruction, canonical state reads/writes, and mutation validation. |
-| `src/app/api/director/turn/route.ts` | Synchronous Game Master turn orchestration boundary. |
+| `convex/world.ts` | Public Convex World/Adventure function contract, feed reconstruction, canonical state reads/writes, and mutation validation. |
+| `src/lib/world/stormbound-baseline.ts` | Stormbound Chapel seed constants and baseline builder. |
+| `src/app/` | Thin App Router pages, route fallbacks, and API adapter files. |
+| `src/app/api/director/turn/route.ts` | Thin `/api/director/turn` Route Handler export. |
+| `src/server/director/` | Server-only Game Master turn request parsing, local route guards, orchestration, provider calls, persistence, extraction, and logging. |
 | `src/lib/director/` | Prompt construction, provider adapter, parsing, validation, and generation settings. |
-| `src/app/world-client.tsx` | Narrative playtest UI and debug panel. |
+| `src/features/play/` | Narrative playtest UI, debug panel, player turn controls, and browser-safe debug display helpers. |
 | `scripts/llm-fixture-server.mjs` | Local OpenAI-compatible fixture provider for deterministic tests. |
 | `tests/e2e/` | Playwright coverage for the current playtest loop. |
 | `docs/` | Architecture, data model, persistence strategy, testing, CI/CD, deployment notes, Epics, and completed changes. |

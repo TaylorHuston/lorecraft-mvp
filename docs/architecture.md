@@ -4,17 +4,19 @@ Lorecraft MVP is a Next.js + Convex persistent-world prototype. It tests whether
 
 ## System Boundaries
 
-- `src/app/world-client.tsx`: narrative playtest UI, debug drawer, reset controls, and client-side interaction state.
-- `src/app/api/director/turn/route.ts`: synchronous Game Master turn orchestration boundary.
+- `src/app/`: thin App Router route composition, route-level loading/error fallbacks, and `/api/director/turn` adapter exports.
+- `src/features/play/`: narrative playtest UI, debug drawer, reset controls, client-side interaction state, and browser-safe display helpers.
+- `src/server/director/`: server-only Game Master turn request parsing, local route guard helpers, Convex HTTP client orchestration, provider calls, persistence, extraction, logging, and response shaping.
 - `src/lib/director/`: prompt construction, OpenAI-compatible provider adapter, parsing, validation, and generation settings.
 - `convex/world.ts`: WorldVersion/Adventure seed/copy/reset, feed reconstruction, canonical state reads/writes, Game Master debug records, and mutation validation.
+- `src/lib/world/stormbound-baseline.ts`: Stormbound Chapel seed constants and baseline builder used by WorldVersion/Adventure creation and reset.
 - `convex/schema.ts`: durable table and index definitions.
 - `scripts/`: local playtest, benchmark, fixture-provider, and E2E support scripts.
 
 ## Game Master Flow
 
 1. The UI submits player narrative input or a Pass trigger for the selected Adventure.
-2. The Next route validates the request and loads current Convex Adventure context plus source WorldVersion metadata.
+2. The thin Next route delegates to `src/server/director/`, which validates the request and loads current Convex Adventure context plus source WorldVersion metadata.
 3. Persistent mode builds a bounded prompt from canonical state, recent successful narration history, NPC profiles, and location context.
 4. The provider returns player-facing narration.
 5. A separate extractor may propose bounded state changes.
