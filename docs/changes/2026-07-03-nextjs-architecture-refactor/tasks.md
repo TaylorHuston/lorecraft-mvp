@@ -107,7 +107,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 |---|---|---|---|---|---|
 | 2026-07-03 | Planning | main | proposal/design/tasks/ADR | Proposed full-stack architecture refactor across App Router, client UI, Game Master route, and Convex boundaries without creating a technical Epic. | pending |
 | 2026-07-04 | Discovery | main + delegated read-only discovery | app guidance, change artifacts, Next guidance, Convex guidance, current monolith inventory | Selected active change, created `change/nextjs-architecture-refactor`, confirmed no blocking product questions, and scoped first implementation slice to route/client boundary extraction. | uncommitted |
-| 2026-07-04 | Route, server, baseline, and formatter extraction | main + frontend/backend discovery agents | `src/app/`, `src/features/play/`, `src/server/director/`, `src/lib/world/`, `convex/world.ts`, docs/Epics | Preserved behavior while moving route composition and Game Master orchestration behind clearer Next/server boundaries; extracted pure debug formatters and Stormbound baseline helper; kept Convex generated public API unchanged. | commit pending |
+| 2026-07-04 | Route, server, baseline, and formatter extraction | main + frontend/backend discovery agents | `src/app/`, `src/features/play/`, `src/server/director/`, `src/lib/world/`, `convex/world.ts`, docs/Epics | Preserved behavior while moving route composition and Game Master orchestration behind clearer Next/server boundaries; extracted pure debug formatters and Stormbound baseline helper; kept Convex generated public API unchanged. | `841c40f` |
 
 ## Specialist Checkpoint
 
