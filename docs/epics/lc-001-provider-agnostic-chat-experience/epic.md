@@ -150,7 +150,8 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/features/play/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders the narrative-only split layout, owns the parent turn submission operation, shows persisted feed entries, and hosts the debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/turn-action-panel.tsx` | renders the `What do you do?` decision surface, Act/Pass controls, Act-expanded textarea, close animation, pending placeholder, notice/error status, Enter-to-submit behavior, and Pass trigger. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
 
@@ -164,6 +165,7 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 | R3-S1 | `npm run e2e` and browser verification | prove pending state disables duplicate submission for the in-flight turn while keeping progress visible. | Recorded |
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
 | R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
+| R4-S0 through R4-S2 | `npm run ci:required` and `npm run e2e` on 2026-07-05 after `src/features/play/turn-action-panel.tsx` extraction | prove the extracted turn panel still opens Act input, submits Act with Enter, supports Pass, exposes pending/error state, and preserves the browser playtest path. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -607,7 +609,8 @@ The system SHALL keep empty, pending, and error states understandable without re
 |---|---|---|
 | `src/features/play/world-client.tsx` | renders persisted feed rows as a prose-first story stream, with Game Master narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices. | Recheck when this Story changes or the listed path changes. |
 | `src/features/play/world-client.tsx` | keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/turn-action-panel.tsx` | keeps the continuation input, pending state, error state, Act expansion, Pass control, and Enter-to-send behavior near the story stream. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 

@@ -28,3 +28,54 @@ body {
     "Geist", "Geist Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
+
+:where(
+  a[href],
+  button:not(:disabled),
+  summary,
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"])
+) {
+  cursor: pointer;
+}
+
+.turn-response-area-enter {
+  animation: turn-response-area-enter 180ms ease-out both;
+  transform-origin: top left;
+}
+
+.turn-response-area-exit {
+  animation: turn-response-area-exit 160ms ease-in both;
+  transform-origin: top left;
+}
+
+@keyframes turn-response-area-enter {
+  from {
+    opacity: 0;
+    transform: scaleX(0.18) scaleY(0.75);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes turn-response-area-exit {
+  from {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scaleX(0.18) scaleY(0.75);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-response-area-enter,
+  .turn-response-area-exit {
+    animation: none;
+  }
+}

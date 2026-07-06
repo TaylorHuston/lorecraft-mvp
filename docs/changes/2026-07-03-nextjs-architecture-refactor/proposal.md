@@ -75,7 +75,7 @@ The change should:
 
 ## Impact
 
-- Product: no intentional behavior change; the app should still play, resume, pass, reset, debug, and mutate state exactly as before.
+- Product: no product-model change; the app should still play, resume, pass, reset, debug, and mutate state as before. During implementation, Taylor approved small Act/Pass/input interaction polish as part of extracting the turn-control UI boundary.
 - Code: high. This will move code across UI components, hooks, server/application modules, and Convex helper modules.
 - Tests: high. Existing unit and E2E coverage should be preserved and focused tests should be added around newly extracted boundaries where useful.
 - Docs: medium. Architecture, README project structure, testing notes, and Epic implementation maps should be updated.

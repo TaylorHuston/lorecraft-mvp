@@ -34,7 +34,7 @@ Current Next.js guidance and local project guidance both point toward the same f
 - Replacing Convex as canonical state.
 - Replacing the Game Master Route Handler with Server Actions, Convex actions, or a separate service.
 - Production auth, permissions, remote deployment hardening, rate limiting, or public API launch.
-- Broad styling changes beyond accidental layout break prevention.
+- Broad styling changes beyond accidental layout break prevention or explicitly approved turn-control polish discovered during this refactor.
 
 ## Planning Interview / Boundary Refinement
 
@@ -56,6 +56,8 @@ Current Next.js guidance and local project guidance both point toward the same f
   - Auth/ownership/security production model.
   - New Story/Adventure behavior.
   - Convex schema redesign.
+- Approved refinement during implementation:
+  - The Act/Pass decision surface may receive small interaction polish while being extracted, provided the player-facing product model stays the same: `What do you do?`, Act opens the narrative input, Pass submits a pass turn, Enter submits text, and the parent backend turn workflow remains unchanged.
 - Boundary choices challenged:
   - This should not be split into one Epic Story per file; those would be implementation tasks, not user-path capabilities.
   - A technical architecture Epic would make Epics less product-facing, so this revision removes that approach.

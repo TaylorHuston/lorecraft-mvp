@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
@@ -16,6 +16,7 @@ import {
   summaryText,
   turnSummaryItems,
 } from "./debug-formatters";
+import { TurnActionPanel } from "./turn-action-panel";
 
 type DirectorTurnResponse =
   | {
@@ -111,11 +112,9 @@ export function WorldClient({
   const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(
     initialAdventureId,
   );
-  const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isActInputOpen, setIsActInputOpen] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
@@ -138,7 +137,6 @@ export function WorldClient({
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
-  const directorInputRef = useRef<HTMLTextAreaElement | null>(null);
   const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const npcSaveVersions = useRef<Record<string, number>>({});
   const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
@@ -164,14 +162,6 @@ export function WorldClient({
 
     storyScroller.scrollTop = storyScroller.scrollHeight;
   }, [feedLength, isSubmitting, error]);
-
-  useEffect(() => {
-    if (!isActInputOpen || isSubmitting) {
-      return;
-    }
-
-    directorInputRef.current?.focus();
-  }, [isActInputOpen, isSubmitting]);
 
   useEffect(() => {
     const timers = npcSaveTimers.current;
@@ -299,41 +289,20 @@ export function WorldClient({
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const submittedInput = input.trim();
-
-    if (
-      !adventureId ||
-      !isActInputOpen ||
-      !submittedInput ||
-      isSubmitting ||
-      isSeeding ||
-      isResetting ||
-      isCreatingAdventure
-    ) {
-      return;
-    }
-
-    await submitTurn({ trigger: "act", input: submittedInput });
-  }
-
-  function handleAct() {
-    if (isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
-      return;
-    }
-
-    setError(null);
-    setNotice(null);
-    setIsActInputOpen(true);
-  }
-
   async function handlePass() {
     if (!adventureId || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
-      return;
+      return false;
     }
 
-    await submitTurn({ trigger: "pass" });
+    return await submitTurn({ trigger: "pass" });
+  }
+
+  async function handleActSubmit(input: string) {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+      return false;
+    }
+
+    return await submitTurn({ trigger: "act", input });
   }
 
   async function submitTurn(turn: { trigger: "act"; input: string } | { trigger: "pass" }) {
@@ -341,17 +310,11 @@ export function WorldClient({
     setError(null);
     setNotice(null);
     setIsSubmitting(true);
-    if (turn.trigger === "act") {
-      setInput("");
-    }
     try {
       const npcSavesFlushed = await flushQueuedNpcSaves();
       const locationSavesFlushed = await flushActiveLocationSaves();
       if (!npcSavesFlushed || !locationSavesFlushed) {
-        if (turn.trigger === "act") {
-          setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
-        }
-        return;
+        return false;
       }
 
       const response = await fetch("/api/director/turn", {
@@ -368,22 +331,12 @@ export function WorldClient({
 
       if (!response.ok || !result.ok) {
         setError(result.ok ? "The Game Master turn failed." : result.error);
-        if (turn.trigger === "act") {
-          setIsActInputOpen(true);
-          setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
-        }
-        return;
+        return false;
       }
-
-      if (turn.trigger === "act") {
-        setIsActInputOpen(false);
-      }
+      return true;
     } catch (submitError) {
       setError(errorMessage(submitError));
-      if (turn.trigger === "act") {
-        setIsActInputOpen(true);
-        setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
-      }
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -691,15 +644,6 @@ export function WorldClient({
     setNotice("Location created.");
   }
 
-  function handleInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
-      return;
-    }
-
-    event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
-  }
-
   return (
     <main id="lorecraft-app" className="min-h-screen bg-[#090908] pt-12 text-zinc-100">
       <div
@@ -816,79 +760,14 @@ export function WorldClient({
                   </div>
                 </section>
 
-                <form
-                  id="narrative-input-form"
-                  onSubmit={handleSubmit}
-                  className="mx-auto mb-5 w-[calc(100%-2.5rem)] max-w-[50rem] shrink-0 rounded-2xl bg-zinc-800/95 px-5 py-3 shadow-2xl shadow-black/35 sm:w-[calc(100%-4rem)] lg:w-[calc(100%-5rem)]"
-                >
-                  {isSubmitting ? (
-                    <TurnPendingPlaceholder />
-                  ) : (
-                    <>
-                      <p
-                        id="turn-action-prompt"
-                        className="block text-left text-sm italic leading-6 text-zinc-300"
-                      >
-                        What do you do?
-                      </p>
-                      {isActInputOpen ? (
-                        <textarea
-                          id="director-input"
-                          ref={directorInputRef}
-                          aria-labelledby="turn-action-prompt"
-                          value={input}
-                          onChange={(event) => setInput(event.target.value)}
-                          onKeyDown={handleInputKeyDown}
-                          placeholder="Type your response..."
-                          rows={2}
-                          disabled={isSeeding || isResetting || isCreatingAdventure}
-                          className="mt-3 min-h-16 w-full resize-none rounded-xl bg-zinc-700/45 px-4 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-700/65"
-                        />
-                      ) : (
-                        <div id="turn-controls" className="mt-3 flex justify-start gap-2">
-                          <button
-                            id="act-turn-button"
-                            type="button"
-                            onClick={handleAct}
-                            disabled={isSeeding || isResetting || isCreatingAdventure}
-                            className="flex size-14 items-center justify-center rounded-xl bg-amber-300 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Act
-                          </button>
-                          <button
-                            id="pass-turn-button"
-                            type="button"
-                            onClick={handlePass}
-                            disabled={isSeeding || isResetting || isCreatingAdventure}
-                            className="flex size-14 items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Pass
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div
-                    id="async-status-region"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >
-                    {notice ? (
-                      <p id="turn-notice-message" className="mt-3 text-xs text-emerald-300/80">
-                        {notice}
-                      </p>
-                    ) : null}
-                  </div>
-                  {error ? (
-                    <p
-                      id="turn-error-message"
-                      role="alert"
-                      className="mt-3 text-sm text-rose-300"
-                    >
-                      {error}
-                    </p>
-                  ) : null}
-                </form>
+                <TurnActionPanel
+                  disabled={isSeeding || isResetting || isCreatingAdventure}
+                  isSubmitting={isSubmitting}
+                  notice={notice}
+                  error={error}
+                  onActSubmit={handleActSubmit}
+                  onPass={handlePass}
+                />
               </>
             )}
           </div>
@@ -1186,27 +1065,6 @@ function GearIcon() {
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.7a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.3a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
     </svg>
-  );
-}
-
-function TurnPendingPlaceholder() {
-  return (
-    <div
-      id="turn-pending-placeholder"
-      role="status"
-      aria-live="polite"
-      className="flex min-h-[4.5rem] items-center gap-3 text-sm text-zinc-300"
-    >
-      <span className="sr-only">Game Master is writing a response.</span>
-      <span className="flex gap-1" aria-hidden="true">
-        <span className="size-2 animate-pulse rounded-full bg-amber-300/90 [animation-delay:0ms]" />
-        <span className="size-2 animate-pulse rounded-full bg-amber-300/70 [animation-delay:150ms]" />
-        <span className="size-2 animate-pulse rounded-full bg-amber-300/50 [animation-delay:300ms]" />
-      </span>
-      <span aria-hidden="true" className="text-zinc-400">
-        The story is turning...
-      </span>
-    </div>
   );
 }
 

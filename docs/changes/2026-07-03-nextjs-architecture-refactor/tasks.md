@@ -3,10 +3,10 @@
 ## Resume Here
 
 - Current state: applying
-- Last completed action: first behavior-preserving architecture slice implemented and verified: thin App Router pages/route adapter, route loading/error fallbacks, feature-level play client relocation, server-only Game Master request/orchestration modules, pure debug formatter extraction, and Stormbound baseline extraction outside Convex generated API.
-- Next action: continue Workstream 2 by extracting client hooks/components for turn submission, Adventure selection, NPC autosave, Location editing, and debug tabs; then continue Workstream 4 beyond baseline extraction.
+- Last completed action: addressed the first `/sdd-review` implementation finding by extracting the Act/Pass/input decision surface into `TurnActionPanel`, preserving the approved turn-control polish while keeping backend turn submission in the parent feature client.
+- Next action: verify and commit this Workstream 2 slice, then continue Workstream 2 by extracting Adventure selection, NPC autosave, Location editing, and debug tabs; continue Workstream 4 beyond baseline extraction.
 - Active branch/ref: `change/nextjs-architecture-refactor`
-- Expected dirty files: implementation/docs from first slice until committed; next slice should continue on `change/nextjs-architecture-refactor`.
+- Expected dirty files: `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `src/app/globals.css`, this change folder's artifacts, and review remediation records until the current slice is verified and committed.
 - Known blockers: none identified
 
 ## Task Checklist
@@ -48,7 +48,7 @@
     - [x] Scenario R1-S1: Story stream can change without debug formatter changes.
     - [ ] Scenario R1-S2: Debug tab can change without player story layout changes.
   - [ ] Requirement R2: Client Hooks Own Interactive Workflows
-    - [ ] Scenario R2-S1: Turn submission workflow is isolated.
+    - [x] Scenario R2-S1: Turn submission workflow is isolated.
     - [ ] Scenario R2-S2: Debug autosave workflow is isolated.
   - [x] Requirement R3: UI Components Do Not Own Backend Rules
     - [x] Scenario R3-S1: Client component imports stay client-safe.
@@ -90,8 +90,8 @@
 ### 6. Review And Closeout
 
 - [x] 6.1 Record changelog impact as not required because this is behavior-preserving internal architecture work.
-- [ ] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
-- [ ] 6.3 Record review outcome as `review.md`.
+- [x] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
+- [x] 6.3 Record review outcome as `review.md`.
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
@@ -108,6 +108,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-03 | Planning | main | proposal/design/tasks/ADR | Proposed full-stack architecture refactor across App Router, client UI, Game Master route, and Convex boundaries without creating a technical Epic. | pending |
 | 2026-07-04 | Discovery | main + delegated read-only discovery | app guidance, change artifacts, Next guidance, Convex guidance, current monolith inventory | Selected active change, created `change/nextjs-architecture-refactor`, confirmed no blocking product questions, and scoped first implementation slice to route/client boundary extraction. | uncommitted |
 | 2026-07-04 | Route, server, baseline, and formatter extraction | main + frontend/backend discovery agents | `src/app/`, `src/features/play/`, `src/server/director/`, `src/lib/world/`, `convex/world.ts`, docs/Epics | Preserved behavior while moving route composition and Game Master orchestration behind clearer Next/server boundaries; extracted pure debug formatters and Stormbound baseline helper; kept Convex generated public API unchanged. | `841c40f` |
+| 2026-07-05 | Turn action panel extraction and review remediation | main | `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `src/app/globals.css`, proposal/design/tasks/review | Extracted Act/Pass/input UI state, keyboard submit, close animation, and pending/status rendering into a focused Client Component; reconciled the approved turn-control polish into the active change scope. | commit pending |
 
 ## Specialist Checkpoint
 
@@ -115,6 +116,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 |---|---|---|---|---|---|
 | 2026-07-04 | Discovery and Workstreams 1-4 | Next.js App Router, React Client Components, Route Handler, Convex functions, E2E verification | `next-best-practices`, Convex generated AI guidelines, `sdd-apply` specialist routing, delegated frontend/backend discovery | loaded / delegated | Keep pages and route handlers thin, avoid async Client Components or non-serializable Server-to-Client props, keep `/api/director/turn` stable, preserve Convex public contracts, and split implementation into behavior-preserving phases. |
 | 2026-07-04 | First implementation slice | Next route files, server-only modules, Convex helper import, browser feature code, package dependency | `next-best-practices`, Convex generated AI guidelines, frontend/backend discovery agents | loaded / delegated | Added `server-only`, mocked it in Vitest, moved pure Convex baseline helper outside `convex/` after generated API drift was detected, and kept UI workflow logic intact while extracting only browser-safe helpers. |
+| 2026-07-05 | Workstream 2 turn action panel | React Client Component state boundary, keyboard submit, focus, animation, browser-visible UI | `next-best-practices`, `building-components`, shared visual style guide, `sdd-apply` specialist routing | loaded / no delegation: current uncommitted UI state is tightly coupled and smaller to extract locally | Extract the Act/Pass/input interaction into a browser-safe component while preserving keyboard behavior, focus, reduced-motion handling, and parent-owned backend submission. |
 
 ## Verification Ledger
 
@@ -128,6 +130,9 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-04 | `npm run ci:required` | broad supporting gate | Lint, all Vitest tests, TypeScript, and production Next build pass after route/server/client/Convex helper movement. | passed |
 | 2026-07-04 | `npm run convex:once` | Convex compile/codegen check | Convex functions compile with `convex/world.ts` importing `src/lib/world/stormbound-baseline.ts`; generated API shape no longer includes helper module drift. | passed |
 | 2026-07-04 | `npm run e2e` | deterministic E2E | Browser, route, fixture provider, Convex state, Act/Pass, debug editing, reset, and Adventure management still work after the refactor slice. | passed |
+| 2026-07-05 | `npm run ci:required`; `npm run e2e` | review verification | Required CI and deterministic browser E2E still pass after turn-control UI polish and the review timer typing fix. | passed |
+| 2026-07-05 | `npm run ci:required` | broad supporting gate | Lint, Vitest, TypeScript, and production Next build pass after extracting `TurnActionPanel` and reconciling turn-control polish. | passed |
+| 2026-07-05 | `npm run e2e` | deterministic E2E | Browser, route, fixture provider, Convex state, Act/Pass, debug editing, reset, and Adventure management still work with the extracted turn action panel. | passed |
 
 ## Manual Feedback
 
@@ -136,6 +141,7 @@ Record the user's manual testing feedback after implementation starts.
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
 | 2026-07-03 | User confirmed scope should include everything, not only UI. | scope decision | Design includes UI, route, server/application, and Convex boundaries. | resolved |
+| 2026-07-05 | User iterated on Act/Pass/input layout, hover behavior, close animation, response area size, and cursor behavior during the architecture refactor. | requirement refinement | Proposal/design updated to allow explicitly approved turn-control polish inside Workstream 2; extracted the turn controls into `TurnActionPanel` so future UI polish is not embedded in the parent play client. | implemented, verification pending |
 
 ## Planning Updates
 
@@ -147,14 +153,16 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending Taylor because this slice adds route-level loading and error fallback UI, even though deterministic E2E passed.
+- Status: pending Taylor because this change adds route-level loading/error fallback UI and approved turn-control interaction polish, even though deterministic E2E passed.
 - App URL / route: `/` and `/adventures/<id>`
 - Required setup or test data: seeded Stormbound Chapel demo World with at least one Adventure.
 - Steps for the user:
   - Open `/`.
   - Create or continue an Adventure.
   - Submit an Act turn.
+  - Click `Act`, confirm the response area expands from the button row, starts about twice the button height, stays left-aligned, and can be closed with `×` back to the Act/Pass buttons.
   - Submit a Pass turn.
+  - Confirm Pass does not briefly flash as hovered when closing the response area.
   - Open debug panel and verify Prompt, NPC, Location, and State tabs remain usable.
   - Reset or delete an Adventure only if intentionally testing destructive local flows.
 - Expected result:
@@ -176,9 +184,9 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: pending
 - ADR status: Proposed
 - Changelog current: not required
-- `sdd-review` verdict: pending
-- Review record: pending
-- `review.md` findings resolved: pending
+- `sdd-review` verdict: changes-requested
+- Review record: `docs/changes/2026-07-03-nextjs-architecture-refactor/review.md`
+- `review.md` findings resolved: partial; turn-control scope, manual checklist, affected Epic evidence, and turn-panel extraction findings addressed; broader Workstream 2 and Workstream 4 findings remain
 - Planning updates resolved: pending
 - Manual UI confirmation status: pending Taylor
 - PR / merge state: not started
