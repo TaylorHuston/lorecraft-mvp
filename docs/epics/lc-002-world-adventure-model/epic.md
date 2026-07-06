@@ -103,7 +103,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 | `convex/world.ts` | Builds the Stormbound Chapel baseline, lists local Adventures, creates new Adventures from the current WorldVersion, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
 | `src/app/page.tsx` | Hosts the World container route at `/`. | Recheck when startup routing changes. |
 | `src/app/adventures/[adventureId]/page.tsx` | Hosts direct Adventure URLs at `/adventures/<id>`. | Recheck when Adventure routing changes. |
-| `src/features/play/world-client.tsx` | Shows the startup World container screen, lists Adventures inside Stormbound Chapel, navigates to Adventure URLs, creates and deletes local Adventures, and loads the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx` | Show the startup World container screen, list Adventures inside Stormbound Chapel, navigate to Adventure URLs, create and delete local Adventures, and load the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
 
 #### Verified By
 
@@ -158,9 +158,9 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `convex/world.ts` | Reads/writes commands, turns, narrations, events, facts, state diffs, Game Master calls, actor moves, NPC edits, location edits, and feed reconstruction by Adventure. | Recheck when persistence, debug editing, movement, reset, or feed behavior changes. |
+| `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-turn-persistence.ts` | Read/write commands, turns, narrations, events, facts, state diffs, Game Master calls, actor moves, NPC edits, location edits, feed reconstruction, Game Master context, debug snapshot context, and accepted turn state changes by Adventure. | Recheck when persistence, debug editing, movement, reset, context, or feed behavior changes. |
 | `src/app/api/director/turn/route.ts` | Accepts `adventureId`, loads Adventure context, records turn artifacts against the Adventure, and passes Adventure/source-version metadata into logs. | Recheck when Game Master route input or turn orchestration changes. |
-| `src/features/play/world-client.tsx` | Sends `adventureId` for turns and debug mutations, shows Adventure/source WorldVersion in debug state, and reloads snapshot/feed from selected Adventure state. | Recheck when UI state identity changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts`, `src/features/play/use-location-debug-saves.ts` | Send `adventureId` for turns and debug mutations, show Adventure/source WorldVersion in debug state, flush debug saves before turns/navigation, and reload snapshot/feed from selected Adventure state. | Recheck when UI state identity changes. |
 | `src/lib/director/types.ts`, `src/lib/director/prompt.ts`, `src/lib/director/debug-log.ts`, `src/lib/director/turn-errors.ts` | Carry Adventure/source-version identity through prompts, summaries, logs, and user-facing load errors. | Recheck when prompt/log/error contracts change. |
 
 #### Verified By
@@ -170,6 +170,7 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 | R1-S1, R1-S2, R2-S1 | `npm run test -- src/app/api/director/turn/route.test.ts src/lib/director/director.test.ts`; `npm run test` | Route/unit contracts use `adventureId`, Adventure load errors are structured, and prompt/debug summaries include Adventure/source-version metadata. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run typecheck`; `npm run convex:once` | TypeScript and Convex generated schema/functions accept Adventure-scoped runtime contracts. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run e2e`; `npm run ci:required` | Browser playtest and required CI pass with Adventure-scoped story turns, debug state, reload behavior, and reset/delete flows. | Passing |
+| R1-S1, R1-S2, R2-S1 | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after architecture extraction | Browser playtest, Convex compile, and required CI pass with extracted Adventure landing, debug save hooks, snapshot read model, Game Master context model, and turn persistence helpers. | Passing |
 
 #### Verification Gaps
 

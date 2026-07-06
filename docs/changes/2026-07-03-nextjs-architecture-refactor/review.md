@@ -2,24 +2,24 @@
 
 ## Verdict
 
-changes-requested
+changes-requested; apply follow-up addressed listed findings and a fresh `/sdd-review` is still required before merge readiness
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | findings | `tasks.md` still describes the change as applying with open implementation, verification, review, and closeout work. |
-| Epic truth | findings | LC-001 and LC-002 implementation maps were updated for the completed slice, but the task ledger still marks stale implementation-path reconciliation and scenario-mapped verification as pending. |
-| Requirements and Scenarios | findings | Completed slice behavior is verified, but Workstream 2 and Workstream 4 scenarios remain incomplete by the active task ledger. |
-| Story reference traceability | findings | Story labels remain stable; final traceability is pending until remaining implementation-path and verification-map tasks are reconciled. |
+| Change artifacts | addressed after review | Apply follow-up updated `tasks.md` to implementation-complete state; fresh review still pending. |
+| Epic truth | addressed after review | LC-001 and LC-002 implementation and evidence maps now include the completed client and Convex helper splits. |
+| Requirements and Scenarios | addressed after review | Workstream 2 and Workstream 4 scenarios are checked complete after apply follow-up. |
+| Story reference traceability | addressed after review | Story labels remain stable and implementation paths were reconciled. |
 | Tests and verification | pass | `npm run ci:required` and `npm run e2e` passed during review after a timer typing fix. |
 | Manual UI confirmation | findings | Manual UI confirmation remains `pending Taylor`; latest turn-control polish also needs manual confirmation if kept in this change. |
 | Code review | findings | A TypeScript timer mismatch was fixed during review. Remaining source repo dirty files must be committed or explicitly split before readiness. |
 | Visual / UX consistency | findings | Latest turn-control styling is coherent with the app direction, but it is broader than the architecture-refactor design's behavior-preserving scope. |
 | Security review | pass | No new auth, secret, provider, persistence, or network exposure was added by the latest UI edits; existing server-only route split still keeps provider flow server-side. |
-| Documentation | findings | Architecture docs and README match the completed slice, but the active ledger still marks broader doc/evidence reconciliation pending. |
+| Documentation | addressed after review | Architecture docs, ADR status, Epic maps, and active ledger were reconciled after apply follow-up. |
 | Changelog | pass | No changelog entry required for the architecture slice; latest UI polish is local MVP interaction polish and should not be release-noted unless retained as user-facing release scope. |
-| Branch and merge readiness | findings | `develop...change/nextjs-architecture-refactor` conflict check is clean, but the app working tree is dirty and the active change remains incomplete. |
+| Branch and merge readiness | pending fresh review | Implementation is complete after apply follow-up; commit and fresh `/sdd-review` remain before merge readiness. |
 | PRD alignment | not applicable | No product-direction drift requiring PRD update was identified in this review pass. |
 
 ## Findings
@@ -30,15 +30,19 @@ changes-requested
 
 ### REQUIRED
 
-- [ ] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:46` - Workstream 2 remains incomplete: debug tab separation and turn/debug autosave hook ownership are still unchecked. Recommendation: continue `/sdd-apply` for the remaining client decomposition work or replan the active change to explicitly defer the remaining scenarios.
-- [ ] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:65` - Workstream 4 remains incomplete beyond baseline extraction; snapshot/context and turn-persistence capability splits are still unchecked. Recommendation: complete those Convex capability slices or explicitly narrow/defer them in the change artifacts.
+- [x] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:46` - Workstream 2 remains incomplete: debug tab separation and turn/debug autosave hook ownership are still unchecked. Recommendation: continue `/sdd-apply` for the remaining client decomposition work or replan the active change to explicitly defer the remaining scenarios.
+  - 2026-07-05 apply update: extracted Adventure landing, debug shell/tab mechanics, NPC autosave, and Location save workflows; reran `npm run ci:required` and `npm run e2e`.
+- [x] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:65` - Workstream 4 remains incomplete beyond baseline extraction; snapshot/context and turn-persistence capability splits are still unchecked. Recommendation: complete those Convex capability slices or explicitly narrow/defer them in the change artifacts.
+  - 2026-07-05 apply update: extracted snapshot read model, Game Master context read model, transcript context read model, and turn-persistence accepted-update helpers; reran `npm run ci:required`, `npm run convex:once`, and `npm run e2e`.
 - [x] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:82` - Scenario-mapped Epic `Verified By` updates remain pending. Recommendation: update LC-001 and LC-002 evidence maps so they cite the completed slice and current file paths rather than relying only on the chronological task ledger.
   - 2026-07-05 update: LC-001-S1 and LC-001-S5 now cite `src/features/play/turn-action-panel.tsx` and 2026-07-05 `npm run ci:required` / `npm run e2e` evidence for the extracted Act/Pass/input path. Broader Epic evidence cleanup remains tied to unfinished workstreams.
+  - 2026-07-05 apply update: LC-001 and LC-002 now cite the extracted play feature files and Convex helper modules for the completed Workstream 2 and Workstream 4 slices.
 - [x] `docs/changes/2026-07-03-nextjs-architecture-refactor/tasks.md:150` - Manual UI confirmation is still `pending Taylor`, and the latest turn-control UI polish changed visible interaction behavior after that walkthrough was written. Recommendation: update the walkthrough to include the Act expansion, close animation, Pass hover behavior, and response-area sizing, then record Taylor confirmation or an accepted gap.
   - 2026-07-05 update: the manual UI checklist now includes Act expansion, close animation, response-area size/alignment, and Pass hover behavior. Status remains pending Taylor.
 - [x] `docs/changes/2026-07-03-nextjs-architecture-refactor/design.md:37` and `src/features/play/world-client.tsx:873` - The uncommitted Act/Pass/input animation polish is broader than the architecture refactor design's stated non-goal of avoiding broad styling changes. Recommendation: either commit it under a separate UI-polish change or replan this change to include the approved interaction polish explicitly.
   - 2026-07-05 update: proposal/design now record explicitly approved turn-control polish as part of Workstream 2 extraction, without changing the product model.
-- [ ] `src/features/play/world-client.tsx:914` - The app source repo has uncommitted implementation changes in `src/app/globals.css` and `src/features/play/world-client.tsx`. Recommendation: commit the verified UI polish in the correct change scope before treating the branch as merge-ready.
+- [x] `src/features/play/world-client.tsx:914` - The app source repo has uncommitted implementation changes in `src/app/globals.css` and `src/features/play/world-client.tsx`. Recommendation: commit the verified UI polish in the correct change scope before treating the branch as merge-ready.
+  - 2026-07-05 apply update: pending commit from this apply run includes the extracted client and Convex helper slices; final merge readiness still requires a fresh `/sdd-review`.
 
 ### SUGGESTION
 
@@ -91,3 +95,4 @@ changes-requested
 ## Review Log
 
 - 2026-07-05: Review created. Fixed `setTimeout` typing issue, reran `npm run ci:required`, reran `npm run e2e`, and recorded required findings for incomplete workstreams, pending evidence, pending manual confirmation, scope drift, and dirty app files.
+- 2026-07-05: Apply follow-up completed Workstream 2 and Workstream 4, updated LC-001/LC-002 maps, accepted the ADR, reran `npm run ci:required`, `npm run convex:once`, and `npm run e2e`, and left final readiness to a fresh `/sdd-review`.

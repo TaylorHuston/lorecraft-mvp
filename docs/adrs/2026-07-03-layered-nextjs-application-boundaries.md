@@ -1,6 +1,6 @@
 # ADR: Layered Next.js Application Boundaries
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-03
 - Related change: `docs/changes/2026-07-03-nextjs-architecture-refactor/`
 - Related Epics / Stories: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`; `docs/epics/lc-002-world-adventure-model/epic.md`
@@ -9,9 +9,9 @@
 
 Lorecraft's MVP has proven the Game Master loop, World/Adventure copies, story-visible turn context, Pass turns, NPC state mutation, Location Cards, and debug surfaces. The implementation now concentrates too much behavior in a few files:
 
-- `src/app/world-client.tsx` combines route UI, story UI, turn submission, Adventure management, debug editing, autosave queues, display helpers, and Convex hook usage.
+- `src/features/play/world-client.tsx` previously combined story UI, turn submission, Adventure management, debug editing, autosave queues, display helpers, and Convex hook usage.
 - `src/app/api/director/turn/route.ts` combines HTTP concerns, local route guarding, Convex setup, Game Master orchestration, provider calls, parsing, persistence, extraction, movement validation, logging, and response shaping.
-- `convex/world.ts` combines seed data, Adventure lifecycle, snapshot construction, Game Master context, turn persistence, reset behavior, debug editing, and cleanup helpers.
+- `convex/world.ts` previously combined seed data, Adventure lifecycle, snapshot construction, Game Master context, turn persistence, reset behavior, debug editing, and cleanup helpers.
 
 Next.js 16 App Router guidance and Lorecraft's local developer guide both favor thin route files, Server Components by default, small Client Component boundaries, route handlers for server-only API work, and durable application behavior outside React components. Lorecraft also needs to preserve a clean backend boundary for future clients such as mobile, scripts, debug tooling, or a World Builder.
 
@@ -57,6 +57,7 @@ Lorecraft SHALL use layered Next.js application boundaries:
 - Negative: Some temporary wrapper modules may exist to preserve Convex generated API stability while internals move.
 - Negative: Over-splitting could make the app harder to follow; implementation must split by capability, not by arbitrary line count.
 - Follow-up: After implementation, update `docs/architecture.md`, README project structure, and Epic `Implemented By` maps.
+- Accepted implementation: route files, the Game Master route adapter, the play feature UI, debug save workflows, Stormbound baseline builder, snapshot/context assembly, and turn-persistence helpers have been split while preserving the public route and Convex API contracts.
 
 ## Validation
 

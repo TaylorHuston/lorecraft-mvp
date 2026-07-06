@@ -12,29 +12,26 @@ import { internal } from "./_generated/api";
 import {
   DEFAULT_ADVENTURE_SLUG,
   NPC_PROFILE_FACT_KEYS_FOR_WRITE,
-  PLAYER_KEY,
   SEEDED_NPCS,
   SEEDED_ROOMS,
   WORLD_SLUG,
   buildStormboundBaseline,
   type AdventureBaseline,
 } from "../src/lib/world/stormbound-baseline";
+import {
+  loadSnapshotReadModel,
+} from "../src/lib/world/convex-snapshot-read-model";
+import {
+  loadDirectorContextReadModel,
+  loadTranscriptDirectorContextReadModel,
+} from "../src/lib/world/convex-director-context";
+import {
+  applyAcceptedActorMoves as applyAcceptedActorMovesToTurn,
+  applyAcceptedNpcUpdates as applyAcceptedNpcUpdatesToTurn,
+  type FactValue,
+} from "../src/lib/world/convex-turn-persistence";
 
-type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
-type AcceptedNpcUpdateForWrite = {
-  actorKey: string;
-  actorName: string;
-  reason: string;
-  changes: Array<{ key: "mood" | "status" | "memory"; value: string }>;
-};
-type AcceptedActorMoveForWrite = {
-  actorKey: string;
-  actorName: string;
-  toLocationKey: string;
-  toLocationName: string;
-  reason: string;
-};
 type DebugLocationWriteResult = {
   ok: boolean;
   error?: string;
@@ -152,10 +149,6 @@ function actorSubjectId(actorKey: string) {
 
 function objectSubjectId(objectId: Id<"worldObjects">) {
   return `object:${objectId}`;
-}
-
-function roomSubjectId(roomKey: string) {
-  return `room:${roomKey}`;
 }
 
 function slugify(input: string) {
@@ -469,135 +462,6 @@ async function copyBaselineRuntimeRows(
     text: args.baseline.initialNarration,
     source: "seed",
   });
-}
-
-async function applyAcceptedNpcUpdates(
-  ctx: MutationCtx,
-  args: {
-    worldId: Id<"worlds">;
-    adventureId: Id<"adventures">;
-    turnId: Id<"turns">;
-    commandId?: Id<"commands">;
-    acceptedUpdates: AcceptedNpcUpdateForWrite[];
-  },
-) {
-  let changedFacts = 0;
-  const operations: Array<
-    | {
-        op: "setFact";
-        subjectType: string;
-        subjectId: string;
-        key: string;
-        value: FactValue;
-      }
-    | { op: "appendEvent"; text: string }
-  > = [];
-
-  for (const update of args.acceptedUpdates) {
-    const subjectId = actorSubjectId(update.actorKey);
-    for (const change of update.changes) {
-      await setFact(ctx, {
-        worldId: args.worldId,
-        adventureId: args.adventureId,
-        subjectType: "actor",
-        subjectId,
-        key: change.key,
-        value: change.value,
-        source: "llm",
-        overwrite: true,
-      });
-      changedFacts += 1;
-      operations.push({
-        op: "setFact",
-        subjectType: "actor",
-        subjectId,
-        key: change.key,
-        value: change.value,
-      });
-    }
-
-    const changedKeys = update.changes.map((change) => change.key).join(", ");
-    const eventText = `${update.actorName}'s ${changedKeys} changed after the exchange.`;
-    await ctx.db.insert("events", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      text: eventText,
-      source: "llm",
-    });
-    operations.push({ op: "appendEvent", text: eventText });
-  }
-
-  if (operations.length > 0) {
-    await ctx.db.insert("stateDiffs", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      source: "llm",
-      operations,
-    });
-  }
-
-  return changedFacts;
-}
-
-async function applyAcceptedActorMoves(
-  ctx: MutationCtx,
-  args: {
-    worldId: Id<"worlds">;
-    adventureId: Id<"adventures">;
-    turnId: Id<"turns">;
-    commandId?: Id<"commands">;
-    acceptedMoves: AcceptedActorMoveForWrite[];
-  },
-) {
-  if (args.acceptedMoves.length === 0) {
-    return 0;
-  }
-
-  const adventure = await ctx.db.get(args.adventureId);
-  const player = adventure?.currentPlayerActorId
-    ? await ctx.db.get(adventure.currentPlayerActorId)
-    : null;
-  const currentRoomId = player?.roomId;
-  const operations: Array<{ op: "moveActor"; actorId: Id<"actors">; toRoomId: Id<"rooms"> }> = [];
-
-  if (!currentRoomId) {
-    return 0;
-  }
-
-  for (const move of args.acceptedMoves) {
-    const actor = await findActorByKeyOrName(ctx, args.adventureId, move.actorKey, move.actorName);
-    const toRoom = await findRoomByKey(ctx, args.adventureId, move.toLocationKey);
-
-    if (
-      !actor ||
-      !toRoom ||
-      actor.adventureId !== args.adventureId ||
-      toRoom.adventureId !== args.adventureId ||
-      actor.roomId !== currentRoomId
-    ) {
-      continue;
-    }
-
-    await ctx.db.patch(actor._id, { roomId: toRoom._id });
-    operations.push({ op: "moveActor", actorId: actor._id, toRoomId: toRoom._id });
-  }
-
-  if (operations.length > 0) {
-    await ctx.db.insert("stateDiffs", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      source: "llm",
-      operations,
-    });
-  }
-
-  return operations.length;
 }
 
 async function deleteActorFactByKey(
@@ -1079,164 +943,11 @@ export const getSnapshot = query({
       return null;
     }
 
-    const { adventure, world, worldVersion, player, room } = loaded;
-    const includeDebugState = debugSnapshotDataEnabled();
-    const [
-      exits,
-      actors,
-      objects,
-      facts,
-      events,
-      narrations,
-      diffs,
-      directorCalls,
-      turns,
-      feed,
-      locations,
-    ] =
-      await Promise.all([
-        loadVisibleExits(ctx, args.adventureId, room._id),
-        ctx.db
-          .query("actors")
-          .withIndex("by_adventureId_and_roomId", (q) =>
-            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-          )
-          .take(20),
-        ctx.db
-          .query("worldObjects")
-          .withIndex("by_adventureId_and_roomId", (q) =>
-            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-          )
-          .take(30),
-        ctx.db
-          .query("facts")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(80),
-        ctx.db
-          .query("events")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(30),
-        ctx.db
-          .query("narrations")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(30),
-        ctx.db
-          .query("stateDiffs")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(12),
-        ctx.db
-          .query("directorCalls")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(10),
-        loadTurnSummaries(ctx, args.adventureId, 12),
-        loadFeed(ctx, args.adventureId, 60),
-        loadLocationSummaries(ctx, args.adventureId),
-      ]);
-
-    return {
-      adventure: {
-        _id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        _id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        _id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      player: {
-        _id: player._id,
-        key: stableActorKey(player),
-        name: player.name,
-        roomId: player.roomId,
-      },
-      room: {
-        _id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-      },
-      locations,
-      exits: exits.map((exit) => ({
-        _id: exit._id,
-        label: exit.label,
-        toRoomName: exit.toRoomName,
-      })),
-      actors: actors.map((actor) => ({
-        _id: actor._id,
-        key: stableActorKey(actor),
-        name: actor.name,
-        description: actor.description,
-        role: actor.role,
-      })),
-      objects: objects
-        .filter((object) => object.visible)
-        .map((object) => ({
-          _id: object._id,
-          key: object.key,
-          name: object.name,
-          description: object.description,
-        })),
-      facts: includeDebugState
-        ? facts.map((fact) => ({
-            _id: fact._id,
-            subjectType: fact.subjectType,
-            subjectId: fact.subjectId,
-            key: fact.key,
-            value: fact.value,
-            source: fact.source,
-          }))
-        : [],
-      feed,
-      events: events.map((event) => ({
-        _id: event._id,
-        text: event.text,
-        source: event.source,
-      })),
-      narrations: narrations.map((narration) => ({
-        _id: narration._id,
-        text: narration.text,
-        source: narration.source,
-      })),
-      diffs: includeDebugState
-        ? diffs.map((diff) => ({
-            _id: diff._id,
-            ...(diff.turnId ? { turnId: diff.turnId } : {}),
-            source: diff.source,
-            operations: diff.operations,
-          }))
-        : [],
-      turns,
-      directorCalls: includeDebugState
-        ? directorCalls.map((call) => ({
-            _id: call._id,
-            _creationTime: call._creationTime,
-            ...(call.turnId ? { turnId: call.turnId } : {}),
-            provider: call.provider,
-            model: call.model,
-            requestSummary: call.requestSummary,
-            status: call.status,
-            acceptedUpdates: call.acceptedUpdates,
-            ignoredUpdates: call.ignoredUpdates,
-            ...(call.commandId ? { commandId: call.commandId } : {}),
-            ...(call.rawRequest !== undefined ? { rawRequest: call.rawRequest } : {}),
-            ...(call.rawResponse !== undefined ? { rawResponse: call.rawResponse } : {}),
-            ...(call.parsedResponse !== undefined ? { parsedResponse: call.parsedResponse } : {}),
-            ...(call.error !== undefined ? { error: call.error } : {}),
-          }))
-        : [],
-    };
+    return await loadSnapshotReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+      includeDebugState: debugSnapshotDataEnabled(),
+    });
   },
 });
 
@@ -1325,122 +1036,10 @@ export const getDirectorContext = query({
       return null;
     }
 
-    const { adventure, world, worldVersion, player, room } = loaded;
-    const [exits, actors, objects, facts, recentFeed, storyVisibleHistory, allRooms] = await Promise.all([
-      loadVisibleExits(ctx, args.adventureId, room._id),
-      ctx.db
-        .query("actors")
-        .withIndex("by_adventureId_and_roomId", (q) =>
-          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-        )
-        .take(20),
-      ctx.db
-        .query("worldObjects")
-        .withIndex("by_adventureId_and_roomId", (q) =>
-          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-        )
-        .take(30),
-      ctx.db
-        .query("facts")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-      loadFeed(ctx, args.adventureId, 20),
-      loadStoryVisibleHistory(ctx, args.adventureId, 20),
-      ctx.db
-        .query("rooms")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-    ]);
-    const visibleObjects = objects
-      .filter((object) => object.visible)
-      .map((object) => ({
-        key: object.key,
-        name: object.name,
-        description: object.description,
-      }));
-    const actorSummaries = actors.map((actor) => ({
-      key: stableActorKey(actor),
-      name: actor.name,
-      role: actor.role,
-    }));
-
-    return {
-      adventure: {
-        id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      player: {
-        id: player._id,
-        key: stableActorKey(player),
-        name: player.name,
-      },
-      room: {
-        id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-      },
-      exits: exits.map((exit) => ({ label: exit.label, toRoomName: exit.toRoomName })),
-      actors: actors.map((actor) => {
-        const actorKey = stableActorKey(actor);
-        return {
-          id: actor._id,
-          key: actorKey,
-          name: actor.name,
-          role: actor.role,
-          description: actor.description,
-          locationKey: room.key,
-          facts: facts
-            .filter((fact) => fact.subjectId === actorSubjectId(actorKey))
-            .map((fact) => ({
-              key: fact.key,
-              value: fact.value,
-              source: fact.source,
-            })),
-        };
-      }),
-      objects: visibleObjects,
-      locationCard: {
-        id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-        facts: facts
-          .filter((fact) => fact.subjectId === roomSubjectId(room.key))
-          .map((fact) => ({
-            key: fact.key,
-            value: fact.value,
-            source: fact.source,
-          })),
-        visibleObjects,
-        visibleExits: exits.map((exit) => ({
-          label: exit.label,
-          toLocationKey: exit.toRoomKey,
-          toLocationName: exit.toRoomName,
-        })),
-        presentActors: actorSummaries,
-      },
-      knownLocations: allRooms.map((knownRoom) => ({
-        id: knownRoom._id,
-        key: knownRoom.key,
-        name: knownRoom.name,
-        description: knownRoom.description,
-      })),
-      recentFeed,
-      storyVisibleHistory,
-    };
+    return await loadDirectorContextReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+    });
   },
 });
 
@@ -1474,62 +1073,10 @@ export const getTranscriptDirectorContext = query({
     if (!loaded) {
       return null;
     }
-    const { adventure, world, worldVersion } = loaded;
-
-    const [chapel, player, actors, objects, transcript] = await Promise.all([
-      findRoomByKey(ctx, args.adventureId, "chapel"),
-      findActorByKeyOrName(ctx, args.adventureId, PLAYER_KEY, "Taylor"),
-      ctx.db
-        .query("actors")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-      ctx.db
-        .query("worldObjects")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(30),
-      loadTranscript(ctx, args.adventureId, 40),
-    ]);
-    const startingNpcs = actors
-      .filter((actor) => actor.role === "npc")
-      .map((actor) => `Starting NPC: ${actor.name}. ${actor.description}`);
-
-    const initialSeed = [
-      `${world.name}: ${world.description}`,
-      chapel
-        ? `Opening scene: ${chapel.description}`
-        : "Opening scene: You begin in the Stormbound Chapel as rain lashes the old building.",
-      player ? `Player: ${player.name}. ${player.description}` : "Player: Taylor, the playtester.",
-      ...startingNpcs,
-      objects.length > 0
-        ? `Opening details: ${objects
-            .filter((object) => object.visible)
-            .map((object) => `${object.name}: ${object.description}`)
-            .join("; ")}`
-        : undefined,
-    ]
-      .filter((line): line is string => Boolean(line))
-      .join("\n");
-
-    return {
-      adventure: {
-        id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      initialSeed,
-      transcript,
-    };
+    return await loadTranscriptDirectorContextReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+    });
   },
 });
 
@@ -1743,13 +1290,17 @@ export const completeDirectorTurn = mutation({
       return { directorCallId, narrationId, changedFacts: 0 };
     }
 
-    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedUpdates: args.acceptedUpdates,
-    });
+    const changedFacts = await applyAcceptedNpcUpdatesToTurn(
+      ctx,
+      { setFact, actorSubjectId },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedUpdates: args.acceptedUpdates,
+      },
+    );
 
     await ctx.db.patch(args.turnId, { status: "succeeded", completedAt: Date.now() });
 
@@ -1821,20 +1372,28 @@ export const recordNpcStateExtraction = mutation({
       return { directorCallId, changedFacts: 0, movedActors: 0 };
     }
 
-    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedUpdates: args.acceptedUpdates,
-    });
-    const movedActors = await applyAcceptedActorMoves(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedMoves: args.acceptedMoves ?? [],
-    });
+    const changedFacts = await applyAcceptedNpcUpdatesToTurn(
+      ctx,
+      { setFact, actorSubjectId },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedUpdates: args.acceptedUpdates,
+      },
+    );
+    const movedActors = await applyAcceptedActorMovesToTurn(
+      ctx,
+      { findActorByKeyOrName, findRoomByKey },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedMoves: args.acceptedMoves ?? [],
+      },
+    );
 
     return { directorCallId, changedFacts, movedActors };
   },
@@ -2323,254 +1882,6 @@ async function loadCurrentAdventure(ctx: QueryCtx, adventureId: Id<"adventures">
   }
 
   return { adventure, world, worldVersion, player, room };
-}
-
-async function loadVisibleExits(ctx: QueryCtx, adventureId: Id<"adventures">, roomId: Id<"rooms">) {
-  const exits = await ctx.db
-    .query("exits")
-    .withIndex("by_adventureId_and_fromRoomId", (q) =>
-      q.eq("adventureId", adventureId).eq("fromRoomId", roomId),
-    )
-    .take(20);
-
-  return await Promise.all(
-    exits
-      .filter((exit) => exit.visible)
-      .map(async (exit) => {
-        const toRoom = await ctx.db.get(exit.toRoomId);
-        return {
-          _id: exit._id,
-          label: exit.label,
-          toRoomKey: toRoom?.key ?? "unknown",
-          toRoomName: toRoom?.name ?? "Unknown",
-        };
-      }),
-  );
-}
-
-async function loadLocationSummaries(ctx: QueryCtx, adventureId: Id<"adventures">) {
-  const [rooms, actors, objects, exits] = await Promise.all([
-    ctx.db
-      .query("rooms")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("actors")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("worldObjects")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("exits")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-  ]);
-  const roomsById = new Map(rooms.map((room) => [room._id, room]));
-
-  return rooms.map((room) => ({
-    _id: room._id,
-    key: room.key,
-    name: room.name,
-    description: room.description,
-    actors: actors
-      .filter((actor) => actor.roomId === room._id)
-      .map((actor) => ({
-        _id: actor._id,
-        key: stableActorKey(actor),
-        name: actor.name,
-        description: actor.description,
-        role: actor.role,
-      })),
-    objects: objects
-      .filter((object) => object.roomId === room._id && object.visible)
-      .map((object) => ({ key: object.key, name: object.name })),
-    exits: exits
-      .filter((exit) => exit.fromRoomId === room._id && exit.visible)
-      .map((exit) => {
-        const toRoom = roomsById.get(exit.toRoomId);
-        return {
-          label: exit.label,
-          toLocationKey: toRoom?.key ?? "unknown",
-          toLocationName: toRoom?.name ?? "Unknown",
-        };
-      }),
-  }));
-}
-
-async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const [commands, narrations, events] = await Promise.all([
-    ctx.db
-      .query("commands")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("narrations")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("events")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-  ]);
-
-  return [
-    ...commands.map((command) => ({
-      id: `command:${command._id}`,
-      kind: "player" as const,
-      text: command.input,
-      source: "player",
-      createdAt: command._creationTime,
-      ...(command.turnId ? { turnId: command.turnId } : {}),
-      commandId: command._id,
-    })),
-    ...narrations.map((narration) => ({
-      id: `narration:${narration._id}`,
-      kind: "director" as const,
-      text: narration.text,
-      source: narration.source,
-      createdAt: narration._creationTime,
-      ...(narration.turnId ? { turnId: narration.turnId } : {}),
-      ...(narration.commandId ? { commandId: narration.commandId } : {}),
-    })),
-    ...events.map((event) => ({
-      id: `event:${event._id}`,
-      kind: "event" as const,
-      text: event.text,
-      source: event.source,
-      createdAt: event._creationTime,
-      ...(event.turnId ? { turnId: event.turnId } : {}),
-      ...(event.commandId ? { commandId: event.commandId } : {}),
-    })),
-  ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadStoryVisibleHistory(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const narrations = await ctx.db
-    .query("narrations")
-    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-    .order("desc")
-    .take(limit);
-  const turnIds = [...new Set(narrations.flatMap((narration) => (narration.turnId ? [narration.turnId] : [])))];
-  const turns = await Promise.all(turnIds.map((turnId) => ctx.db.get(turnId)));
-  const successfulTurnIds = new Set(
-    turns
-      .filter((turn): turn is NonNullable<typeof turn> => turn?.status === "succeeded")
-      .map((turn) => turn._id),
-  );
-
-  return narrations
-    .filter((narration) => narration.source === "seed" || !narration.turnId || successfulTurnIds.has(narration.turnId))
-    .map((narration) => ({
-      id: `narration:${narration._id}`,
-      kind: "director" as const,
-      text: narration.text,
-      source: narration.source,
-      createdAt: narration._creationTime,
-      ...(narration.turnId ? { turnId: narration.turnId } : {}),
-      ...(narration.commandId ? { commandId: narration.commandId } : {}),
-    }))
-    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadTranscript(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const [commands, narrations] = await Promise.all([
-    ctx.db
-      .query("commands")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("narrations")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-  ]);
-
-  return [
-    ...commands.map((command) => ({
-      id: `command:${command._id}`,
-      kind: "player" as const,
-      text: command.input,
-      source: "player",
-      createdAt: command._creationTime,
-      ...(command.turnId ? { turnId: command.turnId } : {}),
-      commandId: command._id,
-    })),
-    ...narrations
-      .filter((narration) => narration.source !== "seed")
-      .map((narration) => ({
-        id: `narration:${narration._id}`,
-        kind: "director" as const,
-        text: narration.text,
-        source: narration.source,
-        createdAt: narration._creationTime,
-        ...(narration.turnId ? { turnId: narration.turnId } : {}),
-        ...(narration.commandId ? { commandId: narration.commandId } : {}),
-      })),
-  ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const turns = await ctx.db
-    .query("turns")
-    .withIndex("by_adventureId_and_sequenceNumber", (q) => q.eq("adventureId", adventureId))
-    .order("desc")
-    .take(limit);
-
-  return await Promise.all(
-    turns.map(async (turn) => {
-      const [command, narrations, events, stateDiffs, directorCalls] = await Promise.all([
-        turn.commandId ? ctx.db.get(turn.commandId) : Promise.resolve(null),
-        ctx.db
-          .query("narrations")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("events")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("stateDiffs")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("directorCalls")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .order("desc")
-          .take(1),
-      ]);
-
-      return {
-        _id: turn._id,
-        _creationTime: turn._creationTime,
-        sequenceNumber: turn.sequenceNumber,
-        actorId: turn.actorId,
-        trigger: turn.trigger,
-        status: turn.status,
-        narrationCount: narrations.length,
-        eventCount: events.length,
-        stateDiffCount: stateDiffs.length,
-        ...(turn.commandId ? { commandId: turn.commandId } : {}),
-        ...(turn.error !== undefined ? { error: turn.error } : {}),
-        ...(turn.completedAt !== undefined ? { completedAt: turn.completedAt } : {}),
-        ...(command ? { playerInput: command.input } : {}),
-        ...(directorCalls[0] ? { directorCallStatus: directorCalls[0].status } : {}),
-      };
-    }),
-  );
 }
 
 async function deleteCommands(ctx: MutationCtx, adventureId: Id<"adventures">) {

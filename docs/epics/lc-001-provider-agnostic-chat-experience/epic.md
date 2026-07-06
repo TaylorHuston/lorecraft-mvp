@@ -150,10 +150,11 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/features/play/world-client.tsx` | renders the narrative-only split layout, owns the parent turn submission operation, shows persisted feed entries, and hosts the debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders the narrative-only split layout, owns the parent turn submission operation, and shows persisted feed entries. | Recheck when this Story changes or the listed path changes. |
 | `src/features/play/turn-action-panel.tsx` | renders the `What do you do?` decision surface, Act/Pass controls, Act-expanded textarea, close animation, pending placeholder, notice/error status, Enter-to-submit behavior, and Pass trigger. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/debug-panel-shell.tsx` | hosts the debug drawer shell and tab selection separately from the player story layout. | Recheck when debug drawer structure changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-turn-persistence.ts` | record player inputs for action turns, create commandless Pass turns, reconstruct the feed from `commands`, `narrations`, and `events`, and accept actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed paths change. |
 
 #### Verified By
 
@@ -166,6 +167,7 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
 | R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
 | R4-S0 through R4-S2 | `npm run ci:required` and `npm run e2e` on 2026-07-05 after `src/features/play/turn-action-panel.tsx` extraction | prove the extracted turn panel still opens Act input, submits Act with Enter, supports Pass, exposes pending/error state, and preserves the browser playtest path. | Recorded |
+| R4-S0 through R4-S2 | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after client and Convex helper extraction | prove the split play client, debug shell, autosave hooks, snapshot helpers, context helpers, and turn-persistence helpers preserve the deterministic browser playtest path. | Passing |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -1326,11 +1328,11 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `convex/world.ts` | exposes Location Card data through persistent Game Master context, debug snapshot location summaries, debug-gated location edit/create actions backed by internal mutations, validated actor movement persistence, session location/actor reset, and turn-scoped `moveActor` state diffs. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-turn-persistence.ts` | expose Location Card data through persistent Game Master context, debug snapshot location summaries, debug-gated location edit/create actions backed by internal mutations, validated actor movement persistence, session location/actor reset, and turn-scoped `moveActor` state diffs. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/prompt.ts` | renders current Location Card and Known Locations prompt sections in persistent mode while keeping transcript mode seed-plus-transcript only. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | parses state extraction output with `npcUpdates` and `actorMoves`, validates movement against current-scene actors, existing known locations, clear travel input, narration-confirmed arrival, and explicit NPC movement narration. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records validated actor moves through the post-narration extractor path and skips movement extraction in transcript mode. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx` | adds the debug `Locations` tab with canonical location inspection, edit, create, and actor/object/exit summaries. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-location-debug-saves.ts` | add the debug `Locations` tab with canonical location inspection, edit/create save workflow, flush-before-turn behavior, and actor/object/exit summaries. | Recheck when this Story changes or the listed paths change. |
 | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | cover deterministic fixture-backed movement in browser E2E. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1342,6 +1344,7 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 | R3-S1 through R3-S4 | `npm run e2e` | proves the debug `Locations` tab lists, edits, creates, and preserves stable keys for canonical locations. | Recorded |
 | R4-S1 through R4-S3 | `npm run e2e` | proves Reset Session restores seeded locations/actor positions, accepted movement creates turn-scoped debug evidence, and rejected unknown-location movement remains inspectable. | Recorded |
 | Supporting gate | `npm run ci:required` and `npx convex codegen` passed after location context, debug-gated writes, movement persistence, and review remediation. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after Workstream 2 and 4 extraction | prove the extracted Location debug save hook, snapshot read model, director context model, and turn persistence helpers preserve location editing, movement evidence, reset, and browser debug flows. | Passing |
 
 #### Verification Gaps
 
@@ -1427,10 +1430,10 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/lib/director/npc-profiles.ts` | derives read-only NPC profiles from current-scene actors and actor facts. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | seeds Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; it also exposes debug-gated canonical NPC create/update/reset actions, clears blank debug fact values, and caps debug-created NPC/location counts. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts` | seed Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; expose NPC context and debug snapshot data; and keep debug-gated canonical NPC write actions registered through Convex. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/prompt.ts` | renders `npcProfiles` into canonical `npcCards`, includes `conversationFocus`, `lastAction`, and `sceneDirective` as persistent-mode prompt components; records `npcProfileKeys` and `npcMutationMode: "bounded_updates"` in request summaries; and keeps read-only NPC cards/profiles higher priority than recent feed prose. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | reads canonical Convex NPC context for persistent Game Master turns and leaves transcript mode unchanged. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx` | adds a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flushes queued NPC autosaves before player turn submission; and cancels queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts` | add a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flush queued NPC autosaves before player turn submission; and cancel queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/director.test.ts` | covers persistent NPC profile prompt context, prompt priority/scene directive context, direct-NPC question targeting, canonical debug-created NPC context, transcript exclusion, and the bounded mutation boundary. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1442,6 +1445,7 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 | R3-S1 through R3-S4 | `npm run e2e` | proves the debug `NPCs` tab shows seeded NPCs, saves Mira description edits, clears editable knowledge, creates a current-location NPC, and restores/removes debug-created NPC state on Reset Session. | Recorded |
 | R3-S2 and R3-S4 | Focused director tests | prove canonical debug-created NPC context and direct/recent addressed NPC targeting reach the next persistent Game Master request. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run typecheck`, `npm run lint`, and `npx convex codegen` passed after NPC profile/debug write remediation. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after Workstream 2 and 4 extraction | prove the extracted NPC autosave hook, debug shell, snapshot read model, director context model, and turn persistence helpers preserve NPC debug editing, reset, turn submission flushing, and deterministic browser flows. | Passing |
 
 #### Verification Gaps
 
@@ -1584,7 +1588,7 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 | `src/lib/director/prompt.ts` | keeps persistent story generation plain-prose and adds `buildNpcStateExtractionRequest` for a second JSON-only extractor request using final narration, current input, current-scene NPC Cards, recent story, and the `mood` / `status` / `memory` allowlist. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | adds `parseNpcStateExtractionOutput` while reusing existing NPC update validation, actor allowlisting, field allowlisting, memory caps, and scene-beat persistence boundaries. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | runs extraction only after successful persistent narration, records story and extraction calls with `requestSummary.callRole`, skips extraction in transcript mode, and treats extractor failure as a debug-visible persistence miss rather than a failed story turn. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | adds `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-turn-persistence.ts` | add `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records. | Recheck when this Story changes or the listed paths change. |
 | `scripts/director-playtest.mjs` | verifies persistent mode now records both story-generation and NPC-state-extraction calls for each tested turn. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By

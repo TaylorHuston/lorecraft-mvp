@@ -1,7 +1,7 @@
 "use client";
 
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -10,13 +10,27 @@ import {
   directorUpdateItems,
   domId,
   errorMessage,
-  formatAdventureTimestamp,
   latestDirectorRequestSummary,
   summaryList,
   summaryText,
   turnSummaryItems,
 } from "./debug-formatters";
+import { AdventureLanding, type AdventureListItem } from "./adventure-landing";
+import { DebugActionButton, DebugPanelShell } from "./debug-panel-shell";
 import { TurnActionPanel } from "./turn-action-panel";
+import {
+  NPC_PROFILE_FACT_KEYS,
+  type NpcDebugActor,
+  type NpcDebugDraft,
+  type NpcDebugSavePayload,
+  type NpcSaveStatus,
+  useNpcDebugAutosave,
+} from "./use-npc-debug-autosave";
+import {
+  type LocationSaveStatus,
+  type NewLocationDraft,
+  useLocationDebugSaves,
+} from "./use-location-debug-saves";
 
 type DirectorTurnResponse =
   | {
@@ -35,55 +49,6 @@ type DirectorPromptGuidance = {
   npcBehavior: string;
   persistence: string;
 };
-
-type DebugTab = "prompt" | "npcs" | "locations" | "state";
-
-type NpcSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
-type NpcDebugDraft = {
-  name?: string;
-  description?: string;
-  facts?: Record<string, string>;
-};
-type NpcDebugSavePayload = {
-  name: string;
-  description: string;
-  facts: Record<string, string>;
-};
-type NpcDebugActor = {
-  _id: Id<"actors">;
-  key: string;
-  name: string;
-  description: string;
-  role: "npc";
-  locationKey: string;
-  locationName: string;
-};
-type NpcPendingSave = {
-  adventureId: Id<"adventures">;
-  actor: NpcDebugActor;
-  payload: NpcDebugSavePayload;
-  saveVersion: number;
-};
-type LocationSaveStatus = "idle" | "saving" | "saved" | "error";
-type AdventureListItem = {
-  _id: Id<"adventures">;
-  name: string;
-  worldName: string;
-  sourceVersionNumber: number;
-  currentLocationName?: string;
-  turnCount: number;
-  lastPlayedAt: number;
-};
-
-const NPC_PROFILE_FACT_KEYS = [
-  "background",
-  "persona",
-  "voice",
-  "mood",
-  "status",
-  "memory",
-  "knowledge",
-];
 
 const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
   style: "Grounded, concise prose with concrete sensory detail. Keep the scene moving.",
@@ -104,11 +69,6 @@ export function WorldClient({
   const createAdventure = useMutation(api.world.createAdventure);
   const deleteAdventure = useMutation(api.world.deleteAdventure);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
-  const updateLocation = useAction(api.world.updateLocation);
-  const createLocation = useAction(api.world.createLocation);
-  const updateNpc = useAction(api.world.updateNpc);
-  const createNpc = useAction(api.world.createNpc);
-  const resetNpc = useAction(api.world.resetNpc);
   const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(
     initialAdventureId,
   );
@@ -120,29 +80,10 @@ export function WorldClient({
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
-  const [debugTab, setDebugTab] = useState<DebugTab>("prompt");
-  const [npcDrafts, setNpcDrafts] = useState<Record<string, NpcDebugDraft>>({});
-  const [npcSaveStatus, setNpcSaveStatus] = useState<
-    Record<string, NpcSaveStatus>
-  >({});
-  const [collapsedNpcKeys, setCollapsedNpcKeys] = useState<Record<string, boolean>>({});
-  const [savingNpcKey, setSavingNpcKey] = useState<string | null>(null);
-  const [locationSaveStatus, setLocationSaveStatus] = useState<Record<string, LocationSaveStatus>>({});
-  const [newLocation, setNewLocation] = useState({
-    key: "",
-    name: "",
-    description: "",
-  });
   const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
-  const npcSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const npcSaveVersions = useRef<Record<string, number>>({});
-  const npcPendingSaves = useRef<Record<string, NpcPendingSave>>({});
-  const npcActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
-  const locationActiveSaves = useRef<Record<string, Promise<boolean>[]>>({});
-  const nextDebugNpcOrdinal = useRef(1);
 
   const adventureId = selectedAdventureId;
   const isLoadingAdventures = selectedAdventureId === null && adventures === undefined;
@@ -152,6 +93,17 @@ export function WorldClient({
   const topBarWorldName = adventureId
     ? (snapshot?.world.name ?? "Loading world")
     : "Adventures";
+  const npcDebug = useNpcDebugAutosave({
+    adventureId,
+    locations: snapshot?.locations,
+    onError: setError,
+    onNotice: setNotice,
+  });
+  const locationDebug = useLocationDebugSaves({
+    adventureId,
+    onError: setError,
+    onNotice: setNotice,
+  });
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -163,31 +115,18 @@ export function WorldClient({
     storyScroller.scrollTop = storyScroller.scrollHeight;
   }, [feedLength, isSubmitting, error]);
 
-  useEffect(() => {
-    const timers = npcSaveTimers.current;
-    return () => {
-      for (const timer of Object.values(timers)) {
-        clearTimeout(timer);
-      }
-      npcPendingSaves.current = {};
-    };
-  }, []);
-
   async function handleSeed() {
     setError(null);
     setNotice(null);
     setIsSeeding(true);
     try {
-      await cancelQueuedNpcSavesAndWaitForActive();
-      await flushActiveLocationSaves();
+      await npcDebug.cancelQueuedSavesAndWaitForActive();
+      await locationDebug.flushActiveSaves();
       setError(null);
       const seededAdventureId = await seedWorld();
       setSelectedAdventureId(seededAdventureId);
       router.push(`/adventures/${seededAdventureId}`);
-      setNpcDrafts({});
-      setNpcSaveStatus({});
-      setCollapsedNpcKeys({});
-      setLocationSaveStatus({});
+      resetLocalDraftState();
       setNotice("Fresh Stormbound Chapel world seeded.");
     } catch (seedError) {
       setError(errorMessage(seedError));
@@ -248,18 +187,16 @@ export function WorldClient({
   async function handleReturnToAdventures() {
     setError(null);
     setNotice(null);
-    await flushQueuedNpcSaves();
-    await flushActiveLocationSaves();
+    await npcDebug.flushQueuedSaves();
+    await locationDebug.flushActiveSaves();
     setSelectedAdventureId(null);
     router.push("/");
     resetLocalDraftState();
   }
 
   function resetLocalDraftState() {
-    setNpcDrafts({});
-    setNpcSaveStatus({});
-    setCollapsedNpcKeys({});
-    setLocationSaveStatus({});
+    npcDebug.resetLocalState();
+    locationDebug.resetLocalState();
   }
 
   async function handleReset() {
@@ -271,14 +208,11 @@ export function WorldClient({
     setNotice(null);
     setIsResetting(true);
     try {
-      await cancelQueuedNpcSavesAndWaitForActive();
-      await flushActiveLocationSaves();
+      await npcDebug.cancelQueuedSavesAndWaitForActive();
+      await locationDebug.flushActiveSaves();
       setError(null);
       const result = await resetPlaytestWorld({ adventureId });
-      setNpcDrafts({});
-      setNpcSaveStatus({});
-      setCollapsedNpcKeys({});
-      setLocationSaveStatus({});
+      resetLocalDraftState();
       setNotice(
         `Reset playtest state: cleared ${result.deletedTurns} scoped turns, ${result.deletedCommands} player inputs, restored ${result.restoredFacts} NPC facts, removed ${result.deletedActors} debug NPCs, and reset ${result.resetActorLocations} actor locations.`,
       );
@@ -311,8 +245,8 @@ export function WorldClient({
     setNotice(null);
     setIsSubmitting(true);
     try {
-      const npcSavesFlushed = await flushQueuedNpcSaves();
-      const locationSavesFlushed = await flushActiveLocationSaves();
+      const npcSavesFlushed = await npcDebug.flushQueuedSaves();
+      const locationSavesFlushed = await locationDebug.flushActiveSaves();
       if (!npcSavesFlushed || !locationSavesFlushed) {
         return false;
       }
@@ -340,308 +274,6 @@ export function WorldClient({
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  function updateNpcDraft(
-    actor: NpcDebugActor,
-    draft: NpcDebugDraft,
-    payload: NpcDebugSavePayload,
-  ) {
-    setNpcDrafts((current) => ({
-      ...current,
-      [actor.key]: draft,
-    }));
-    scheduleNpcSave(actor, payload);
-  }
-
-  async function addNpc() {
-    if (!adventureId) {
-      return;
-    }
-
-    const existingActorKeys = new Set(
-      snapshot?.locations.flatMap((location) => location.actors.map((actor) => actor.key)) ?? [],
-    );
-    let actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
-    while (existingActorKeys.has(actorKey)) {
-      nextDebugNpcOrdinal.current += 1;
-      actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
-    }
-    nextDebugNpcOrdinal.current += 1;
-    const payload = {
-      name: "New NPC",
-      description: "A temporary NPC for playtesting.",
-      facts: defaultNpcFacts(),
-    };
-
-    setError(null);
-    setNotice(null);
-    setSavingNpcKey(actorKey);
-    setNpcSaveStatus((current) => ({ ...current, [actorKey]: "saving" }));
-    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
-    try {
-      const result = await createNpc({
-        adventureId,
-        key: actorKey,
-        ...payload,
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Failed to create NPC.");
-        setNpcSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
-        return;
-      }
-      setNpcSaveStatus((current) => ({ ...current, [actorKey]: "saved" }));
-      setNotice("NPC created.");
-    } catch (createError) {
-      setError(errorMessage(createError));
-      setNpcSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
-    } finally {
-      setSavingNpcKey(null);
-    }
-  }
-
-  function toggleNpcCollapsed(actorKey: string) {
-    setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: !(current[actorKey] ?? true) }));
-  }
-
-  function scheduleNpcSave(actor: NpcDebugActor, payload: NpcDebugSavePayload) {
-    if (!adventureId) {
-      return;
-    }
-
-    npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
-    const saveVersion = npcSaveVersions.current[actor.key];
-    const saveAdventureId = adventureId;
-
-    setNpcSaveStatus((current) => ({ ...current, [actor.key]: "unsaved" }));
-    clearTimeout(npcSaveTimers.current[actor.key]);
-    npcPendingSaves.current[actor.key] = {
-      adventureId: saveAdventureId,
-      actor,
-      payload,
-      saveVersion,
-    };
-    npcSaveTimers.current[actor.key] = setTimeout(() => {
-      delete npcSaveTimers.current[actor.key];
-      delete npcPendingSaves.current[actor.key];
-      void startPersistNpc({ adventureId: saveAdventureId, actor, payload, saveVersion });
-    }, 700);
-  }
-
-  function startPersistNpc(pendingSave: NpcPendingSave) {
-    const savePromise = persistNpc(
-      pendingSave.adventureId,
-      pendingSave.actor,
-      pendingSave.payload,
-      pendingSave.saveVersion,
-    );
-    npcActiveSaves.current[pendingSave.actor.key] = [
-      ...(npcActiveSaves.current[pendingSave.actor.key] ?? []),
-      savePromise,
-    ];
-    void savePromise.finally(() => {
-      const remainingSaves = (npcActiveSaves.current[pendingSave.actor.key] ?? []).filter(
-        (activeSave) => activeSave !== savePromise,
-      );
-      if (remainingSaves.length > 0) {
-        npcActiveSaves.current[pendingSave.actor.key] = remainingSaves;
-      } else {
-        delete npcActiveSaves.current[pendingSave.actor.key];
-      }
-    });
-    return savePromise;
-  }
-
-  async function flushQueuedNpcSaves() {
-    const pendingSaves = Object.values(npcPendingSaves.current);
-    const flushedSaves = pendingSaves.map((pendingSave) => {
-      clearTimeout(npcSaveTimers.current[pendingSave.actor.key]);
-      delete npcSaveTimers.current[pendingSave.actor.key];
-      delete npcPendingSaves.current[pendingSave.actor.key];
-      return startPersistNpc(pendingSave);
-    });
-    const activeSaves = Object.values(npcActiveSaves.current).flat();
-    const results = await Promise.all([...flushedSaves, ...activeSaves]);
-    return results.every(Boolean);
-  }
-
-  async function cancelQueuedNpcSavesAndWaitForActive() {
-    const actorKeys = new Set([
-      ...Object.keys(npcSaveTimers.current),
-      ...Object.keys(npcPendingSaves.current),
-      ...Object.keys(npcActiveSaves.current),
-      ...Object.keys(npcSaveVersions.current),
-    ]);
-
-    for (const actorKey of actorKeys) {
-      clearTimeout(npcSaveTimers.current[actorKey]);
-      delete npcSaveTimers.current[actorKey];
-      delete npcPendingSaves.current[actorKey];
-      npcSaveVersions.current[actorKey] = (npcSaveVersions.current[actorKey] ?? 0) + 1;
-    }
-
-    await Promise.allSettled(Object.values(npcActiveSaves.current).flat());
-  }
-
-  async function persistNpc(
-    saveAdventureId: Id<"adventures">,
-    actor: NpcDebugActor,
-    payload: NpcDebugSavePayload,
-    saveVersion: number,
-  ): Promise<boolean> {
-    setError(null);
-    setSavingNpcKey(actor.key);
-    setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saving" }));
-    try {
-      const result = await updateNpc({
-        adventureId: saveAdventureId,
-        actorId: actor._id,
-        name: payload.name,
-        description: payload.description,
-        facts: payload.facts,
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Failed to save NPC.");
-        setNpcSaveStatus((current) => ({ ...current, [actor.key]: "error" }));
-        return false;
-      }
-
-      if (npcSaveVersions.current[actor.key] === saveVersion) {
-        setNpcSaveStatus((current) => ({ ...current, [actor.key]: "saved" }));
-      }
-      return true;
-    } catch (saveError) {
-      setError(errorMessage(saveError));
-      setNpcSaveStatus((current) => ({ ...current, [actor.key]: "error" }));
-      return false;
-    } finally {
-      if (npcSaveVersions.current[actor.key] === saveVersion) {
-        setSavingNpcKey(null);
-      }
-    }
-  }
-
-  async function resetNpcDebugActor(actor: NpcDebugActor) {
-    if (!adventureId) {
-      return;
-    }
-
-    setError(null);
-    setNotice(null);
-    setSavingNpcKey(actor.key);
-    clearTimeout(npcSaveTimers.current[actor.key]);
-    delete npcSaveTimers.current[actor.key];
-    delete npcPendingSaves.current[actor.key];
-    npcSaveVersions.current[actor.key] = (npcSaveVersions.current[actor.key] ?? 0) + 1;
-    try {
-      const result = await resetNpc({ adventureId, actorId: actor._id });
-      if (!result.ok) {
-        setError(result.error ?? "Failed to reset NPC.");
-        return;
-      }
-      setNpcDrafts((current) => {
-        const next = { ...current };
-        delete next[actor.key];
-        return next;
-      });
-      setNpcSaveStatus((current) => ({ ...current, [actor.key]: "idle" }));
-      setNotice(result.actorId ? "NPC reset." : "Debug NPC removed.");
-    } catch (resetError) {
-      setError(errorMessage(resetError));
-    } finally {
-      setSavingNpcKey(null);
-    }
-  }
-
-  async function saveLocation(
-    locationId: Id<"rooms">,
-    locationKey: string,
-    name: string,
-    description: string,
-  ): Promise<boolean> {
-    if (!adventureId) {
-      return false;
-    }
-
-    setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saving" }));
-    const savePromise = persistLocation(adventureId, locationId, locationKey, name, description);
-    locationActiveSaves.current[locationKey] = [
-      ...(locationActiveSaves.current[locationKey] ?? []),
-      savePromise,
-    ];
-    void savePromise.finally(() => {
-      const remainingSaves = (locationActiveSaves.current[locationKey] ?? []).filter(
-        (activeSave) => activeSave !== savePromise,
-      );
-      if (remainingSaves.length > 0) {
-        locationActiveSaves.current[locationKey] = remainingSaves;
-      } else {
-        delete locationActiveSaves.current[locationKey];
-      }
-    });
-    return savePromise;
-  }
-
-  async function persistLocation(
-    saveAdventureId: Id<"adventures">,
-    locationId: Id<"rooms">,
-    locationKey: string,
-    name: string,
-    description: string,
-  ): Promise<boolean> {
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await updateLocation({
-        adventureId: saveAdventureId,
-        locationId,
-        name,
-        description,
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Failed to save location.");
-        setLocationSaveStatus((current) => ({ ...current, [locationKey]: "error" }));
-        return false;
-      }
-      setLocationSaveStatus((current) => ({ ...current, [locationKey]: "saved" }));
-      setNotice("Location saved.");
-      return true;
-    } catch (saveError) {
-      setError(errorMessage(saveError));
-      setLocationSaveStatus((current) => ({ ...current, [locationKey]: "error" }));
-      return false;
-    }
-  }
-
-  async function flushActiveLocationSaves() {
-    const activeSaves = Object.values(locationActiveSaves.current).flat();
-    if (activeSaves.length === 0) {
-      return true;
-    }
-
-    const results = await Promise.all(activeSaves);
-    return results.every(Boolean);
-  }
-
-  async function handleCreateLocation() {
-    if (!adventureId) {
-      return;
-    }
-
-    setError(null);
-    setNotice(null);
-    const result = await createLocation({
-      adventureId,
-      key: newLocation.key,
-      name: newLocation.name,
-      description: newLocation.description,
-    });
-    if (!result.ok) {
-      setError(result.error ?? "Failed to create location.");
-      return;
-    }
-    setNewLocation({ key: "", name: "", description: "" });
-    setNotice("Location created.");
   }
 
   return (
@@ -774,279 +406,107 @@ export function WorldClient({
         </section>
 
         {adventureId ? (
-          <aside
-            id="debug-panel"
-            className={`fixed right-0 top-12 z-20 h-[calc(100vh-3rem)] w-full max-w-[600px] overflow-y-auto border-l border-zinc-800 bg-zinc-900/95 px-4 py-5 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-[600px] ${
-              isDebugPanelCollapsed
-                ? "pointer-events-none translate-x-full"
-                : "translate-x-0"
-            }`}
-            aria-hidden={isDebugPanelCollapsed}
-            inert={isDebugPanelCollapsed ? true : undefined}
-          >
-          <div
-            id="debug-panel-header"
-            className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col"
-          >
-            <div id="debug-panel-title-block">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-zinc-300">
-                Debug panel
-              </h2>
-              <p className="mt-2 text-xs leading-5 text-zinc-500">
-                Hidden Adventure state, Game Master calls, validation decisions, events, and state diffs.
+          <DebugPanelShell
+            isCollapsed={isDebugPanelCollapsed}
+            hasSnapshot={Boolean(snapshot)}
+            headerActions={
+              <>
+                <DebugActionButton
+                  id="fresh-seed-button"
+                  onClick={handleSeed}
+                  disabled={isSeeding || isResetting}
+                >
+                  {isSeeding ? "Resetting" : "Reset World"}
+                </DebugActionButton>
+                <DebugActionButton
+                  id="rough-reset-button"
+                  onClick={handleReset}
+                  disabled={!adventureId || isResetting || isSeeding}
+                  tone="danger"
+                >
+                  {isResetting ? "Resetting" : "Reset Session"}
+                </DebugActionButton>
+              </>
+            }
+            emptyState={
+              <p id="debug-panel-empty-state" className="mt-6 text-sm text-zinc-500">
+                Seed a world to inspect state.
               </p>
-            </div>
-            <div id="debug-panel-actions" className="flex flex-wrap gap-2">
-              <DebugActionButton
-                id="fresh-seed-button"
-                onClick={handleSeed}
-                disabled={isSeeding || isResetting}
-              >
-                {isSeeding ? "Resetting" : "Reset World"}
-              </DebugActionButton>
-              <DebugActionButton
-                id="rough-reset-button"
-                onClick={handleReset}
-                disabled={!adventureId || isResetting || isSeeding}
-                tone="danger"
-              >
-                {isResetting ? "Resetting" : "Reset Session"}
-              </DebugActionButton>
-            </div>
-          </div>
-
-          {snapshot ? (
-            <div id="debug-panel-content" className="mt-6 space-y-6">
-              <DebugTabs value={debugTab} onChange={setDebugTab} />
-              {debugTab === "prompt" ? (
-                <div
-                  id={debugTabPanelId("prompt")}
-                  role="tabpanel"
-                  aria-labelledby={debugTabId("prompt")}
-                >
-                  <DirectorPromptControls
-                    value={promptGuidance}
-                    onChange={setPromptGuidance}
-                    latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
-                  />
-                </div>
-              ) : null}
-              {debugTab === "npcs" ? (
-                <div
-                  id={debugTabPanelId("npcs")}
-                  role="tabpanel"
-                  aria-labelledby={debugTabId("npcs")}
-                >
-                  <NpcDebugPanel
-                    actors={buildNpcDebugActors(snapshot.locations)}
-                    facts={snapshot.facts}
-                    drafts={npcDrafts}
-                    saveStatus={npcSaveStatus}
-                    collapsedNpcKeys={collapsedNpcKeys}
-                    savingNpcKey={savingNpcKey}
-                    onAdd={addNpc}
-                    onChange={updateNpcDraft}
-                    onToggleCollapsed={toggleNpcCollapsed}
-                    onReset={resetNpcDebugActor}
-                  />
-                </div>
-              ) : null}
-              {debugTab === "locations" ? (
-                <div
-                  id={debugTabPanelId("locations")}
-                  role="tabpanel"
-                  aria-labelledby={debugTabId("locations")}
-                >
-                  <LocationDebugPanel
-                    locations={snapshot.locations}
-                    saveStatus={locationSaveStatus}
-                    newLocation={newLocation}
-                    onNewLocationChange={setNewLocation}
-                    onSave={saveLocation}
-                    onCreate={handleCreateLocation}
-                  />
-                </div>
-              ) : null}
-              {debugTab === "state" ? (
-                <div
-                  id={debugTabPanelId("state")}
-                  role="tabpanel"
-                  aria-labelledby={debugTabId("state")}
-                >
-                  <DebugList
-                    title="Scene"
-                    items={[
-                      `Adventure: ${snapshot.adventure.name} (${snapshot.adventure._id})`,
-                      `Source WorldVersion: v${snapshot.sourceWorldVersion.versionNumber} (${snapshot.sourceWorldVersion._id})`,
-                      `${snapshot.world.name} / ${snapshot.room.name}`,
-                      `Player: ${snapshot.player.name} (${snapshot.player.key})`,
-                      `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
-                      `Objects: ${snapshot.objects.map((object) => object.name).join(", ") || "none"}`,
-                    ]}
-                  />
-                  <DebugList
-                    title="Hidden facts"
-                    items={snapshot.facts.map(
-                      (fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`,
-                    )}
-                  />
-                  <DebugList
-                    title="State changes"
-                    items={directorUpdateItems(snapshot.directorCalls)}
-                  />
-                  <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
-                  <DebugList
-                    title="Events"
-                    items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
-                  />
-                  <DebugList
-                    title="Narrations"
-                    items={snapshot.narrations.map(
-                      (narration) => `${narration.text} (${narration.source})`,
-                    )}
-                  />
-                  <DebugJson title="Turns" value={snapshot.turns} />
-                  <DebugJson title="Game Master calls" value={snapshot.directorCalls} />
-                  <DebugJson title="State diffs" value={snapshot.diffs} />
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p id="debug-panel-empty-state" className="mt-6 text-sm text-zinc-500">
-              Seed a world to inspect state.
-            </p>
-          )}
-          </aside>
+            }
+            promptPanel={snapshot ? (
+              <DirectorPromptControls
+                value={promptGuidance}
+                onChange={setPromptGuidance}
+                latestSummary={latestDirectorRequestSummary(snapshot.directorCalls)}
+              />
+            ) : null}
+            npcsPanel={snapshot ? (
+              <NpcDebugPanel
+                actors={npcDebug.actors}
+                facts={snapshot.facts}
+                drafts={npcDebug.drafts}
+                saveStatus={npcDebug.saveStatus}
+                collapsedNpcKeys={npcDebug.collapsedNpcKeys}
+                savingNpcKey={npcDebug.savingNpcKey}
+                onAdd={npcDebug.addNpc}
+                onChange={npcDebug.updateDraft}
+                onToggleCollapsed={npcDebug.toggleCollapsed}
+                onReset={npcDebug.resetActor}
+              />
+            ) : null}
+            locationsPanel={snapshot ? (
+              <LocationDebugPanel
+                locations={snapshot.locations}
+                saveStatus={locationDebug.saveStatus}
+                newLocation={locationDebug.newLocation}
+                onNewLocationChange={locationDebug.setNewLocation}
+                onSave={locationDebug.saveLocation}
+                onCreate={locationDebug.createNewLocation}
+              />
+            ) : null}
+            statePanel={snapshot ? (
+              <div className="space-y-4">
+                <DebugList
+                  title="Scene"
+                  items={[
+                    `Adventure: ${snapshot.adventure.name} (${snapshot.adventure._id})`,
+                    `Source WorldVersion: v${snapshot.sourceWorldVersion.versionNumber} (${snapshot.sourceWorldVersion._id})`,
+                    `${snapshot.world.name} / ${snapshot.room.name}`,
+                    `Player: ${snapshot.player.name} (${snapshot.player.key})`,
+                    `Actors: ${snapshot.actors.map((actor) => `${actor.name} (${actor.key})`).join(", ")}`,
+                    `Objects: ${snapshot.objects.map((object) => object.name).join(", ") || "none"}`,
+                  ]}
+                />
+                <DebugList
+                  title="Hidden facts"
+                  items={snapshot.facts.map(
+                    (fact) => `${fact.subjectId}.${fact.key} = ${String(fact.value)} (${fact.source})`,
+                  )}
+                />
+                <DebugList
+                  title="State changes"
+                  items={directorUpdateItems(snapshot.directorCalls)}
+                />
+                <DebugList title="Turns" items={turnSummaryItems(snapshot.turns)} />
+                <DebugList
+                  title="Events"
+                  items={snapshot.events.map((event) => `${event.text} (${event.source})`)}
+                />
+                <DebugList
+                  title="Narrations"
+                  items={snapshot.narrations.map(
+                    (narration) => `${narration.text} (${narration.source})`,
+                  )}
+                />
+                <DebugJson title="Turns" value={snapshot.turns} />
+                <DebugJson title="Game Master calls" value={snapshot.directorCalls} />
+                <DebugJson title="State diffs" value={snapshot.diffs} />
+              </div>
+            ) : null}
+          />
         ) : null}
       </div>
     </main>
-  );
-}
-
-function AdventureLanding({
-  adventures,
-  isLoading,
-  isCreatingAdventure,
-  deletingAdventureId,
-  error,
-  notice,
-  onCreateAdventure,
-  onSelectAdventure,
-  onDeleteAdventure,
-}: {
-  adventures: AdventureListItem[];
-  isLoading: boolean;
-  isCreatingAdventure: boolean;
-  deletingAdventureId: Id<"adventures"> | null;
-  error: string | null;
-  notice: string | null;
-  onCreateAdventure: () => void;
-  onSelectAdventure: (adventureId: Id<"adventures">) => void;
-  onDeleteAdventure: (adventure: AdventureListItem) => void;
-}) {
-  const worldName = adventures[0]?.worldName ?? "Stormbound Chapel";
-
-  return (
-    <section
-      id="adventure-landing"
-      className="mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 flex-col justify-center px-5 py-8 sm:px-8"
-    >
-      <div id="adventure-landing-header" className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
-            World
-          </p>
-          <h1 id="world-container-title" className="mt-2 text-xl font-semibold text-zinc-100">
-            {worldName}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-500">
-            Continue a saved Adventure or start a fresh copy of the current WorldVersion.
-          </p>
-        </div>
-        <div id="adventure-landing-actions" className="flex flex-wrap gap-2">
-          <button
-            id="create-adventure-button"
-            type="button"
-            onClick={onCreateAdventure}
-            disabled={isCreatingAdventure || deletingAdventureId !== null}
-            className="rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isCreatingAdventure ? "Creating" : "New Adventure"}
-          </button>
-        </div>
-      </div>
-
-      {error ? (
-        <p id="adventure-landing-error" role="alert" className="mb-4 text-sm text-rose-300">
-          {error}
-        </p>
-      ) : null}
-      {notice ? (
-        <p id="adventure-landing-notice" className="mb-4 text-sm text-emerald-300/80">
-          {notice}
-        </p>
-      ) : null}
-
-      <div id="world-container" className="rounded-md bg-zinc-900/70">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-          <h2 className="text-sm font-medium text-zinc-200">Adventures</h2>
-          <span className="text-xs text-zinc-500">{adventures.length}</span>
-        </div>
-        {isLoading ? (
-          <p id="adventure-list-loading-state" className="px-4 py-5 text-sm text-zinc-500">
-            Loading Adventures...
-          </p>
-        ) : adventures.length > 0 ? (
-          <div id="adventure-list" className="divide-y divide-zinc-800">
-          {adventures.map((adventure) => (
-            <article
-              id={`adventure-card-${adventure._id}`}
-              key={adventure._id}
-              className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center"
-            >
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-medium text-zinc-100">{adventure.name}</h2>
-                <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-zinc-500">
-                  <div>
-                    <dt className="sr-only">Turns</dt>
-                    <dd>{adventure.turnCount} turns</dd>
-                  </div>
-                  <div>
-                    <dt className="sr-only">Last played</dt>
-                    <dd>{formatAdventureTimestamp(adventure.lastPlayedAt)}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                <button
-                  id={`continue-adventure-${adventure._id}`}
-                  type="button"
-                  onClick={() => onSelectAdventure(adventure._id)}
-                  disabled={deletingAdventureId === adventure._id}
-                  className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Continue
-                </button>
-                <button
-                  id={`delete-adventure-${adventure._id}`}
-                  type="button"
-                  onClick={() => onDeleteAdventure(adventure)}
-                  disabled={deletingAdventureId !== null}
-                  className="rounded-md border border-rose-900/70 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {deletingAdventureId === adventure._id ? "Deleting" : "Delete"}
-                </button>
-              </div>
-            </article>
-          ))}
-          </div>
-        ) : (
-        <div id="adventure-list-empty-state" className="px-4 py-5">
-          <p className="text-sm leading-6 text-zinc-400">No Adventures yet.</p>
-        </div>
-      )}
-      </div>
-    </section>
   );
 }
 
@@ -1143,81 +603,6 @@ function StoryEntryShell({
   );
 }
 
-function DebugTabs({ value, onChange }: { value: DebugTab; onChange: (value: DebugTab) => void }) {
-  const tabs: Array<{ value: DebugTab; label: string }> = [
-    { value: "prompt", label: "Prompt" },
-    { value: "npcs", label: "NPCs" },
-    { value: "locations", label: "Locations" },
-    { value: "state", label: "State" },
-  ];
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: DebugTab) => {
-    const currentIndex = tabs.findIndex((item) => item.value === tab);
-    if (currentIndex < 0) {
-      return;
-    }
-
-    const lastIndex = tabs.length - 1;
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowRight") {
-      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
-    } else if (event.key === "ArrowLeft") {
-      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = lastIndex;
-    }
-
-    if (nextIndex === null) {
-      return;
-    }
-
-    event.preventDefault();
-    const nextTab = tabs[nextIndex].value;
-    onChange(nextTab);
-    document.getElementById(debugTabId(nextTab))?.focus();
-  };
-
-  return (
-    <div
-      id="debug-tabs"
-      role="tablist"
-      aria-label="Debug sections"
-      className="grid grid-cols-4 rounded-md border border-zinc-800 text-xs uppercase"
-    >
-      {tabs.map((tab) => (
-        <button
-          id={debugTabId(tab.value)}
-          key={tab.value}
-          role="tab"
-          type="button"
-          aria-selected={value === tab.value}
-          aria-controls={debugTabPanelId(tab.value)}
-          tabIndex={value === tab.value ? 0 : -1}
-          onClick={() => onChange(tab.value)}
-          onKeyDown={(event) => handleKeyDown(event, tab.value)}
-          className={`px-3 py-2 ${
-            value === tab.value
-              ? "bg-amber-300 text-zinc-950"
-              : "bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function debugTabId(tab: DebugTab) {
-  return `debug-tab-${tab}`;
-}
-
-function debugTabPanelId(tab: DebugTab) {
-  return `debug-tab-panel-${tab}`;
-}
-
 function DebugSectionHeader({
   id,
   title,
@@ -1255,36 +640,6 @@ function DebugCard({
     <div id={id} className="rounded-md border border-zinc-800 bg-zinc-950/45 p-3">
       {children}
     </div>
-  );
-}
-
-function DebugActionButton({
-  id,
-  children,
-  onClick,
-  disabled,
-  tone = "neutral",
-}: {
-  id: string;
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  tone?: "neutral" | "danger";
-}) {
-  return (
-    <button
-      id={id}
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-60 ${
-        tone === "danger"
-          ? "border-rose-500/70 text-rose-200 hover:bg-rose-950/40"
-          : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -1495,8 +850,8 @@ function LocationDebugPanel({
     exits: Array<{ label: string; toLocationKey: string; toLocationName: string }>;
   }>;
   saveStatus: Record<string, LocationSaveStatus>;
-  newLocation: { key: string; name: string; description: string };
-  onNewLocationChange: (location: { key: string; name: string; description: string }) => void;
+  newLocation: NewLocationDraft;
+  onNewLocationChange: (location: NewLocationDraft) => void;
   onSave: (
     locationId: Id<"rooms">,
     locationKey: string,
@@ -1787,46 +1142,6 @@ function titleFromKey(actorKey: string) {
   return words.length > 0
     ? words.map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ")
     : "Debug NPC";
-}
-
-function defaultNpcFacts() {
-  return {
-    background: "New NPC background.",
-    persona: "New NPC personality.",
-    voice: "New NPC voice.",
-    mood: "neutral",
-    status: "present in the current scene",
-    memory: "This NPC has not yet formed meaningful memories of Taylor.",
-    knowledge: "This NPC has no private knowledge yet.",
-  };
-}
-
-function buildNpcDebugActors(
-  locations: Array<{
-    key: string;
-    name: string;
-    actors: Array<{
-      _id: Id<"actors">;
-      key: string;
-      name: string;
-      description: string;
-      role: "player" | "npc";
-    }>;
-  }>,
-): NpcDebugActor[] {
-  return locations.flatMap((location) =>
-    location.actors
-      .filter((actor): actor is typeof actor & { role: "npc" } => actor.role === "npc")
-      .map((actor) => ({
-        _id: actor._id,
-        key: actor.key,
-        name: actor.name,
-        description: actor.description,
-        role: "npc",
-        locationKey: location.key,
-        locationName: location.name,
-      })),
-  );
 }
 
 function npcSaveStatusLabel(status: NpcSaveStatus, hasDraft: boolean) {
