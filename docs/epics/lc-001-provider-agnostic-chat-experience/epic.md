@@ -1,9 +1,9 @@
 ---
 id: LC-001
-status: draft
+status: implemented
 created: 2026-07-01
-modified: 2026-07-02
-last_verified: 2026-07-02
+modified: 2026-07-05
+last_verified: 2026-07-05
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -44,27 +44,27 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
-| LC-001-S1 |  | Narrative Play Feed And Unified Input |  |  |
-| LC-001-S2 |  | Provider-Agnostic Backend Game Master Boundary |  |  |
-| LC-001-S3 |  | Persistent Current-Scene NPC State |  |  |
-| LC-001-S4 |  | Debuggable Game Master Calls And Reset |  |  |
-| LC-001-S5 |  | Story Stream Reading Experience |  |  |
-| LC-001-S6 |  | Scoped Narrative Turns |  |  |
-| LC-001-S7 |  | Active Game Master Guidance And Context Assembly |  |  |
-| LC-001-S8 |  | Transcript Game Master Mode |  |  |
-| LC-001-S12 |  | Lightweight Location Cards And Movement |  |  |
-| LC-001-S9 |  | Read-Only NPC Context |  |  |
-| LC-001-S10 |  | Extracted NPC State Mutation |  |  |
-| LC-001-S11 |  | End To End Playtest Verification |  |  |
+| LC-001-S1 | implemented | Narrative Play Feed And Unified Input | 2026-07-05 | Revalidated by architecture-refactor CI, Convex compile, and E2E gates. |
+| LC-001-S2 | implemented | Provider-Agnostic Backend Game Master Boundary | 2026-07-05 | Revalidated by thin route/server boundary review plus CI and E2E gates. |
+| LC-001-S3 | implemented | Persistent Current-Scene NPC State | 2026-07-05 | Revalidated by NPC context/edit/reset E2E coverage and CI gates. |
+| LC-001-S4 | implemented | Debuggable Game Master Calls And Reset | 2026-07-05 | Revalidated by debug/reset E2E coverage and review. |
+| LC-001-S5 | implemented | Story Stream Reading Experience | 2026-07-05 | Revalidated by story stream and turn-control E2E coverage. |
+| LC-001-S6 | implemented | Scoped Narrative Turns | 2026-07-05 | Revalidated by turn-scoped route tests and E2E coverage. |
+| LC-001-S7 | implemented | Active Game Master Guidance And Context Assembly | 2026-07-05 | Revalidated by extracted context helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S8 | implemented | Transcript Game Master Mode | 2026-07-05 | Revalidated by unchanged focused tests and CI gates. |
+| LC-001-S12 | implemented | Lightweight Location Cards And Movement | 2026-07-05 | Revalidated by extracted location helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S9 | implemented | Read-Only NPC Context | 2026-07-05 | Revalidated by extracted NPC/debug helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S10 | implemented | Extracted NPC State Mutation | 2026-07-05 | Revalidated by turn-persistence helper extraction, CI, Convex compile, and E2E gates. |
+| LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Deterministic browser E2E passed. |
 
 ## Stories
 
 ### Story LC-001-S1: Narrative Play Feed And Unified Input
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 
@@ -181,10 +181,10 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 - None.
 ### Story LC-001-S2: Provider-Agnostic Backend Game Master Boundary
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer, I want Lorecraft to call LLMs through backend application logic and a provider adapter, so that the UI can change later and local model playtesting does not lock the app to one provider.
 
@@ -272,10 +272,12 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 |---|---|---|---|
 | R1-S1 and R1-S2 | `npm run e2e` exercises the browser-to-route turn submission path through the real backend route and fixture OpenAI-compatible provider without React importing provider SDKs or secrets. | As described in the evidence cell. | Recorded |
 | R1-S2 and R3-S1/R3-S2 | `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers bounded request construction, missing config handling, OpenAI-compatible response extraction, and no-mutation setup failure behavior. | As described in the evidence cell. | Recorded |
+| R1-S3 | 2026-07-05 architecture review of `src/app/api/director/turn/route.ts`, `src/server/director/turn-route.ts`, `src/lib/director/*`, and `src/lib/world/convex-*` after `npm run ci:required`, `npm run convex:once`, and `npm run e2e` passed. | proves the Route Handler is a thin adapter and reusable server/world helper modules own the movable orchestration logic instead of React. | Passing |
 | R1-S4 | `src/app/api/director/turn/route.test.ts` | proves malformed `worldId` returns a structured `400` before LLM config is required and without recording player input. | Recorded |
 | R2-S1 and R2-S2 | Runtime POST to `/api/director/turn` with `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` succeeded, proving the provider adapter contract against local Ollama. | As described in the evidence cell. | Passing |
+| R2-S3 | `src/app/api/director/turn/route.test.ts` and 2026-07-05 `npm run ci:required` cover missing configuration as a structured setup failure before a provider call. | proves deterministic app surfaces and setup-oriented failure handling remain available when provider configuration is absent. | Passing |
 | R3-S1 and R3-S2 | Game Master request construction tests | prove each provider request is built from current persisted state and recent bounded narration context rather than provider-managed remote session state. | Recorded |
-| Supporting gate | `npm run ci:required` and `npm run convex:once` passed for the broader app surface. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` passed on 2026-07-05 for the broader app surface after the architecture refactor. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
 
@@ -288,10 +290,10 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 - None.
 ### Story LC-001-S3: Persistent Current-Scene NPC State
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want an NPC in the scene to remember meaningful interaction state, so that Lorecraft can prove structured persistence without modeling the full world yet.
 
@@ -421,10 +423,10 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 - None.
 ### Story LC-001-S4: Debuggable Game Master Calls And Reset
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want to inspect Game Master calls and reset the spike world, so that early LLM behavior can be tuned without losing evidence or hand-editing every playtest cleanup.
 
@@ -530,10 +532,10 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 - None.
 ### Story LC-001-S5: Story Stream Reading Experience
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want the play surface to read like an unfolding story and stay anchored near the newest turn, so that long sessions feel like interactive fiction instead of a chat log I have to manage.
 
@@ -636,10 +638,10 @@ The system SHALL keep empty, pending, and error states understandable without re
 - None.
 ### Story LC-001-S6: Scoped Narrative Turns
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want each resolved story beat to be stored as a scoped turn with an explicit trigger, so that action turns, Pass turns, debug records, and future rollback boundaries have one durable unit of progression.
 
@@ -785,10 +787,10 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 - None.
 ### Story LC-001-S7: Active Game Master Guidance And Context Assembly
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified: 2026-07-02
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want the Game Master to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
 
@@ -1041,10 +1043,10 @@ The system SHALL use the same story-visible history policy for state extraction 
 - None.
 ### Story LC-001-S8: Transcript Game Master Mode
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want a story-only Game Master mode that saves the transcript but does not mutate canonical world state, so that I can isolate story quality from persistence mechanics before adding mutation pressure back in.
 
@@ -1206,10 +1208,10 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 - None.
 ### Story LC-001-S12: Lightweight Location Cards And Movement
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want canonical locations to ground narration and support bounded actor movement, so that the story can move through known places without becoming a command-driven MUD.
 
@@ -1357,10 +1359,10 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 - None.
 ### Story LC-001-S9: Read-Only NPC Context
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want NPCs to exist as readable authored objects in Game Master context, so that NPC-focused narration is grounded in world state before Lorecraft reintroduces intelligent state mutation.
 
@@ -1462,10 +1464,10 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 - None.
 ### Story LC-001-S10: Extracted NPC State Mutation
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want meaningful NPC characteristics to mutate through a separate validated extraction pass, so that the world can remember story consequences without making the creative Game Master response carry persistence decisions.
 
@@ -1613,10 +1615,10 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 - None.
 ### Story LC-001-S11: End To End Playtest Verification
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want deterministic browser E2E coverage of the Lorecraft playtest loop, so that UI, backend route, Convex state, and provider-shaped Game Master behavior can be verified together.
 

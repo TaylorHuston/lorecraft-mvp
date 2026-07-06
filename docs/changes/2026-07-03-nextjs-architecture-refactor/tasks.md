@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete; ready for fresh `/sdd-review`
-- Last completed action: completed remaining Workstream 2 and Workstream 4 slices by extracting Adventure landing, debug shell/tab mechanics, NPC autosave, Location save workflows, Convex snapshot read-model assembly, Game Master context assembly, transcript context assembly, and turn-persistence helpers.
-- Next action: commit the verified implementation/artifact slice, then run `/sdd-review` as the local PR gate.
+- Current state: reviewed and ready for local integration into `develop` after user authorization.
+- Last completed action: fresh `/sdd-review` passed after reconciling stale review state and LC-001 evidence metadata.
+- Next action: ask Taylor whether to merge and close this change according to the app branch policy.
 - Active branch/ref: `change/nextjs-architecture-refactor`
 - Expected dirty files: none after ledger commit
 - Known blockers: none identified
@@ -105,13 +105,14 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-03 | Planning | main | proposal/design/tasks/ADR | Proposed full-stack architecture refactor across App Router, client UI, Game Master route, and Convex boundaries without creating a technical Epic. | pending |
-| 2026-07-04 | Discovery | main + delegated read-only discovery | app guidance, change artifacts, Next guidance, Convex guidance, current monolith inventory | Selected active change, created `change/nextjs-architecture-refactor`, confirmed no blocking product questions, and scoped first implementation slice to route/client boundary extraction. | uncommitted |
+| 2026-07-03 | Planning | main | proposal/design/tasks/ADR | Proposed full-stack architecture refactor across App Router, client UI, Game Master route, and Convex boundaries without creating a technical Epic. | `841c40f` |
+| 2026-07-04 | Discovery | main + delegated read-only discovery | app guidance, change artifacts, Next guidance, Convex guidance, current monolith inventory | Selected active change, created `change/nextjs-architecture-refactor`, confirmed no blocking product questions, and scoped first implementation slice to route/client boundary extraction. | `841c40f` |
 | 2026-07-04 | Route, server, baseline, and formatter extraction | main + frontend/backend discovery agents | `src/app/`, `src/features/play/`, `src/server/director/`, `src/lib/world/`, `convex/world.ts`, docs/Epics | Preserved behavior while moving route composition and Game Master orchestration behind clearer Next/server boundaries; extracted pure debug formatters and Stormbound baseline helper; kept Convex generated public API unchanged. | `841c40f` |
 | 2026-07-05 | Turn action panel extraction and review remediation | main | `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `src/app/globals.css`, proposal/design/tasks/review | Extracted Act/Pass/input UI state, keyboard submit, close animation, and pending/status rendering into a focused Client Component; reconciled the approved turn-control polish into the active change scope. | `331b88f` |
 | 2026-07-05 | Workstream 2 remaining client decomposition | main + delegated frontend discovery | `src/features/play/adventure-landing.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts`, `src/features/play/use-location-debug-saves.ts`, `src/features/play/world-client.tsx` | Extracted Adventure landing, debug drawer/tab shell, NPC autosave queue/flush/reset workflow, and Location save/create/flush workflow while preserving parent-owned turn submission and selected Adventure identity. | `f1001a3` |
 | 2026-07-05 | Workstream 4 Convex capability helpers | main + delegated Convex discovery | `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-turn-persistence.ts` | Preserved public `api.world.*` contracts while moving snapshot assembly, Game Master context assembly, transcript context assembly, and accepted turn-persistence helpers outside the generated Convex module. | `f1001a3` |
 | 2026-07-05 | Artifact reconciliation | main | `docs/architecture.md`, ADR, LC-001, LC-002, review/tasks | Updated architecture docs, accepted ADR, Epic `Implemented By` / `Verified By` maps, and review/task state for the completed client and Convex slices. | `f1001a3` |
+| 2026-07-05 | Review artifact cleanup | main + delegated artifact/security reviewers | LC-001, review/tasks | Reconciled stale LC-001 lifecycle/evidence rows and refreshed the current review verdict after CI, Convex compile, E2E, security, and branch-readiness checks passed. | review-fix commit |
 
 ## Specialist Checkpoint
 
@@ -144,6 +145,7 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-05 | `npm run e2e` first rerun | deterministic E2E regression check | Caught lost `inert` behavior on collapsed debug panel after shell extraction. | failed, fixed |
 | 2026-07-05 | `npm run e2e` final rerun | deterministic E2E | Browser playtest passes through seed/reset, Adventure management, Act/Pass, debug drawer collapse/expand, NPC/Location debug editing, movement evidence, and reset with extracted client and Convex helpers. | passed |
 | 2026-07-05 | `npm run ci:required` final rerun | broad supporting gate | Lint, Vitest, TypeScript, and production Next build pass after restoring collapsed debug panel `inert` behavior. | passed |
+| 2026-07-05 | Fresh `/sdd-review`: `npm run ci:required`; `npm run convex:once`; `npm run e2e`; `git diff --check develop...HEAD`; `git merge-tree --write-tree develop HEAD` | local PR gate | App code, Convex compile, deterministic browser path, whitespace hygiene, and mergeability all pass after the architecture refactor. | passed |
 
 ## Manual Feedback
 
@@ -195,9 +197,9 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes
 - ADR status: Accepted
 - Changelog current: not required
-- `sdd-review` verdict: changes-requested
+- `sdd-review` verdict: ready
 - Review record: `docs/changes/2026-07-03-nextjs-architecture-refactor/review.md`
-- `review.md` findings resolved: yes for the prior required findings; fresh `/sdd-review` still required as the final PR gate
+- `review.md` findings resolved: yes
 - Planning updates resolved: yes
 - Manual UI confirmation status: pending Taylor
 - PR / merge state: not started
