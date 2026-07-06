@@ -140,6 +140,41 @@ describe("Director utility route", () => {
     );
     expect(mocks.mutation).toHaveBeenCalledTimes(1);
   });
+
+  it("matches visible /look actors by a unique part of their display name", async () => {
+    configureLlmEnv();
+    const context = persistentContext();
+    context.actors[1] = {
+      ...context.actors[1],
+      key: "guide-serin",
+      name: "Guide Serin",
+      description: "A patient guide who waits near the tutorial threshold.",
+    };
+    mocks.query.mockResolvedValueOnce(context);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(providerResponse("Guide Serin watches you with patient attention."));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(utilityRequest("/look Serin"));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      command: "look",
+      message: "Guide Serin watches you with patient attention.",
+    });
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mocks.mutation.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        command: "look",
+        target: "Serin",
+        text: "Guide Serin watches you with patient attention.",
+        source: "llm",
+        status: "success",
+      }),
+    );
+  });
 });
 
 function utilityRequest(input: string) {

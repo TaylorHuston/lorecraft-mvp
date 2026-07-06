@@ -27,31 +27,55 @@ export function resolveLookTarget(
     return { ok: true, target: { kind: "scene" } };
   }
 
-  const actor = context.actors.find(
-    (candidate) =>
-      normalizeTarget(candidate.key) === normalizedTarget ||
-      normalizeTarget(candidate.name) === normalizedTarget,
+  const actorMatch = findLookCandidate(
+    context.actors.map((candidate) => ({
+      key: candidate.key,
+      name: candidate.name,
+    })),
+    normalizedTarget,
   );
-  if (actor) {
+  if (actorMatch.status === "ambiguous") {
+    return {
+      ok: false,
+      text: `Which "${target?.trim()}" do you mean? Try a more specific name.`,
+    };
+  }
+  if (actorMatch.status === "match") {
     return {
       ok: true,
-      target: { kind: "actor", key: actor.key, name: actor.name },
+      target: {
+        kind: "actor",
+        key: actorMatch.candidate.key,
+        name: actorMatch.candidate.name,
+      },
     };
   }
 
-  const object = context.objects.find(
-    (candidate) =>
-      normalizeTarget(candidate.key) === normalizedTarget ||
-      normalizeTarget(candidate.name) === normalizedTarget,
+  const objectMatch = findLookCandidate(
+    context.objects.map((candidate) => ({
+      key: candidate.key,
+      name: candidate.name,
+    })),
+    normalizedTarget,
   );
-  if (object) {
+  if (objectMatch.status === "ambiguous") {
+    return {
+      ok: false,
+      text: `Which "${target?.trim()}" do you mean? Try a more specific name.`,
+    };
+  }
+  if (objectMatch.status === "match") {
     return {
       ok: true,
-      target: { kind: "object", key: object.key, name: object.name },
+      target: {
+        kind: "object",
+        key: objectMatch.candidate.key,
+        name: objectMatch.candidate.name,
+      },
     };
   }
 
-  const location = [
+  const locationCandidates = [
     {
       key: context.room.key,
       name: context.room.name,
@@ -60,15 +84,22 @@ export function resolveLookTarget(
       key: knownLocation.key,
       name: knownLocation.name,
     })),
-  ].find(
-    (candidate) =>
-      normalizeTarget(candidate.key) === normalizedTarget ||
-      normalizeTarget(candidate.name) === normalizedTarget,
-  );
-  if (location) {
+  ];
+  const locationMatch = findLookCandidate(locationCandidates, normalizedTarget);
+  if (locationMatch.status === "ambiguous") {
+    return {
+      ok: false,
+      text: `Which "${target?.trim()}" do you mean? Try a more specific name.`,
+    };
+  }
+  if (locationMatch.status === "match") {
     return {
       ok: true,
-      target: { kind: "location", key: location.key, name: location.name },
+      target: {
+        kind: "location",
+        key: locationMatch.candidate.key,
+        name: locationMatch.candidate.name,
+      },
     };
   }
 
@@ -166,4 +197,40 @@ function formatLookTarget(target: LookTarget) {
 
 function normalizeTarget(value: string | undefined) {
   return value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ?? "";
+}
+
+function findLookCandidate<T extends { key: string; name: string }>(
+  candidates: T[],
+  normalizedTarget: string,
+): { status: "match"; candidate: T } | { status: "ambiguous" } | { status: "none" } {
+  const exact = candidates.find(
+    (candidate) =>
+      normalizeTarget(candidate.key) === normalizedTarget ||
+      normalizeTarget(candidate.name) === normalizedTarget,
+  );
+  if (exact) {
+    return { status: "match", candidate: exact };
+  }
+
+  const targetTokens = normalizedTarget.split(" ").filter(Boolean);
+  if (targetTokens.length === 0) {
+    return { status: "none" };
+  }
+
+  const tokenMatches = candidates.filter((candidate) => {
+    const candidateTokens = new Set([
+      ...normalizeTarget(candidate.key).split(" ").filter(Boolean),
+      ...normalizeTarget(candidate.name).split(" ").filter(Boolean),
+    ]);
+    return targetTokens.every((token) => candidateTokens.has(token));
+  });
+
+  if (tokenMatches.length === 1) {
+    return { status: "match", candidate: tokenMatches[0] };
+  }
+  if (tokenMatches.length > 1) {
+    return { status: "ambiguous" };
+  }
+
+  return { status: "none" };
 }
