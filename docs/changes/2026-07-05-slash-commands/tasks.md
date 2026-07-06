@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: implemented autocomplete feedback, pending `/sdd-review` and Taylor manual UI confirmation.
-- Last completed action: added LC-001-S13/R4 slash-command autocomplete, updated docs/changelog, and verified focused tests, E2E, and required CI.
-- Next action: run `/sdd-review`; then address findings or close/merge with user approval.
+- Current state: `/sdd-review` changes requested; safe review fixes applied.
+- Last completed action: fixed review findings for offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
+- Next action: commit safe review fixes, then rerun `/sdd-review` for a fresh ready verdict.
 - Active branch/ref: `change/slash-commands-tutorial`
-- Expected dirty files: implementation, docs, tests, and active change artifacts for this change
+- Expected dirty files: safe review fixes in implementation, tests, Epic docs, `tasks.md`, and `review.md`
 - Known blockers: none identified
 
 ## Task Checklist
@@ -80,9 +80,9 @@
 ### 6. Review And Closeout
 
 - [x] 6.1 Update root `CHANGELOG.md` because this is user-facing added behavior.
-- [ ] 6.2 Run `sdd-review` as the local PR gate.
-- [ ] 6.3 Record review outcome as `review.md` or a clean review ledger note.
-- [ ] 6.4 Address review findings or explicitly defer accepted non-blocking risks.
+- [x] 6.2 Run `sdd-review` as the local PR gate.
+- [x] 6.3 Record review outcome as `review.md` or a clean review ledger note.
+- [x] 6.4 Address review findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not contain stale implementation status.
 - [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
@@ -101,6 +101,7 @@
 | 2026-07-05 | Docs/changelog reconciliation | main | `README.md`, `CHANGELOG.md`, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, LC-001 Epic, LC-002 Epic | Updated public/current-state docs and scenario-mapped Epic evidence for slash utilities and Tutorial World. | `implementation commit` |
 | 2026-07-05 | Forgiving `/look` target matching | main | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts` | Matched unique target tokens such as `/look Serin` to visible display names such as `Guide Serin` while preserving ambiguity handling. | `a82eb30` |
 | 2026-07-05 | LC-001-S13/R4 autocomplete | main + explorer `019f365b-34de-79c0-ad82-40f825780880` | `src/lib/director/slash-command-autocomplete.ts`, `src/lib/director/slash-command-autocomplete.test.ts`, `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, change artifacts, `README.md`, `CHANGELOG.md` | Added command and `/look` target autocomplete with keyboard/click acceptance, derived targets from current snapshot state, kept backend command parsing authoritative, and updated docs/evidence. | `6e03962` |
+| 2026-07-06 | Safe `/sdd-review` remediation | main + artifact/code/security reviewers | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts`, `convex/world.ts`, `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, LC-002 Epic, `review.md`, `tasks.md` | Fixed offscreen location inspection, scoped reseed deletion to Stormbound, restored empty first-run seed action, and reconciled stale Epic artifact structure/wording. | review remediation commit |
 
 ## Verification Ledger
 
@@ -121,6 +122,10 @@
 | 2026-07-05 | `npm run typecheck` | broad supporting gate | TypeScript accepts autocomplete view model wiring and client component changes. | Passed |
 | 2026-07-05 | `npm run e2e` | deterministic E2E | Browser proves `/` command suggestions, `/l` acceptance into `/look `, `/look Mi` target suggestions, Tab acceptance to `/look Mira`, utility submission, and continued slash utility flow. | Passed |
 | 2026-07-05 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after autocomplete. | Passed, 66 tests |
+| 2026-07-06 | `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | Proves offscreen known locations are rejected for `/look`, visible targets still work, and autocomplete behavior remains correct. | Passed, 11 tests |
+| 2026-07-06 | `npm run typecheck` | broad supporting gate | TypeScript accepts review fixes. | Passed |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest still passes after empty-state seed action and review fixes. | Passed |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after review fixes. | Passed, 67 tests |
 
 ## Specialist Checkpoint
 
@@ -188,11 +193,11 @@
 - Superseded earlier Epic truth reconciled: complete
 - ADR status: not applicable
 - Changelog current: complete
-- `sdd-review` verdict: pending
-- Review record: pending
-- `review.md` findings resolved: pending
+- `sdd-review` verdict: changes-requested, safe fixes applied; fresh rerun pending
+- Review record: `docs/changes/2026-07-05-slash-commands/review.md`
+- `review.md` findings resolved: fixed in safe review pass; fresh rerun pending
 - Planning updates resolved: not applicable
 - Manual UI confirmation status: pending Taylor
-- PR / merge state: local implementation pending review/merge
+- PR / merge state: local implementation pending fresh review/merge
 - Deferred scope accepted: recorded
 - Change moved to `docs/changes/closed/`: no

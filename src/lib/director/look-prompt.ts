@@ -75,15 +75,21 @@ export function resolveLookTarget(
     };
   }
 
+  const visibleExitLocationCandidates = context.locationCard
+    ? context.locationCard.visibleExits.map((exit) => ({
+        key: exit.toLocationKey,
+        name: exit.toLocationName,
+      }))
+    : context.exits.map((exit) => ({
+        key: exit.toRoomName,
+        name: exit.toRoomName,
+      }));
   const locationCandidates = [
     {
       key: context.room.key,
       name: context.room.name,
     },
-    ...(context.knownLocations ?? []).map((knownLocation) => ({
-      key: knownLocation.key,
-      name: knownLocation.name,
-    })),
+    ...visibleExitLocationCandidates,
   ];
   const locationMatch = findLookCandidate(locationCandidates, normalizedTarget);
   if (locationMatch.status === "ambiguous") {

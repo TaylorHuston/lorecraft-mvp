@@ -25,10 +25,12 @@ export type WorldContainerItem = {
 type AdventureLandingProps = {
   worlds: WorldContainerItem[];
   isLoading: boolean;
+  isSeeding: boolean;
   creatingWorldId: Id<"worlds"> | null;
   deletingAdventureId: Id<"adventures"> | null;
   error: string | null;
   notice: string | null;
+  onSeedWorld: () => void;
   onCreateAdventure: (worldId: Id<"worlds">) => void;
   onSelectAdventure: (adventureId: Id<"adventures">) => void;
   onDeleteAdventure: (adventure: AdventureListItem) => void;
@@ -37,10 +39,12 @@ type AdventureLandingProps = {
 export function AdventureLanding({
   worlds,
   isLoading,
+  isSeeding,
   creatingWorldId,
   deletingAdventureId,
   error,
   notice,
+  onSeedWorld,
   onCreateAdventure,
   onSelectAdventure,
   onDeleteAdventure,
@@ -126,6 +130,15 @@ export function AdventureLanding({
           <p className="text-sm leading-6 text-zinc-400">
             Seed the demo world to begin.
           </p>
+          <button
+            id="seed-world-button"
+            type="button"
+            onClick={onSeedWorld}
+            disabled={isSeeding || creatingWorldId !== null || deletingAdventureId !== null}
+            className="mt-4 rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSeeding ? "Seeding" : "Seed Demo World"}
+          </button>
         </div>
       )}
     </section>

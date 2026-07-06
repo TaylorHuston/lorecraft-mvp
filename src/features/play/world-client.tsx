@@ -404,10 +404,12 @@ export function WorldClient({
               <AdventureLanding
                 worlds={worldContainers ?? []}
                 isLoading={isLoadingAdventures}
+                isSeeding={isSeeding}
                 creatingWorldId={creatingWorldId}
                 deletingAdventureId={deletingAdventureId}
                 error={error}
                 notice={notice}
+                onSeedWorld={() => void handleSeed()}
                 onCreateAdventure={(worldId) => void handleCreateAdventure(worldId)}
                 onSelectAdventure={handleSelectAdventure}
                 onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}

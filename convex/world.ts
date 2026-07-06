@@ -581,7 +581,6 @@ export const seedDemoWorld = mutation({
   returns: v.id("adventures"),
   handler: async (ctx) => {
     await deleteDemoWorld(ctx);
-    await deleteTutorialWorld(ctx);
 
     const baseline = buildStormboundBaseline();
     const worldId = await ctx.db.insert("worlds", {
@@ -2143,10 +2142,6 @@ async function deleteDirectorCalls(ctx: MutationCtx, adventureId: Id<"adventures
 
 async function deleteDemoWorld(ctx: MutationCtx) {
   await deleteWorldBySlug(ctx, WORLD_SLUG);
-}
-
-async function deleteTutorialWorld(ctx: MutationCtx) {
-  await deleteWorldBySlug(ctx, TUTORIAL_WORLD_SLUG);
 }
 
 async function deleteWorldBySlug(ctx: MutationCtx, slug: string) {

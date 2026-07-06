@@ -1746,10 +1746,6 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 #### Story Notes
 
 - None.
-## Cross-Story Concerns
-
-- Slash commands are allowed only as pre-turn utility actions unless a later Story explicitly expands that boundary. They must not become hidden turns, story narrations, state diffs, movement commands, inventory commands, combat commands, or a broad MUD command parser by accident.
-
 ### Story LC-001-S13: Pre-Turn Slash Command Utilities
 
 Status: implemented
@@ -1877,6 +1873,10 @@ The system SHALL offer lightweight autocomplete inside the Act-expanded input fo
 #### Story Notes
 
 - This Story reconciles the earlier MVP bias away from command parsing by limiting slash commands to pre-turn, read-only utility actions.
+
+## Cross-Story Concerns
+
+- Slash commands are allowed only as pre-turn utility actions unless a later Story explicitly expands that boundary. They must not become hidden turns, story narrations, state diffs, movement commands, inventory commands, combat commands, or a broad MUD command parser by accident.
 
 
 ## Open Decisions

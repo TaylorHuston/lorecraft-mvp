@@ -110,6 +110,46 @@ describe("Director utility route", () => {
     );
   });
 
+  it("does not inspect known locations that are not currently visible", async () => {
+    mocks.query.mockResolvedValueOnce({
+      ...persistentContext(),
+      knownLocations: [
+        {
+          id: "room-chapel",
+          key: "chapel",
+          name: "Chapel",
+          description: "Rain taps against warped shutters.",
+        },
+        {
+          id: "room-graveyard",
+          key: "graveyard",
+          name: "Graveyard",
+          description: "Wet headstones lean in the dark.",
+        },
+      ],
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(utilityRequest("/look Graveyard"));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      command: "look",
+      message: 'You do not see "Graveyard" here to inspect.',
+    });
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mocks.mutation.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        command: "look",
+        target: "Graveyard",
+        source: "engine",
+        status: "error",
+      }),
+    );
+  });
+
   it("calls the provider for visible /look targets and records a utility message", async () => {
     configureLlmEnv();
     mocks.query.mockResolvedValueOnce(persistentContext());

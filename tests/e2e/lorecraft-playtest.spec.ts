@@ -310,6 +310,10 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     await expect(page.locator("#adventure-list-loading-state")).toHaveCount(0, {
       timeout: 30_000,
     });
+    if (await page.locator("#seed-world-button").isVisible()) {
+      await page.locator("#seed-world-button").click();
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+    }
     const stormboundContainer = page.locator("section[id^='world-container-']").filter({
       hasText: "Stormbound Chapel",
     });
@@ -320,7 +324,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
       await openDebugPanel(page);
       await page.locator("#fresh-seed-button").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
-    } else {
+    } else if (await stormboundContainer.locator("button[id^='create-adventure-']").isVisible()) {
       await stormboundContainer.locator("button[id^='create-adventure-']").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     }

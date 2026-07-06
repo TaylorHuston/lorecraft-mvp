@@ -23,11 +23,11 @@ Lorecraft needs a clear boundary between authored World material and mutable pla
 
 ## Outcome
 
-Playtesters can start and resume a Stormbound Chapel Adventure that mutates independently from authored World material, while reset restores the Adventure to the WorldVersion it was created from.
+Playtesters can start and resume Adventures from seeded Worlds that mutate independently from authored World material, while reset restores each Adventure to the WorldVersion it was created from.
 
 ## Current Scope
 
-- Seed the Stormbound Chapel World and immutable WorldVersion.
+- Seed Stormbound Chapel and Tutorial Worlds with immutable WorldVersions.
 - Create, resume, or delete local Adventures from the startup World container screen, then play each Adventure at `/adventures/<id>`.
 - Scope mutable runtime rows, debug state, Game Master turns, feed reconstruction, NPC edits, location edits, actor movement, state diffs, and reset to the Adventure.
 - Keep source World and WorldVersion visible as debug/source context.
@@ -102,10 +102,10 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `convex/schema.ts` | Defines `worldVersions`, `adventures`, source-version metadata, and Adventure-owned runtime row fields/indexes. | Recheck when WorldVersion/Adventure shape changes. |
-| `convex/world.ts` | Builds the Stormbound Chapel baseline, lists local Adventures, creates new Adventures from the current WorldVersion, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
+| `convex/world.ts` | Builds seeded World baselines, lists local Adventures by World container, creates new Adventures from the selected current WorldVersion, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
 | `src/app/page.tsx` | Hosts the World container route at `/`. | Recheck when startup routing changes. |
 | `src/app/adventures/[adventureId]/page.tsx` | Hosts direct Adventure URLs at `/adventures/<id>`. | Recheck when Adventure routing changes. |
-| `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx` | Show the startup World container screen, list Adventures inside Stormbound Chapel, navigate to Adventure URLs, create and delete local Adventures, and load the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx` | Show the startup World container screen, list Adventures inside seeded World containers, navigate to Adventure URLs, create and delete local Adventures, and load the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
 
 #### Verified By
 
@@ -113,7 +113,7 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 |---|---|---|---|
 | R1-S1, R1-S2, R2-S1 | `npm run convex:once`; `LORECRAFT_ENABLE_DEBUG_ROUTES=1 npx convex run world:seedDemoWorld`; `npx convex run world:getSnapshot '{\"adventureId\":\"kn7dej4650m780jyn93w55qhfn89rnxc\"}'` | Convex schema compiles, seed creates a default Adventure, snapshot exposes Adventure/source WorldVersion identity, and playable rows are copied into Adventure-owned state. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run test`; `npm run typecheck` | Type and unit coverage compile against the new Adventure context contract. | Passing |
-| R1-S1, R1-S2, R2-S1 | Browser smoke and E2E against `http://localhost:3000`: startup screen showed Stormbound Chapel as the World container, listed existing Adventures by turns and last played date, New Adventure created `Stormbound Chapel Adventure 2`, the story stream opened at `/adventures/<id>` with source-version opening narration, reload preserved that Adventure URL, Back returned to the World container, and a temporary Adventure could be deleted from the list. | The player-facing startup flow supports continue/create/delete and opens a copied playable Adventure at a direct URL. | Passing |
+| R1-S1, R1-S2, R2-S1 | Browser smoke and E2E against `http://localhost:3000`: startup screen showed seeded World containers, listed existing Adventures by turns and last played date, New Adventure created an Adventure under the selected container, the story stream opened at `/adventures/<id>` with source-version opening narration, reload preserved that Adventure URL, Back returned to the World container list, and a temporary Adventure could be deleted from the list. | The player-facing startup flow supports continue/create/delete and opens a copied playable Adventure at a direct URL. | Passing |
 
 #### Verification Gaps
 
