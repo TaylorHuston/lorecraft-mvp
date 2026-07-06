@@ -1,9 +1,9 @@
 ---
 id: LC-001
-status: draft
+status: implemented
 created: 2026-07-01
-modified: 2026-07-02
-last_verified: 2026-07-02
+modified: 2026-07-05
+last_verified: 2026-07-05
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -44,27 +44,27 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
-| LC-001-S1 |  | Narrative Play Feed And Unified Input |  |  |
-| LC-001-S2 |  | Provider-Agnostic Backend Game Master Boundary |  |  |
-| LC-001-S3 |  | Persistent Current-Scene NPC State |  |  |
-| LC-001-S4 |  | Debuggable Game Master Calls And Reset |  |  |
-| LC-001-S5 |  | Story Stream Reading Experience |  |  |
-| LC-001-S6 |  | Scoped Narrative Turns |  |  |
-| LC-001-S7 |  | Active Game Master Guidance And Context Assembly |  |  |
-| LC-001-S8 |  | Transcript Game Master Mode |  |  |
-| LC-001-S12 |  | Lightweight Location Cards And Movement |  |  |
-| LC-001-S9 |  | Read-Only NPC Context |  |  |
-| LC-001-S10 |  | Extracted NPC State Mutation |  |  |
-| LC-001-S11 |  | End To End Playtest Verification |  |  |
+| LC-001-S1 | implemented | Narrative Play Feed And Unified Input | 2026-07-05 | Revalidated by architecture-refactor CI, Convex compile, and E2E gates. |
+| LC-001-S2 | implemented | Provider-Agnostic Backend Game Master Boundary | 2026-07-05 | Revalidated by thin route/server boundary review plus CI and E2E gates. |
+| LC-001-S3 | implemented | Persistent Current-Scene NPC State | 2026-07-05 | Revalidated by NPC context/edit/reset E2E coverage and CI gates. |
+| LC-001-S4 | implemented | Debuggable Game Master Calls And Reset | 2026-07-05 | Revalidated by debug/reset E2E coverage and review. |
+| LC-001-S5 | implemented | Story Stream Reading Experience | 2026-07-05 | Revalidated by story stream and turn-control E2E coverage. |
+| LC-001-S6 | implemented | Scoped Narrative Turns | 2026-07-05 | Revalidated by turn-scoped route tests and E2E coverage. |
+| LC-001-S7 | implemented | Active Game Master Guidance And Context Assembly | 2026-07-05 | Revalidated by extracted context helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S8 | implemented | Transcript Game Master Mode | 2026-07-05 | Revalidated by unchanged focused tests and CI gates. |
+| LC-001-S12 | implemented | Lightweight Location Cards And Movement | 2026-07-05 | Revalidated by extracted location helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S9 | implemented | Read-Only NPC Context | 2026-07-05 | Revalidated by extracted NPC/debug helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S10 | implemented | Extracted NPC State Mutation | 2026-07-05 | Revalidated by turn-persistence helper extraction, CI, Convex compile, and E2E gates. |
+| LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Deterministic browser E2E passed. |
 
 ## Stories
 
 ### Story LC-001-S1: Narrative Play Feed And Unified Input
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 
@@ -150,9 +150,11 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders the narrative-only split layout, Act/Pass decision surface, Act-expanded textarea, Pass control, pending/error states, persisted feed entries, and debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders the narrative-only split layout, owns the parent turn submission operation, and shows persisted feed entries. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/turn-action-panel.tsx` | renders the `What do you do?` decision surface, Act/Pass controls, Act-expanded textarea, close animation, pending placeholder, notice/error status, Enter-to-submit behavior, and Pass trigger. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/debug-panel-shell.tsx` | hosts the debug drawer shell and tab selection separately from the player story layout. | Recheck when debug drawer structure changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | records player inputs for action turns, creates commandless Pass turns, reconstructs the feed from `commands`, `narrations`, and `events`, and accepts actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-turn-persistence.ts` | record player inputs for action turns, create commandless Pass turns, reconstruct the feed from `commands`, `narrations`, and `events`, and accept actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed paths change. |
 
 #### Verified By
 
@@ -164,6 +166,8 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 | R3-S1 | `npm run e2e` and browser verification | prove pending state disables duplicate submission for the in-flight turn while keeping progress visible. | Recorded |
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
 | R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
+| R4-S0 through R4-S2 | `npm run ci:required` and `npm run e2e` on 2026-07-05 after `src/features/play/turn-action-panel.tsx` extraction | prove the extracted turn panel still opens Act input, submits Act with Enter, supports Pass, exposes pending/error state, and preserves the browser playtest path. | Recorded |
+| R4-S0 through R4-S2 | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after client and Convex helper extraction | prove the split play client, debug shell, autosave hooks, snapshot helpers, context helpers, and turn-persistence helpers preserve the deterministic browser playtest path. | Passing |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -177,10 +181,10 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 - None.
 ### Story LC-001-S2: Provider-Agnostic Backend Game Master Boundary
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer, I want Lorecraft to call LLMs through backend application logic and a provider adapter, so that the UI can change later and local model playtesting does not lock the app to one provider.
 
@@ -268,10 +272,12 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 |---|---|---|---|
 | R1-S1 and R1-S2 | `npm run e2e` exercises the browser-to-route turn submission path through the real backend route and fixture OpenAI-compatible provider without React importing provider SDKs or secrets. | As described in the evidence cell. | Recorded |
 | R1-S2 and R3-S1/R3-S2 | `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` covers bounded request construction, missing config handling, OpenAI-compatible response extraction, and no-mutation setup failure behavior. | As described in the evidence cell. | Recorded |
+| R1-S3 | 2026-07-05 architecture review of `src/app/api/director/turn/route.ts`, `src/server/director/turn-route.ts`, `src/lib/director/*`, and `src/lib/world/convex-*` after `npm run ci:required`, `npm run convex:once`, and `npm run e2e` passed. | proves the Route Handler is a thin adapter and reusable server/world helper modules own the movable orchestration logic instead of React. | Passing |
 | R1-S4 | `src/app/api/director/turn/route.test.ts` | proves malformed `worldId` returns a structured `400` before LLM config is required and without recording player input. | Recorded |
 | R2-S1 and R2-S2 | Runtime POST to `/api/director/turn` with `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` succeeded, proving the provider adapter contract against local Ollama. | As described in the evidence cell. | Passing |
+| R2-S3 | `src/app/api/director/turn/route.test.ts` and 2026-07-05 `npm run ci:required` cover missing configuration as a structured setup failure before a provider call. | proves deterministic app surfaces and setup-oriented failure handling remain available when provider configuration is absent. | Passing |
 | R3-S1 and R3-S2 | Game Master request construction tests | prove each provider request is built from current persisted state and recent bounded narration context rather than provider-managed remote session state. | Recorded |
-| Supporting gate | `npm run ci:required` and `npm run convex:once` passed for the broader app surface. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` passed on 2026-07-05 for the broader app surface after the architecture refactor. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
 
@@ -284,10 +290,10 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 - None.
 ### Story LC-001-S3: Persistent Current-Scene NPC State
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want an NPC in the scene to remember meaningful interaction state, so that Lorecraft can prove structured persistence without modeling the full world yet.
 
@@ -393,7 +399,7 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 | `convex/world.ts` | seeds Taylor and Mira with stable actor keys and initializes Mira's `mood`, `status`, and `memory` facts. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | retains structured NPC-update parsing/validation for extractor-style mutation, ignores unknown/offscreen NPC updates, partially accepts valid fields, and caps `memory` at 500 characters. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/prompt.ts` | sends current-scene NPC facts as hidden Game Master guidance. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows hidden NPC facts only in the debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows hidden NPC facts only in the debug panel. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -417,10 +423,10 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 - None.
 ### Story LC-001-S4: Debuggable Game Master Calls And Reset
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want to inspect Game Master calls and reset the spike world, so that early LLM behavior can be tuned without losing evidence or hand-editing every playtest cleanup.
 
@@ -502,7 +508,7 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 | `convex/world.ts` | persists Game Master call audit records, accepted NPC fact diffs, generic world events, and rough reset behavior. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM` and raw provider request text behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST`. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records pre-turn rejection logs and one local `director.turn.unit` log entry for each recorded provider-error, invalid-output, or successful Game Master turn when `LORECRAFT_DEBUG_LOG=1` is enabled. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | renders hidden facts, events, narrations, state diffs, and Game Master calls in the debug panel and exposes rough reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders hidden facts, events, narrations, state diffs, and Game Master calls in the debug panel and exposes rough reset. | Recheck when this Story changes or the listed path changes. |
 | `.gitignore`, `package.json`, `README.md` | document and support the local-only debug log path. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -526,10 +532,10 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 - None.
 ### Story LC-001-S5: Story Stream Reading Experience
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want the play surface to read like an unfolding story and stay anchored near the newest turn, so that long sessions feel like interactive fiction instead of a chat log I have to manage.
 
@@ -605,9 +611,10 @@ The system SHALL keep empty, pending, and error states understandable without re
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/app/world-client.tsx` | renders persisted feed rows as a prose-first story stream, with Game Master narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes, while preserving the existing unified narrative input and Enter-to-send behavior. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders persisted feed rows as a prose-first story stream, with Game Master narration as normalized app-font prose, player turns as authored action text, and world events as quiet inline notices. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | keeps the play surface in a constrained first-viewport layout where the story stream scrolls independently and the continuation input stays visible across desktop and narrow viewports. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | scrolls the story pane to the bottom when feed length, pending state, or error state changes. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/turn-action-panel.tsx` | keeps the continuation input, pending state, error state, Act expansion, Pass control, and Enter-to-send behavior near the story stream. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -631,10 +638,10 @@ The system SHALL keep empty, pending, and error states understandable without re
 - None.
 ### Story LC-001-S6: Scoped Narrative Turns
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want each resolved story beat to be stored as a scoped turn with an explicit trigger, so that action turns, Pass turns, debug records, and future rollback boundaries have one durable unit of progression.
 
@@ -751,7 +758,7 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 | `convex/world.ts` | creates pending action and Pass turns with Adventure-scoped sequence numbers, completes turns as succeeded or failed, links turn-scoped rows, exposes recent turn summaries in `getSnapshot`, includes `turnId` on derived feed entries, and clears turns during Adventure reset. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | passes `turnId`, optional `commandId`, and trigger metadata through successful, provider-error, and invalid-output Game Master completion paths while leaving pre-persistence request/config/Adventure-load failures unpersisted. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | includes optional `turnId`, optional `commandId`, and trigger metadata in local JSONL debug records. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows recent turn sequence/status/count summaries and raw turn summaries in the debug panel, and renders a subtle story-stream turn-number gutter for feed entries linked to a turn. | Recheck when this Story changes or the listed path changes. |
 | `docs/data-model.md`, `docs/persistence-system.md` | document scoped turns and defer snapshot rollback. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -766,7 +773,7 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 | R3-S1 through R3-S3 | `npm run e2e`, focused director tests, `docs/data-model.md`, and `docs/persistence-system.md` | prove rough reset clears turn history, accepted diffs remain turn-scoped audit records, and snapshot rollback remains deferred. | Recorded |
 | R4-S1 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove action turns still create commands and resolve current input. | Recorded |
 | R4-S2 and R4-S3 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove Pass turns complete or fail without command rows while remaining debug-visible. | Recorded |
-| R5-S1 | Source inspection of `src/app/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
+| R5-S1 | Source inspection of `src/features/play/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, and the prior local PR gate passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -780,10 +787,10 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 - None.
 ### Story LC-001-S7: Active Game Master Guidance And Context Assembly
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified: 2026-07-02
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a playtester, I want the Game Master to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
 
@@ -1002,7 +1009,7 @@ The system SHALL use the same story-visible history policy for state extraction 
 | `src/app/api/director/turn/route.ts` | passes effective generation settings, trigger metadata, and validated debug prompt guidance into Game Master request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/raw-request.ts` | gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/director.test.ts` | covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, raw request storage gating, and local turn-unit debug log shape. | Recheck when this Story changes or the listed path changes. |
 | `scripts/director-playtest.mjs` | runs the repeatable local Game Master playtest against a running dev server. | Recheck when this Story changes or the listed path changes. |
@@ -1036,10 +1043,10 @@ The system SHALL use the same story-visible history policy for state extraction 
 - None.
 ### Story LC-001-S8: Transcript Game Master Mode
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want a story-only Game Master mode that saves the transcript but does not mutate canonical world state, so that I can isolate story quality from persistence mechanics before adding mutation pressure back in.
 
@@ -1176,7 +1183,7 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 | `src/lib/director/output.ts` | parses transcript plain prose as narration with no NPC updates. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | branches backend Game Master orchestration by startup mode, loads transcript context for transcript mode, and sends transcript completions through a no-mutation path. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts` | seeds a fresh deterministic demo world, stores successful transcript narrations and Game Master calls, and skips NPC fact writes, LLM events, and state diffs. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | shows the latest Game Master mode and output contract in the debug summary. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | shows the latest Game Master mode and output contract in the debug summary. | Recheck when this Story changes or the listed path changes. |
 | `scripts/director-transcript-playtest.mjs` | verifies the local transcript no-mutation smoke path. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1201,10 +1208,10 @@ The system SHALL make persistent and transcript behavior easy to compare during 
 - None.
 ### Story LC-001-S12: Lightweight Location Cards And Movement
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want canonical locations to ground narration and support bounded actor movement, so that the story can move through known places without becoming a command-driven MUD.
 
@@ -1323,11 +1330,11 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `convex/world.ts` | exposes Location Card data through persistent Game Master context, debug snapshot location summaries, debug-gated location edit/create actions backed by internal mutations, validated actor movement persistence, session location/actor reset, and turn-scoped `moveActor` state diffs. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-turn-persistence.ts` | expose Location Card data through persistent Game Master context, debug snapshot location summaries, debug-gated location edit/create actions backed by internal mutations, validated actor movement persistence, session location/actor reset, and turn-scoped `moveActor` state diffs. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/prompt.ts` | renders current Location Card and Known Locations prompt sections in persistent mode while keeping transcript mode seed-plus-transcript only. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | parses state extraction output with `npcUpdates` and `actorMoves`, validates movement against current-scene actors, existing known locations, clear travel input, narration-confirmed arrival, and explicit NPC movement narration. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records validated actor moves through the post-narration extractor path and skips movement extraction in transcript mode. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | adds the debug `Locations` tab with canonical location inspection, edit, create, and actor/object/exit summaries. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-location-debug-saves.ts` | add the debug `Locations` tab with canonical location inspection, edit/create save workflow, flush-before-turn behavior, and actor/object/exit summaries. | Recheck when this Story changes or the listed paths change. |
 | `scripts/llm-fixture-server.mjs`, `tests/e2e/lorecraft-playtest.spec.ts` | cover deterministic fixture-backed movement in browser E2E. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1339,6 +1346,7 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 | R3-S1 through R3-S4 | `npm run e2e` | proves the debug `Locations` tab lists, edits, creates, and preserves stable keys for canonical locations. | Recorded |
 | R4-S1 through R4-S3 | `npm run e2e` | proves Reset Session restores seeded locations/actor positions, accepted movement creates turn-scoped debug evidence, and rejected unknown-location movement remains inspectable. | Recorded |
 | Supporting gate | `npm run ci:required` and `npx convex codegen` passed after location context, debug-gated writes, movement persistence, and review remediation. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after Workstream 2 and 4 extraction | prove the extracted Location debug save hook, snapshot read model, director context model, and turn persistence helpers preserve location editing, movement evidence, reset, and browser debug flows. | Passing |
 
 #### Verification Gaps
 
@@ -1351,10 +1359,10 @@ The system SHALL make location state, edits, and movement decisions inspectable 
 - None.
 ### Story LC-001-S9: Read-Only NPC Context
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want NPCs to exist as readable authored objects in Game Master context, so that NPC-focused narration is grounded in world state before Lorecraft reintroduces intelligent state mutation.
 
@@ -1424,10 +1432,10 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/lib/director/npc-profiles.ts` | derives read-only NPC profiles from current-scene actors and actor facts. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | seeds Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; it also exposes debug-gated canonical NPC create/update/reset actions, clears blank debug fact values, and caps debug-created NPC/location counts. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts` | seed Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; expose NPC context and debug snapshot data; and keep debug-gated canonical NPC write actions registered through Convex. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/prompt.ts` | renders `npcProfiles` into canonical `npcCards`, includes `conversationFocus`, `lastAction`, and `sceneDirective` as persistent-mode prompt components; records `npcProfileKeys` and `npcMutationMode: "bounded_updates"` in request summaries; and keeps read-only NPC cards/profiles higher priority than recent feed prose. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | reads canonical Convex NPC context for persistent Game Master turns and leaves transcript mode unchanged. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | adds a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flushes queued NPC autosaves before player turn submission; and cancels queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts` | add a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flush queued NPC autosaves before player turn submission; and cancel queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/director.test.ts` | covers persistent NPC profile prompt context, prompt priority/scene directive context, direct-NPC question targeting, canonical debug-created NPC context, transcript exclusion, and the bounded mutation boundary. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1439,6 +1447,7 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 | R3-S1 through R3-S4 | `npm run e2e` | proves the debug `NPCs` tab shows seeded NPCs, saves Mira description edits, clears editable knowledge, creates a current-location NPC, and restores/removes debug-created NPC state on Reset Session. | Recorded |
 | R3-S2 and R3-S4 | Focused director tests | prove canonical debug-created NPC context and direct/recent addressed NPC targeting reach the next persistent Game Master request. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run typecheck`, `npm run lint`, and `npx convex codegen` passed after NPC profile/debug write remediation. | As described in the evidence cell. | Passing |
+| Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after Workstream 2 and 4 extraction | prove the extracted NPC autosave hook, debug shell, snapshot read model, director context model, and turn persistence helpers preserve NPC debug editing, reset, turn submission flushing, and deterministic browser flows. | Passing |
 
 #### Verification Gaps
 
@@ -1455,10 +1464,10 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 - None.
 ### Story LC-001-S10: Extracted NPC State Mutation
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want meaningful NPC characteristics to mutate through a separate validated extraction pass, so that the world can remember story consequences without making the creative Game Master response carry persistence decisions.
 
@@ -1581,7 +1590,7 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 | `src/lib/director/prompt.ts` | keeps persistent story generation plain-prose and adds `buildNpcStateExtractionRequest` for a second JSON-only extractor request using final narration, current input, current-scene NPC Cards, recent story, and the `mood` / `status` / `memory` allowlist. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | adds `parseNpcStateExtractionOutput` while reusing existing NPC update validation, actor allowlisting, field allowlisting, memory caps, and scene-beat persistence boundaries. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | runs extraction only after successful persistent narration, records story and extraction calls with `requestSummary.callRole`, skips extraction in transcript mode, and treats extractor failure as a debug-visible persistence miss rather than a failed story turn. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts` | adds `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records. | Recheck when this Story changes or the listed path changes. |
+| `convex/world.ts`, `src/lib/world/convex-turn-persistence.ts` | add `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records. | Recheck when this Story changes or the listed paths change. |
 | `scripts/director-playtest.mjs` | verifies persistent mode now records both story-generation and NPC-state-extraction calls for each tested turn. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1606,10 +1615,10 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 - None.
 ### Story LC-001-S11: End To End Playtest Verification
 
-Status: draft
+Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified:
+Modified: 2026-07-05
+Last verified: 2026-07-05
 
 As a developer-playtester, I want deterministic browser E2E coverage of the Lorecraft playtest loop, so that UI, backend route, Convex state, and provider-shaped Game Master behavior can be verified together.
 
@@ -1713,7 +1722,7 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 | `scripts/llm-fixture-server.mjs` | provides the deterministic OpenAI-compatible chat completions fixture for story-generation and NPC-state extraction calls. | Recheck when this Story changes or the listed path changes. |
 | `scripts/e2e-next-server.mjs` | builds and runs the Next app on the E2E test port with signal handling for clean Playwright shutdown. | Recheck when this Story changes or the listed path changes. |
 | `tests/e2e/lorecraft-playtest.spec.ts` | drives the browser through seeding/reset, narrative input, pending state, persisted reload state, debug drawer toggling, turn evidence, and reset reuse. | Recheck when this Story changes or the listed path changes. |
-| `src/app/world-client.tsx` | distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | distinguishes default-world query loading from the no-world seed state so the seed control is stable for browser users and E2E. | Recheck when this Story changes or the listed path changes. |
 | `vitest.config.ts` | keeps Playwright specs out of the Vitest unit-test suite. | Recheck when this Story changes or the listed path changes. |
 | `package.json` | exposes `npm run e2e`, `npm run e2e:install`, fixture, Convex, and Next startup scripts while leaving `npm run ci:required` unchanged. | Recheck when this Story changes or the listed path changes. |
 

@@ -9,46 +9,29 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import {
+  DEFAULT_ADVENTURE_SLUG,
+  NPC_PROFILE_FACT_KEYS_FOR_WRITE,
+  SEEDED_NPCS,
+  SEEDED_ROOMS,
+  WORLD_SLUG,
+  buildStormboundBaseline,
+  type AdventureBaseline,
+} from "../src/lib/world/stormbound-baseline";
+import {
+  loadSnapshotReadModel,
+} from "../src/lib/world/convex-snapshot-read-model";
+import {
+  loadDirectorContextReadModel,
+  loadTranscriptDirectorContextReadModel,
+} from "../src/lib/world/convex-director-context";
+import {
+  applyAcceptedActorMoves as applyAcceptedActorMovesToTurn,
+  applyAcceptedNpcUpdates as applyAcceptedNpcUpdatesToTurn,
+  type FactValue,
+} from "../src/lib/world/convex-turn-persistence";
 
-type FactValue = string | number | boolean | null;
 type DatabaseCtx = MutationCtx | QueryCtx;
-type BaselineFact = { key: string; value: FactValue };
-type AdventureBaseline = {
-  world: { name: string; description: string };
-  rooms: Array<{ key: string; name: string; description: string }>;
-  exits: Array<{ fromRoomKey: string; toRoomKey: string; label: string; visible: boolean }>;
-  player: { key: string; name: string; description: string; roomKey: string };
-  npcs: Array<{
-    key: string;
-    name: string;
-    description: string;
-    roomKey: string;
-    facts: BaselineFact[];
-  }>;
-  objects: Array<{
-    key: string;
-    name: string;
-    description: string;
-    roomKey: string;
-    visible: boolean;
-    facts: BaselineFact[];
-  }>;
-  initialEvent: string;
-  initialNarration: string;
-};
-type AcceptedNpcUpdateForWrite = {
-  actorKey: string;
-  actorName: string;
-  reason: string;
-  changes: Array<{ key: "mood" | "status" | "memory"; value: string }>;
-};
-type AcceptedActorMoveForWrite = {
-  actorKey: string;
-  actorName: string;
-  toLocationKey: string;
-  toLocationName: string;
-  reason: string;
-};
 type DebugLocationWriteResult = {
   ok: boolean;
   error?: string;
@@ -60,243 +43,9 @@ type DebugNpcWriteResult = {
   actorId?: Id<"actors">;
 };
 
-const WORLD_SLUG = "stormbound-chapel-default";
-const DEFAULT_ADVENTURE_SLUG = "stormbound-chapel-default-adventure";
 const DEMO_RESET_ROW_LIMIT = 500;
 const DEBUG_CREATED_LOCATION_LIMIT = 25;
 const DEBUG_CREATED_NPC_LIMIT = 25;
-const PLAYER_KEY = "taylor";
-const NPC_PROFILE_FACT_KEYS_FOR_WRITE = [
-  "background",
-  "persona",
-  "voice",
-  "mood",
-  "status",
-  "memory",
-  "knowledge",
-] as const;
-const MIRA_KEY = "mira";
-const MIRA_DESCRIPTION =
-  "A local woman in practical rain-dark clothes, with damp dark hair and watchful eyes.";
-const MIRA_BASELINE_FACTS = [
-  {
-    key: "background",
-    value:
-      "Mira grew up around Stormbound Chapel and learned its routines from older caretakers. She has seen villagers dismiss old warnings as superstition, and she still carries guilt from once ignoring a sign she should have reported.",
-  },
-  {
-    key: "persona",
-    value:
-      "Cautious, observant, and slow to trust. Mira notices exits, strangers, and small changes before she speaks, and she tests whether someone is safe before sharing frightening truths.",
-  },
-  {
-    key: "voice",
-    value:
-      "Plain-spoken and restrained. Mira uses short warnings, practical details, and chapel or weather imagery. She avoids grand claims unless fear breaks through.",
-  },
-  { key: "mood", value: "watchful" },
-  {
-    key: "status",
-    value:
-      "standing near the chapel aisle, tense from the storm and alert to movement around her",
-  },
-  { key: "memory", value: "Mira has not yet formed meaningful memories of Taylor." },
-  {
-    key: "knowledge",
-    value:
-      "Mira knows the storm began after the chapel bell rang at midnight, but she is afraid to say that plainly.",
-  },
-] as const;
-const LEGACY_MIRA_FACT_KEYS = ["knows_about_storm"] as const;
-const PRIEST_KEY = "brother-alden";
-const PRIEST_NAME = "Brother Alden";
-const PRIEST_DESCRIPTION =
-  "A small, middle-aged priest in a patched black cassock, with ink-stained fingers and a careful stoop.";
-const PRIEST_BASELINE_FACTS = [
-  {
-    key: "background",
-    value:
-      "Brother Alden has tended Stormbound Chapel for years, keeping records, repairing small damage, and quietly helping villagers who come in from the rain.",
-  },
-  {
-    key: "persona",
-    value:
-      "Gentle, nervous, and dutiful. Alden tries to calm frightened people before admitting how much he knows, and he dislikes open confrontation.",
-  },
-  {
-    key: "voice",
-    value:
-      "Soft and formal, with small apologies and careful religious phrasing. He often answers indirectly before gathering courage.",
-  },
-  { key: "mood", value: "uneasy" },
-  {
-    key: "status",
-    value: "standing near the altar with a damp ledger tucked under one arm",
-  },
-  { key: "memory", value: "Brother Alden has not yet formed meaningful memories of Taylor." },
-  {
-    key: "knowledge",
-    value:
-      "Alden found a torn bell-rope fiber near the altar after midnight, but he has not told Mira because he fears accusing someone without proof.",
-  },
-] as const;
-const TAVERNKEEP_KEY = "rowan";
-const TAVERNKEEP_NAME = "Rowan";
-const TAVERNKEEP_DESCRIPTION =
-  "A broad-shouldered tavernkeeper with rolled sleeves, gray-shot hair, and a towel tucked through his belt.";
-const TAVERNKEEP_BASELINE_FACTS = [
-  {
-    key: "background",
-    value:
-      "Rowan has kept the Lantern & Bell open through bad weather, bad harvests, and worse rumors. He knows which villagers drink quietly and which ones talk when the rain gets loud.",
-  },
-  {
-    key: "persona",
-    value:
-      "Practical, watchful, and protective of his regulars. Rowan is friendly enough to paying guests, but he notices trouble before he names it.",
-  },
-  {
-    key: "voice",
-    value:
-      "Dry and plainspoken, with tavern humor and short warnings. Rowan asks direct questions and rarely wastes words.",
-  },
-  { key: "mood", value: "wary but hospitable" },
-  {
-    key: "status",
-    value: "working behind the tavern bar while keeping one eye on the door",
-  },
-  { key: "memory", value: "Rowan has not yet formed meaningful memories of Taylor." },
-  {
-    key: "knowledge",
-    value:
-      "Rowan heard someone pass the tavern toward the chapel shortly before the midnight bell, but he did not see their face.",
-  },
-] as const;
-const MINSTREL_KEY = "lena";
-const MINSTREL_NAME = "Lena";
-const MINSTREL_DESCRIPTION =
-  "A wiry traveling minstrel in a weather-stained green cloak, with quick hands and sharper eyes than her songs suggest.";
-const MINSTREL_BASELINE_FACTS = [
-  {
-    key: "background",
-    value:
-      "Lena arrived in Stormbound two nights ago with a cracked lute, three half-finished songs, and no clear explanation for why she chose this road.",
-  },
-  {
-    key: "persona",
-    value:
-      "Curious, evasive, and amused by danger until it becomes personal. Lena collects rumors and tests strangers with jokes before offering truth.",
-  },
-  {
-    key: "voice",
-    value:
-      "Lyrical but sly. Lena answers with teasing images, half-rhymes, and sudden blunt admissions when cornered.",
-  },
-  { key: "mood", value: "restless" },
-  {
-    key: "status",
-    value: "sitting near the tavern hearth with her lute case under one boot",
-  },
-  { key: "memory", value: "Lena has not yet formed meaningful memories of Taylor." },
-  {
-    key: "knowledge",
-    value:
-      "Lena noticed the chapel bell's sound had two tones at midnight, as if something cracked after the first strike.",
-  },
-] as const;
-const SEEDED_ROOMS = [
-  {
-    key: "chapel",
-    name: "Chapel",
-    description:
-      "Rain taps against warped shutters. A cracked lantern hangs beside a stone altar, Mira waits near the aisle, and Brother Alden stands close to the altar with a ledger under one arm.",
-  },
-  {
-    key: "vestry",
-    name: "Vestry",
-    description:
-      "The vestry smells of old paper and damp wool. A narrow desk sits under shelves of hymnals.",
-  },
-  {
-    key: "graveyard",
-    name: "Graveyard",
-    description: "Tilted stones vanish into the rain. The chapel door glows behind you.",
-  },
-  {
-    key: "tavern",
-    name: "Lantern & Bell Tavern",
-    description:
-      "Warm lamplight pools across scarred tables. Rain ticks against leaded windows, Rowan works behind the bar, and Lena sits near the hearth with a lute case under one boot.",
-  },
-] as const;
-
-const SEEDED_EXITS = [
-  { fromRoomKey: "chapel", toRoomKey: "vestry", label: "west", visible: true },
-  { fromRoomKey: "vestry", toRoomKey: "chapel", label: "east", visible: true },
-  { fromRoomKey: "chapel", toRoomKey: "graveyard", label: "north", visible: true },
-  { fromRoomKey: "graveyard", toRoomKey: "chapel", label: "south", visible: true },
-  { fromRoomKey: "chapel", toRoomKey: "tavern", label: "east", visible: true },
-  { fromRoomKey: "tavern", toRoomKey: "chapel", label: "west", visible: true },
-] as const;
-
-const SEEDED_OBJECTS = [
-  {
-    key: "shutters",
-    name: "Shutters",
-    description: "Warped wooden shutters latched against the storm.",
-    roomKey: "chapel",
-    visible: true,
-    facts: [{ key: "open", value: false }],
-  },
-  {
-    key: "lantern",
-    name: "Lantern",
-    description: "A cracked lantern with a low, unsteady flame.",
-    roomKey: "chapel",
-    visible: true,
-    facts: [{ key: "broken", value: false }],
-  },
-  {
-    key: "altar",
-    name: "Altar",
-    description: "A stone altar scarred by old candle wax.",
-    roomKey: "chapel",
-    visible: true,
-    facts: [{ key: "marked_with_chalk", value: false }],
-  },
-] as const;
-
-const SEEDED_NPCS = [
-  {
-    key: MIRA_KEY,
-    name: "Mira",
-    description: MIRA_DESCRIPTION,
-    facts: MIRA_BASELINE_FACTS,
-    roomKey: "chapel",
-    legacyFactKeys: LEGACY_MIRA_FACT_KEYS,
-  },
-  {
-    key: PRIEST_KEY,
-    name: PRIEST_NAME,
-    description: PRIEST_DESCRIPTION,
-    facts: PRIEST_BASELINE_FACTS,
-    roomKey: "chapel",
-  },
-  {
-    key: TAVERNKEEP_KEY,
-    name: TAVERNKEEP_NAME,
-    description: TAVERNKEEP_DESCRIPTION,
-    facts: TAVERNKEEP_BASELINE_FACTS,
-    roomKey: "tavern",
-  },
-  {
-    key: MINSTREL_KEY,
-    name: MINSTREL_NAME,
-    description: MINSTREL_DESCRIPTION,
-    facts: MINSTREL_BASELINE_FACTS,
-    roomKey: "tavern",
-  },
-] as const;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
@@ -402,10 +151,6 @@ function objectSubjectId(objectId: Id<"worldObjects">) {
   return `object:${objectId}`;
 }
 
-function roomSubjectId(roomKey: string) {
-  return `room:${roomKey}`;
-}
-
 function slugify(input: string) {
   return input
     .trim()
@@ -413,41 +158,6 @@ function slugify(input: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
-}
-
-function buildStormboundBaseline(): AdventureBaseline {
-  return {
-    world: {
-      name: "Stormbound Chapel",
-      description:
-        "A small persistent-world test set around a chapel, a tavern, a vestry, and a rain-lashed graveyard.",
-    },
-    rooms: SEEDED_ROOMS.map((room) => ({ ...room })),
-    exits: SEEDED_EXITS.map((exit) => ({ ...exit })),
-    player: {
-      key: PLAYER_KEY,
-      name: "Taylor",
-      description: "The playtester exploring whether the world remembers.",
-      roomKey: "chapel",
-    },
-    npcs: SEEDED_NPCS.map((npc) => ({
-      key: npc.key,
-      name: npc.name,
-      description: npc.description,
-      roomKey: npc.roomKey,
-      facts: npc.facts.map((fact) => ({ key: fact.key, value: fact.value })),
-    })),
-    objects: SEEDED_OBJECTS.map((object) => ({
-      key: object.key,
-      name: object.name,
-      description: object.description,
-      roomKey: object.roomKey,
-      visible: object.visible,
-      facts: object.facts.map((fact) => ({ key: fact.key, value: fact.value })),
-    })),
-    initialEvent: "The Stormbound Chapel Adventure was created from its source WorldVersion.",
-    initialNarration: "You stand in the chapel while rain works at the shutters.",
-  };
 }
 
 function stableActorKey(actor: { key?: string; name: string }) {
@@ -752,135 +462,6 @@ async function copyBaselineRuntimeRows(
     text: args.baseline.initialNarration,
     source: "seed",
   });
-}
-
-async function applyAcceptedNpcUpdates(
-  ctx: MutationCtx,
-  args: {
-    worldId: Id<"worlds">;
-    adventureId: Id<"adventures">;
-    turnId: Id<"turns">;
-    commandId?: Id<"commands">;
-    acceptedUpdates: AcceptedNpcUpdateForWrite[];
-  },
-) {
-  let changedFacts = 0;
-  const operations: Array<
-    | {
-        op: "setFact";
-        subjectType: string;
-        subjectId: string;
-        key: string;
-        value: FactValue;
-      }
-    | { op: "appendEvent"; text: string }
-  > = [];
-
-  for (const update of args.acceptedUpdates) {
-    const subjectId = actorSubjectId(update.actorKey);
-    for (const change of update.changes) {
-      await setFact(ctx, {
-        worldId: args.worldId,
-        adventureId: args.adventureId,
-        subjectType: "actor",
-        subjectId,
-        key: change.key,
-        value: change.value,
-        source: "llm",
-        overwrite: true,
-      });
-      changedFacts += 1;
-      operations.push({
-        op: "setFact",
-        subjectType: "actor",
-        subjectId,
-        key: change.key,
-        value: change.value,
-      });
-    }
-
-    const changedKeys = update.changes.map((change) => change.key).join(", ");
-    const eventText = `${update.actorName}'s ${changedKeys} changed after the exchange.`;
-    await ctx.db.insert("events", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      text: eventText,
-      source: "llm",
-    });
-    operations.push({ op: "appendEvent", text: eventText });
-  }
-
-  if (operations.length > 0) {
-    await ctx.db.insert("stateDiffs", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      source: "llm",
-      operations,
-    });
-  }
-
-  return changedFacts;
-}
-
-async function applyAcceptedActorMoves(
-  ctx: MutationCtx,
-  args: {
-    worldId: Id<"worlds">;
-    adventureId: Id<"adventures">;
-    turnId: Id<"turns">;
-    commandId?: Id<"commands">;
-    acceptedMoves: AcceptedActorMoveForWrite[];
-  },
-) {
-  if (args.acceptedMoves.length === 0) {
-    return 0;
-  }
-
-  const adventure = await ctx.db.get(args.adventureId);
-  const player = adventure?.currentPlayerActorId
-    ? await ctx.db.get(adventure.currentPlayerActorId)
-    : null;
-  const currentRoomId = player?.roomId;
-  const operations: Array<{ op: "moveActor"; actorId: Id<"actors">; toRoomId: Id<"rooms"> }> = [];
-
-  if (!currentRoomId) {
-    return 0;
-  }
-
-  for (const move of args.acceptedMoves) {
-    const actor = await findActorByKeyOrName(ctx, args.adventureId, move.actorKey, move.actorName);
-    const toRoom = await findRoomByKey(ctx, args.adventureId, move.toLocationKey);
-
-    if (
-      !actor ||
-      !toRoom ||
-      actor.adventureId !== args.adventureId ||
-      toRoom.adventureId !== args.adventureId ||
-      actor.roomId !== currentRoomId
-    ) {
-      continue;
-    }
-
-    await ctx.db.patch(actor._id, { roomId: toRoom._id });
-    operations.push({ op: "moveActor", actorId: actor._id, toRoomId: toRoom._id });
-  }
-
-  if (operations.length > 0) {
-    await ctx.db.insert("stateDiffs", {
-      worldId: args.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      ...(args.commandId ? { commandId: args.commandId } : {}),
-      source: "llm",
-      operations,
-    });
-  }
-
-  return operations.length;
 }
 
 async function deleteActorFactByKey(
@@ -1362,164 +943,11 @@ export const getSnapshot = query({
       return null;
     }
 
-    const { adventure, world, worldVersion, player, room } = loaded;
-    const includeDebugState = debugSnapshotDataEnabled();
-    const [
-      exits,
-      actors,
-      objects,
-      facts,
-      events,
-      narrations,
-      diffs,
-      directorCalls,
-      turns,
-      feed,
-      locations,
-    ] =
-      await Promise.all([
-        loadVisibleExits(ctx, args.adventureId, room._id),
-        ctx.db
-          .query("actors")
-          .withIndex("by_adventureId_and_roomId", (q) =>
-            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-          )
-          .take(20),
-        ctx.db
-          .query("worldObjects")
-          .withIndex("by_adventureId_and_roomId", (q) =>
-            q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-          )
-          .take(30),
-        ctx.db
-          .query("facts")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(80),
-        ctx.db
-          .query("events")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(30),
-        ctx.db
-          .query("narrations")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(30),
-        ctx.db
-          .query("stateDiffs")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(12),
-        ctx.db
-          .query("directorCalls")
-          .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-          .order("desc")
-          .take(10),
-        loadTurnSummaries(ctx, args.adventureId, 12),
-        loadFeed(ctx, args.adventureId, 60),
-        loadLocationSummaries(ctx, args.adventureId),
-      ]);
-
-    return {
-      adventure: {
-        _id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        _id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        _id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      player: {
-        _id: player._id,
-        key: stableActorKey(player),
-        name: player.name,
-        roomId: player.roomId,
-      },
-      room: {
-        _id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-      },
-      locations,
-      exits: exits.map((exit) => ({
-        _id: exit._id,
-        label: exit.label,
-        toRoomName: exit.toRoomName,
-      })),
-      actors: actors.map((actor) => ({
-        _id: actor._id,
-        key: stableActorKey(actor),
-        name: actor.name,
-        description: actor.description,
-        role: actor.role,
-      })),
-      objects: objects
-        .filter((object) => object.visible)
-        .map((object) => ({
-          _id: object._id,
-          key: object.key,
-          name: object.name,
-          description: object.description,
-        })),
-      facts: includeDebugState
-        ? facts.map((fact) => ({
-            _id: fact._id,
-            subjectType: fact.subjectType,
-            subjectId: fact.subjectId,
-            key: fact.key,
-            value: fact.value,
-            source: fact.source,
-          }))
-        : [],
-      feed,
-      events: events.map((event) => ({
-        _id: event._id,
-        text: event.text,
-        source: event.source,
-      })),
-      narrations: narrations.map((narration) => ({
-        _id: narration._id,
-        text: narration.text,
-        source: narration.source,
-      })),
-      diffs: includeDebugState
-        ? diffs.map((diff) => ({
-            _id: diff._id,
-            ...(diff.turnId ? { turnId: diff.turnId } : {}),
-            source: diff.source,
-            operations: diff.operations,
-          }))
-        : [],
-      turns,
-      directorCalls: includeDebugState
-        ? directorCalls.map((call) => ({
-            _id: call._id,
-            _creationTime: call._creationTime,
-            ...(call.turnId ? { turnId: call.turnId } : {}),
-            provider: call.provider,
-            model: call.model,
-            requestSummary: call.requestSummary,
-            status: call.status,
-            acceptedUpdates: call.acceptedUpdates,
-            ignoredUpdates: call.ignoredUpdates,
-            ...(call.commandId ? { commandId: call.commandId } : {}),
-            ...(call.rawRequest !== undefined ? { rawRequest: call.rawRequest } : {}),
-            ...(call.rawResponse !== undefined ? { rawResponse: call.rawResponse } : {}),
-            ...(call.parsedResponse !== undefined ? { parsedResponse: call.parsedResponse } : {}),
-            ...(call.error !== undefined ? { error: call.error } : {}),
-          }))
-        : [],
-    };
+    return await loadSnapshotReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+      includeDebugState: debugSnapshotDataEnabled(),
+    });
   },
 });
 
@@ -1608,122 +1036,10 @@ export const getDirectorContext = query({
       return null;
     }
 
-    const { adventure, world, worldVersion, player, room } = loaded;
-    const [exits, actors, objects, facts, recentFeed, storyVisibleHistory, allRooms] = await Promise.all([
-      loadVisibleExits(ctx, args.adventureId, room._id),
-      ctx.db
-        .query("actors")
-        .withIndex("by_adventureId_and_roomId", (q) =>
-          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-        )
-        .take(20),
-      ctx.db
-        .query("worldObjects")
-        .withIndex("by_adventureId_and_roomId", (q) =>
-          q.eq("adventureId", args.adventureId).eq("roomId", room._id),
-        )
-        .take(30),
-      ctx.db
-        .query("facts")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-      loadFeed(ctx, args.adventureId, 20),
-      loadStoryVisibleHistory(ctx, args.adventureId, 20),
-      ctx.db
-        .query("rooms")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-    ]);
-    const visibleObjects = objects
-      .filter((object) => object.visible)
-      .map((object) => ({
-        key: object.key,
-        name: object.name,
-        description: object.description,
-      }));
-    const actorSummaries = actors.map((actor) => ({
-      key: stableActorKey(actor),
-      name: actor.name,
-      role: actor.role,
-    }));
-
-    return {
-      adventure: {
-        id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      player: {
-        id: player._id,
-        key: stableActorKey(player),
-        name: player.name,
-      },
-      room: {
-        id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-      },
-      exits: exits.map((exit) => ({ label: exit.label, toRoomName: exit.toRoomName })),
-      actors: actors.map((actor) => {
-        const actorKey = stableActorKey(actor);
-        return {
-          id: actor._id,
-          key: actorKey,
-          name: actor.name,
-          role: actor.role,
-          description: actor.description,
-          locationKey: room.key,
-          facts: facts
-            .filter((fact) => fact.subjectId === actorSubjectId(actorKey))
-            .map((fact) => ({
-              key: fact.key,
-              value: fact.value,
-              source: fact.source,
-            })),
-        };
-      }),
-      objects: visibleObjects,
-      locationCard: {
-        id: room._id,
-        key: room.key,
-        name: room.name,
-        description: room.description,
-        facts: facts
-          .filter((fact) => fact.subjectId === roomSubjectId(room.key))
-          .map((fact) => ({
-            key: fact.key,
-            value: fact.value,
-            source: fact.source,
-          })),
-        visibleObjects,
-        visibleExits: exits.map((exit) => ({
-          label: exit.label,
-          toLocationKey: exit.toRoomKey,
-          toLocationName: exit.toRoomName,
-        })),
-        presentActors: actorSummaries,
-      },
-      knownLocations: allRooms.map((knownRoom) => ({
-        id: knownRoom._id,
-        key: knownRoom.key,
-        name: knownRoom.name,
-        description: knownRoom.description,
-      })),
-      recentFeed,
-      storyVisibleHistory,
-    };
+    return await loadDirectorContextReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+    });
   },
 });
 
@@ -1757,62 +1073,10 @@ export const getTranscriptDirectorContext = query({
     if (!loaded) {
       return null;
     }
-    const { adventure, world, worldVersion } = loaded;
-
-    const [chapel, player, actors, objects, transcript] = await Promise.all([
-      findRoomByKey(ctx, args.adventureId, "chapel"),
-      findActorByKeyOrName(ctx, args.adventureId, PLAYER_KEY, "Taylor"),
-      ctx.db
-        .query("actors")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(100),
-      ctx.db
-        .query("worldObjects")
-        .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
-        .take(30),
-      loadTranscript(ctx, args.adventureId, 40),
-    ]);
-    const startingNpcs = actors
-      .filter((actor) => actor.role === "npc")
-      .map((actor) => `Starting NPC: ${actor.name}. ${actor.description}`);
-
-    const initialSeed = [
-      `${world.name}: ${world.description}`,
-      chapel
-        ? `Opening scene: ${chapel.description}`
-        : "Opening scene: You begin in the Stormbound Chapel as rain lashes the old building.",
-      player ? `Player: ${player.name}. ${player.description}` : "Player: Taylor, the playtester.",
-      ...startingNpcs,
-      objects.length > 0
-        ? `Opening details: ${objects
-            .filter((object) => object.visible)
-            .map((object) => `${object.name}: ${object.description}`)
-            .join("; ")}`
-        : undefined,
-    ]
-      .filter((line): line is string => Boolean(line))
-      .join("\n");
-
-    return {
-      adventure: {
-        id: adventure._id,
-        name: adventure.name,
-        worldId: adventure.worldId,
-        worldVersionId: adventure.worldVersionId,
-      },
-      world: {
-        id: world._id,
-        name: world.name,
-        description: world.description,
-      },
-      sourceWorldVersion: {
-        id: worldVersion._id,
-        versionNumber: worldVersion.versionNumber,
-        name: worldVersion.name,
-      },
-      initialSeed,
-      transcript,
-    };
+    return await loadTranscriptDirectorContextReadModel(ctx, {
+      adventureId: args.adventureId,
+      loaded,
+    });
   },
 });
 
@@ -2026,13 +1290,17 @@ export const completeDirectorTurn = mutation({
       return { directorCallId, narrationId, changedFacts: 0 };
     }
 
-    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedUpdates: args.acceptedUpdates,
-    });
+    const changedFacts = await applyAcceptedNpcUpdatesToTurn(
+      ctx,
+      { setFact, actorSubjectId },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedUpdates: args.acceptedUpdates,
+      },
+    );
 
     await ctx.db.patch(args.turnId, { status: "succeeded", completedAt: Date.now() });
 
@@ -2104,20 +1372,28 @@ export const recordNpcStateExtraction = mutation({
       return { directorCallId, changedFacts: 0, movedActors: 0 };
     }
 
-    const changedFacts = await applyAcceptedNpcUpdates(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedUpdates: args.acceptedUpdates,
-    });
-    const movedActors = await applyAcceptedActorMoves(ctx, {
-      worldId: adventure.worldId,
-      adventureId: args.adventureId,
-      turnId: args.turnId,
-      commandId: args.commandId,
-      acceptedMoves: args.acceptedMoves ?? [],
-    });
+    const changedFacts = await applyAcceptedNpcUpdatesToTurn(
+      ctx,
+      { setFact, actorSubjectId },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedUpdates: args.acceptedUpdates,
+      },
+    );
+    const movedActors = await applyAcceptedActorMovesToTurn(
+      ctx,
+      { findActorByKeyOrName, findRoomByKey },
+      {
+        worldId: adventure.worldId,
+        adventureId: args.adventureId,
+        turnId: args.turnId,
+        commandId: args.commandId,
+        acceptedMoves: args.acceptedMoves ?? [],
+      },
+    );
 
     return { directorCallId, changedFacts, movedActors };
   },
@@ -2606,254 +1882,6 @@ async function loadCurrentAdventure(ctx: QueryCtx, adventureId: Id<"adventures">
   }
 
   return { adventure, world, worldVersion, player, room };
-}
-
-async function loadVisibleExits(ctx: QueryCtx, adventureId: Id<"adventures">, roomId: Id<"rooms">) {
-  const exits = await ctx.db
-    .query("exits")
-    .withIndex("by_adventureId_and_fromRoomId", (q) =>
-      q.eq("adventureId", adventureId).eq("fromRoomId", roomId),
-    )
-    .take(20);
-
-  return await Promise.all(
-    exits
-      .filter((exit) => exit.visible)
-      .map(async (exit) => {
-        const toRoom = await ctx.db.get(exit.toRoomId);
-        return {
-          _id: exit._id,
-          label: exit.label,
-          toRoomKey: toRoom?.key ?? "unknown",
-          toRoomName: toRoom?.name ?? "Unknown",
-        };
-      }),
-  );
-}
-
-async function loadLocationSummaries(ctx: QueryCtx, adventureId: Id<"adventures">) {
-  const [rooms, actors, objects, exits] = await Promise.all([
-    ctx.db
-      .query("rooms")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("actors")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("worldObjects")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-    ctx.db
-      .query("exits")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .take(100),
-  ]);
-  const roomsById = new Map(rooms.map((room) => [room._id, room]));
-
-  return rooms.map((room) => ({
-    _id: room._id,
-    key: room.key,
-    name: room.name,
-    description: room.description,
-    actors: actors
-      .filter((actor) => actor.roomId === room._id)
-      .map((actor) => ({
-        _id: actor._id,
-        key: stableActorKey(actor),
-        name: actor.name,
-        description: actor.description,
-        role: actor.role,
-      })),
-    objects: objects
-      .filter((object) => object.roomId === room._id && object.visible)
-      .map((object) => ({ key: object.key, name: object.name })),
-    exits: exits
-      .filter((exit) => exit.fromRoomId === room._id && exit.visible)
-      .map((exit) => {
-        const toRoom = roomsById.get(exit.toRoomId);
-        return {
-          label: exit.label,
-          toLocationKey: toRoom?.key ?? "unknown",
-          toLocationName: toRoom?.name ?? "Unknown",
-        };
-      }),
-  }));
-}
-
-async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const [commands, narrations, events] = await Promise.all([
-    ctx.db
-      .query("commands")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("narrations")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("events")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-  ]);
-
-  return [
-    ...commands.map((command) => ({
-      id: `command:${command._id}`,
-      kind: "player" as const,
-      text: command.input,
-      source: "player",
-      createdAt: command._creationTime,
-      ...(command.turnId ? { turnId: command.turnId } : {}),
-      commandId: command._id,
-    })),
-    ...narrations.map((narration) => ({
-      id: `narration:${narration._id}`,
-      kind: "director" as const,
-      text: narration.text,
-      source: narration.source,
-      createdAt: narration._creationTime,
-      ...(narration.turnId ? { turnId: narration.turnId } : {}),
-      ...(narration.commandId ? { commandId: narration.commandId } : {}),
-    })),
-    ...events.map((event) => ({
-      id: `event:${event._id}`,
-      kind: "event" as const,
-      text: event.text,
-      source: event.source,
-      createdAt: event._creationTime,
-      ...(event.turnId ? { turnId: event.turnId } : {}),
-      ...(event.commandId ? { commandId: event.commandId } : {}),
-    })),
-  ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadStoryVisibleHistory(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const narrations = await ctx.db
-    .query("narrations")
-    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-    .order("desc")
-    .take(limit);
-  const turnIds = [...new Set(narrations.flatMap((narration) => (narration.turnId ? [narration.turnId] : [])))];
-  const turns = await Promise.all(turnIds.map((turnId) => ctx.db.get(turnId)));
-  const successfulTurnIds = new Set(
-    turns
-      .filter((turn): turn is NonNullable<typeof turn> => turn?.status === "succeeded")
-      .map((turn) => turn._id),
-  );
-
-  return narrations
-    .filter((narration) => narration.source === "seed" || !narration.turnId || successfulTurnIds.has(narration.turnId))
-    .map((narration) => ({
-      id: `narration:${narration._id}`,
-      kind: "director" as const,
-      text: narration.text,
-      source: narration.source,
-      createdAt: narration._creationTime,
-      ...(narration.turnId ? { turnId: narration.turnId } : {}),
-      ...(narration.commandId ? { commandId: narration.commandId } : {}),
-    }))
-    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadTranscript(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const [commands, narrations] = await Promise.all([
-    ctx.db
-      .query("commands")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-    ctx.db
-      .query("narrations")
-      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
-      .order("desc")
-      .take(limit),
-  ]);
-
-  return [
-    ...commands.map((command) => ({
-      id: `command:${command._id}`,
-      kind: "player" as const,
-      text: command.input,
-      source: "player",
-      createdAt: command._creationTime,
-      ...(command.turnId ? { turnId: command.turnId } : {}),
-      commandId: command._id,
-    })),
-    ...narrations
-      .filter((narration) => narration.source !== "seed")
-      .map((narration) => ({
-        id: `narration:${narration._id}`,
-        kind: "director" as const,
-        text: narration.text,
-        source: narration.source,
-        createdAt: narration._creationTime,
-        ...(narration.turnId ? { turnId: narration.turnId } : {}),
-        ...(narration.commandId ? { commandId: narration.commandId } : {}),
-      })),
-  ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
-}
-
-async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const turns = await ctx.db
-    .query("turns")
-    .withIndex("by_adventureId_and_sequenceNumber", (q) => q.eq("adventureId", adventureId))
-    .order("desc")
-    .take(limit);
-
-  return await Promise.all(
-    turns.map(async (turn) => {
-      const [command, narrations, events, stateDiffs, directorCalls] = await Promise.all([
-        turn.commandId ? ctx.db.get(turn.commandId) : Promise.resolve(null),
-        ctx.db
-          .query("narrations")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("events")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("stateDiffs")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .take(20),
-        ctx.db
-          .query("directorCalls")
-          .withIndex("by_adventureId_and_turnId", (q) =>
-            q.eq("adventureId", adventureId).eq("turnId", turn._id),
-          )
-          .order("desc")
-          .take(1),
-      ]);
-
-      return {
-        _id: turn._id,
-        _creationTime: turn._creationTime,
-        sequenceNumber: turn.sequenceNumber,
-        actorId: turn.actorId,
-        trigger: turn.trigger,
-        status: turn.status,
-        narrationCount: narrations.length,
-        eventCount: events.length,
-        stateDiffCount: stateDiffs.length,
-        ...(turn.commandId ? { commandId: turn.commandId } : {}),
-        ...(turn.error !== undefined ? { error: turn.error } : {}),
-        ...(turn.completedAt !== undefined ? { completedAt: turn.completedAt } : {}),
-        ...(command ? { playerInput: command.input } : {}),
-        ...(directorCalls[0] ? { directorCallStatus: directorCalls[0].status } : {}),
-      };
-    }),
-  );
 }
 
 async function deleteCommands(ctx: MutationCtx, adventureId: Id<"adventures">) {

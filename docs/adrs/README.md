@@ -6,6 +6,7 @@ Epics and Stories remain the source of truth for implemented behavior. ADRs expl
 
 ## Current Records
 
+- [2026-07-03: Layered Next.js Application Boundaries](2026-07-03-layered-nextjs-application-boundaries.md) - Proposed
 - [2026-07-01: World Templates Create Frozen Adventure Copies](2026-07-01-world-adventure-frozen-copies.md)
 
 ## When To Add One
