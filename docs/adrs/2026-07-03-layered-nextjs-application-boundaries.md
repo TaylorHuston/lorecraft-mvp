@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-03
-- Related change: `docs/changes/2026-07-03-nextjs-architecture-refactor/`
+- Related change: `docs/changes/closed/2026-07-03-nextjs-architecture-refactor/`
 - Related Epics / Stories: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`; `docs/epics/lc-002-world-adventure-model/epic.md`
 
 ## Context

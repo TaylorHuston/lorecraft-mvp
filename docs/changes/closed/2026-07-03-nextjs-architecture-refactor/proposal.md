@@ -70,7 +70,7 @@ The change should:
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-07-03-nextjs-architecture-refactor/`
+- Former active location: `docs/changes/2026-07-03-nextjs-architecture-refactor/`
 - Closed location: `docs/changes/closed/2026-07-03-nextjs-architecture-refactor/`
 
 ## Impact

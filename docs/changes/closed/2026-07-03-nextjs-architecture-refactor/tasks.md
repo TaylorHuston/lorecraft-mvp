@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Current state: reviewed and ready for local integration into `develop` after user authorization.
-- Last completed action: fresh `/sdd-review` passed after reconciling stale review state and LC-001 evidence metadata.
-- Next action: ask Taylor whether to merge and close this change according to the app branch policy.
-- Active branch/ref: `change/nextjs-architecture-refactor`
+- Current state: closed after local merge into `develop`.
+- Last completed action: merged `change/nextjs-architecture-refactor` into `develop` and moved the change artifacts to `docs/changes/closed/`.
+- Next action: none for this change.
+- Active branch/ref: `develop`
 - Expected dirty files: none after ledger commit
 - Known blockers: none identified
 
@@ -96,8 +96,8 @@
 - [x] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -198,10 +198,10 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - ADR status: Accepted
 - Changelog current: not required
 - `sdd-review` verdict: ready
-- Review record: `docs/changes/2026-07-03-nextjs-architecture-refactor/review.md`
+- Review record: `docs/changes/closed/2026-07-03-nextjs-architecture-refactor/review.md`
 - `review.md` findings resolved: yes
 - Planning updates resolved: yes
 - Manual UI confirmation status: pending Taylor
-- PR / merge state: not started
+- PR / merge state: locally merged into `develop` on 2026-07-05; no remote PR created
 - Deferred scope accepted: none
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
