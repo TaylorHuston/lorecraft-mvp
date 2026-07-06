@@ -7,7 +7,7 @@ type TurnActionPanelProps = {
   isSubmitting: boolean;
   notice: string | null;
   error: string | null;
-  onActSubmit: (input: string) => Promise<boolean>;
+  onActSubmit: (input: string) => Promise<"close" | "keep-open" | false>;
   onPass: () => Promise<boolean>;
 };
 
@@ -57,9 +57,15 @@ export function TurnActionPanel({
     }
 
     setInput("");
-    const ok = await onActSubmit(submittedInput);
-    if (ok) {
+    const result = await onActSubmit(submittedInput);
+    if (result === "close") {
       setIsActInputOpen(false);
+      setIsActInputClosing(false);
+      setIsTurnControlsSettling(false);
+      return;
+    }
+    if (result === "keep-open") {
+      setIsActInputOpen(true);
       setIsActInputClosing(false);
       setIsTurnControlsSettling(false);
       return;

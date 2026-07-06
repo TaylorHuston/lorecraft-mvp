@@ -17,7 +17,7 @@ In the MVP, that state is intentionally small:
 - WorldVersions describe the authored baseline.
 - Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
-- Commands, narrations, and events reconstruct the visible play feed.
+- Commands, narrations, events, and utility messages reconstruct the visible play feed.
 - Turns group each resolved story beat with the Game Master work it caused.
 - State diffs record accepted mutations.
 - Game Master calls and local logs explain what happened during LLM/provider interactions.
@@ -105,6 +105,20 @@ Exact raw request storage is diagnostic evidence only. It can include hidden NPC
 
 Request failures that happen before game history is persisted do not create turns. Examples include malformed request bodies, missing `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`, invalid Adventure ids, and missing required Adventure state.
 
+## Pre-Turn Utility Commands
+
+Slash commands are utility actions inside the player's decision phase. They are not narrative turns.
+
+Current commands:
+
+- `/help` returns deterministic engine help text.
+- `/look` asks for an observational description of the current scene.
+- `/look <target>` asks for an observational description of a visible/current-context actor, object, or location.
+
+Utility command results are persisted as `utilityMessages` so reload/resume keeps them visible in the feed. They do not create rows in `turns`, `commands`, `narrations`, `events`, or `stateDiffs`, and they do not run post-narration state extraction.
+
+The prompt boundary is explicit: future Game Master turns use canonical Adventure state plus `loadStoryVisibleHistory`, which reads successful narrations and seed narration. Utility output is excluded from that history. If a player learns something from `/look` and then acts on it, the later Act is what the Game Master evaluates as story input.
+
 ## Game Master Modes
 
 Lorecraft currently has two Game Master modes. The application server selects the mode at startup with `LORECRAFT_DIRECTOR_MODE`.
@@ -119,13 +133,13 @@ This keeps story writing and persistence decisions separate. A future smaller ex
 
 ## Demo World Lifetime
 
-For this MVP experiment, the Stormbound Chapel demo source is not durable product data. The seed mutation creates a fresh deterministic World, immutable WorldVersion, and default Adventure, then deletes the prior deterministic demo World plus its Adventures, WorldVersions, and runtime rows. Use Reset World when a playtest needs to return to the initial authored setup.
+For this MVP experiment, the seeded demo Worlds are not durable product data. The seed mutation creates fresh deterministic Stormbound Chapel and Tutorial Worlds with immutable WorldVersions, plus a default Stormbound Chapel Adventure, then deletes the prior deterministic demo Worlds and their Adventures, WorldVersions, and runtime rows. Use Reset World when a playtest needs to return to the initial authored setup.
 
 Reset Session is narrower: it deletes the selected Adventure's mutable runtime rows and recopies that Adventure's original source WorldVersion. If the World has a newer current WorldVersion, Reset Session does not upgrade the Adventure to it.
 
 Delete Adventure is narrower than Reset World and broader than Reset Session: it removes one local Adventure and its mutable runtime rows, while leaving the source WorldVersion available for future Adventures.
 
-This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. The MVP has a lightweight local World container screen at `/` that lists Adventures inside Stormbound Chapel for continue/create/delete. Each Adventure opens at `/adventures/<id>`. Polished World management, source patching, branching, and long-lived save files are deferred until the core story loop is worth preserving.
+This keeps playtesting focused on the initial seed, transcript behavior, prompt shape, and Game Master loop. The MVP has a lightweight local World container screen at `/` that lists seeded Worlds such as Stormbound Chapel and Tutorial, with Adventures inside each container for continue/create/delete. Each Adventure opens at `/adventures/<id>`. Polished World management, source patching, branching, and long-lived save files are deferred until the core story loop is worth preserving.
 
 ### Transcript mode
 
@@ -302,8 +316,11 @@ The visible play feed is reconstructed from persisted rows:
 - Player input from `commands`.
 - Game Master prose from `narrations`.
 - Concise happenings from `events`.
+- Pre-turn slash command output from `utilityMessages`.
 
 Events are currently shown in the feed because they help us inspect whether the world is changing. If they become noisy, we can filter them later without changing what the canonical state is.
+
+Utility messages are shown because they are useful player-visible inspection results. They are visually distinct, do not have turn numbers, and are not part of future Game Master story context.
 
 Feed entries include `turnId` when they were caused by a narrative turn, but the player-facing stream should still read as a story rather than as rigid turn cards. Turn grouping belongs in backend/debug surfaces until the story UI needs it.
 

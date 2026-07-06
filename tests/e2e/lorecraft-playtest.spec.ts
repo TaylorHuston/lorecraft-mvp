@@ -7,6 +7,17 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
 
     await seedFreshWorld(page);
 
+    await submitSlashCommand(page, "/help");
+    await expect(page.locator("#story-feed [data-story-kind='utility']")).toContainText(
+      "Available commands:",
+    );
+    await submitSlashCommand(page, "/look moonblade");
+    await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
+      'You do not see "moonblade" here to inspect.',
+    );
+    await page.locator("#close-act-input-button").click();
+    await expect(page.locator("#act-turn-button")).toBeVisible();
+
     const playerText = "Mira, what do you know about the storm?";
     await submitAct(page, playerText);
 
@@ -227,7 +238,11 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.locator("#back-to-adventures-button").click();
     await expect(page).toHaveURL("/");
     await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
-    await page.locator("#create-adventure-button").click();
+    await expect(page.locator("#world-container-list")).toContainText("Tutorial");
+    const stormboundContainer = page.locator("section[id^='world-container-']").filter({
+      hasText: "Stormbound Chapel",
+    });
+    await stormboundContainer.locator("button[id^='create-adventure-']").click();
     await page.waitForURL(/\/adventures\/[^/]+$/);
     const temporaryAdventureId = page.url().split("/").pop();
     if (!temporaryAdventureId) {
@@ -246,6 +261,16 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await page.locator(`#delete-adventure-${temporaryAdventureId}`).click();
     await expect(temporaryAdventureCard).toHaveCount(0);
     await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
+
+    const tutorialContainer = page.locator("section[id^='world-container-']").filter({
+      hasText: "Tutorial",
+    });
+    await tutorialContainer.locator("button[id^='create-adventure-']").click();
+    await page.waitForURL(/\/adventures\/[^/]+$/);
+    await expect(page.locator("#story-stream")).toContainText("Guide Serin", {
+      timeout: 30_000,
+    });
+    await expect(page.locator("#story-stream")).toContainText("look around");
   });
 });
 
@@ -263,15 +288,18 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
     await expect(page.locator("#adventure-list-loading-state")).toHaveCount(0, {
       timeout: 30_000,
     });
-    if (await page.locator("#adventure-list button[id^='continue-adventure-']").first().isVisible()) {
-      await page.locator("#adventure-list button[id^='continue-adventure-']").first().click();
+    const stormboundContainer = page.locator("section[id^='world-container-']").filter({
+      hasText: "Stormbound Chapel",
+    });
+    if (await stormboundContainer.locator("button[id^='continue-adventure-']").first().isVisible()) {
+      await stormboundContainer.locator("button[id^='continue-adventure-']").first().click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
       await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
       await openDebugPanel(page);
       await page.locator("#fresh-seed-button").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     } else {
-      await page.locator("#create-adventure-button").click();
+      await stormboundContainer.locator("button[id^='create-adventure-']").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     }
   } else if (await page.locator("#seed-world-button").isVisible()) {
@@ -293,6 +321,18 @@ async function submitAct(page: import("@playwright/test").Page, input: string) {
   await expect(directorInput).toBeVisible();
   await directorInput.fill(input);
   await directorInput.press("Enter");
+}
+
+async function submitSlashCommand(page: import("@playwright/test").Page, input: string) {
+  if (!(await page.locator("#director-input").isVisible())) {
+    await page.locator("#act-turn-button").click();
+  }
+  const directorInput = page.locator("#director-input");
+  await expect(directorInput).toBeVisible();
+  await directorInput.fill(input);
+  await directorInput.press("Enter");
+  await expect(directorInput).toBeVisible({ timeout: 60_000 });
+  await expect(directorInput).toHaveValue("");
 }
 
 async function openDebugPanel(page: import("@playwright/test").Page) {

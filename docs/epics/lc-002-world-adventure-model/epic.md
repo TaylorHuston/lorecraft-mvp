@@ -9,6 +9,7 @@ stories:
   - S2
   - S3
   - S4
+  - S5
 ---
 
 # LC-002 World / Adventure Model
@@ -47,10 +48,11 @@ Playtesters can start and resume a Stormbound Chapel Adventure that mutates inde
 
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
-| S1 | implemented | Start Adventure From World Version | 2026-07-02 | Startup screen can continue existing Adventures or create a new copy from the current WorldVersion. |
+| S1 | implemented | Start Adventure From World Version | 2026-07-02 | Startup screen can continue existing Adventures or create a new copy from the selected seeded WorldVersion. |
 | S2 | implemented | Adventure-Scoped Runtime State | 2026-07-01 | Runtime reads/writes and debug state use `adventureId`. |
 | S3 | implemented | World Version Edits Do Not Mutate Existing Adventures | 2026-07-01 | Live Convex isolation smoke proved v1 Adventure stayed unchanged after v2 source creation. |
 | S4 | implemented | Reset Adventure To Source Version | 2026-07-01 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
+| S5 | implemented | Tutorial World Seed | 2026-07-05 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
 
 ## Stories
 
@@ -275,6 +277,80 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 #### Verification Gaps
 
 - Optional live-provider smoke remains deferred; deterministic browser E2E and required CI are passing.
+
+### Story S5: Tutorial World Seed
+
+Status: implemented
+Created: 2026-07-05
+Modified: 2026-07-05
+Last verified: 2026-07-05
+
+As a new playtester, I want a Tutorial World that teaches the basic interaction loop, so that I can learn Act, Pass, `/help`, `/look`, and NPC presence before entering a normal story world.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Seeded Tutorial World
+
+The system SHALL seed a second authored World named `Tutorial` with an immutable WorldVersion and playable Adventure copy support.
+
+###### Scenario R1-S1: Tutorial appears as a World container
+
+- WHEN the local demo seed runs
+- THEN the startup screen includes a `Tutorial` World container in addition to `Stormbound Chapel`
+- AND Tutorial has its own Adventure list and create/continue behavior
+
+###### Scenario R1-S2: Tutorial Adventure copies its own source version
+
+- WHEN the player creates a Tutorial Adventure
+- THEN the Adventure stores the Tutorial `worldId` and `worldVersionId`
+- AND its runtime locations, NPCs, facts, exits, objects, and opening narration are copied from Tutorial source content
+- AND Stormbound Chapel Adventures are not modified
+
+##### Requirement R2: Progressive Tutorial Content
+
+The system SHALL author Tutorial content around the existing app mechanics without adding new gameplay systems.
+
+###### Scenario R2-S1: Starter room with one NPC
+
+- WHEN a Tutorial Adventure opens
+- THEN the player starts in a tutorial location with one guide NPC
+- AND the opening narration nudges the player to try `/help`, `/look`, Act, and Pass through fiction-friendly language
+
+###### Scenario R2-S2: Multi-NPC room
+
+- WHEN the player moves from the starter location to the next Tutorial location
+- THEN the destination contains multiple NPCs
+- AND the scene supports testing which NPCs are present, who responds, and what `/look <target>` can inspect
+
+###### Scenario R2-S3: Unsupported future systems are not introduced
+
+- WHEN Tutorial content references future lessons
+- THEN it does not require item manipulation, combat, inventory, dice, quests, or builder UI to complete the current Tutorial flow
+
+#### Implemented By
+
+| Path | Role | Recheck Trigger |
+|---|---|---|
+| `src/lib/world/stormbound-baseline.ts` | Defines the Tutorial World baseline alongside Stormbound Chapel, including starter and multi-NPC tutorial locations. | Recheck when seeded World content changes. |
+| `convex/world.ts` | Ensures Stormbound Chapel and Tutorial WorldVersions, lists seeded World containers, creates Adventures from the selected WorldVersion, and deletes/resets Adventure-owned rows. | Recheck when seeded World listing, Adventure creation, or reset/delete semantics change. |
+| `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx` | Renders multiple seeded World containers and creates Adventures from the selected container. | Recheck when home/startup behavior changes. |
+| `tests/e2e/lorecraft-playtest.spec.ts` | Exercises Tutorial listing and Tutorial Adventure creation in the deterministic browser flow. | Recheck when onboarding or startup behavior changes. |
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| R1-S1 and R1-S2 | `npm run e2e` | Home screen lists Tutorial as a separate World container and creates a Tutorial Adventure from Tutorial source content without modifying Stormbound Chapel. | Passing |
+| R2-S1 through R2-S3 | `npm run e2e`; source inspection of `buildTutorialBaseline` | Tutorial opens with Guide Serin in a one-NPC starter room, defines a second multi-NPC room, and uses only existing location, NPC, object, exit, opening narration, Act, Pass, `/help`, and `/look` mechanics. | Passing |
+| Supporting gate | `npm run ci:required`; `npm run convex:once` | Required app checks and Convex function compile pass with multiple seeded Worlds. | Passing |
+
+#### Verification Gaps
+
+- Taylor manual browser confirmation remains pending for whether Tutorial feels useful as onboarding rather than in-app documentation.
+
+#### Story Notes
+
+- Tutorial is a real seeded World, not a modal, overlay, static help screen, or private vault note.
 
 ## Cross-Story Concerns
 

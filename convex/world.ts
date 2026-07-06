@@ -14,8 +14,10 @@ import {
   NPC_PROFILE_FACT_KEYS_FOR_WRITE,
   SEEDED_NPCS,
   SEEDED_ROOMS,
+  TUTORIAL_WORLD_SLUG,
   WORLD_SLUG,
   buildStormboundBaseline,
+  buildTutorialBaseline,
   type AdventureBaseline,
 } from "../src/lib/world/stormbound-baseline";
 import {
@@ -49,13 +51,19 @@ const DEBUG_CREATED_NPC_LIMIT = 25;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
-const feedKind = v.union(v.literal("player"), v.literal("director"), v.literal("event"));
+const feedKind = v.union(
+  v.literal("player"),
+  v.literal("director"),
+  v.literal("event"),
+  v.literal("utility"),
+);
 const turnTrigger = v.union(v.literal("act"), v.literal("pass"));
 const directorStatus = v.union(
   v.literal("success"),
   v.literal("provider_error"),
   v.literal("invalid_output"),
 );
+const utilityStatus = v.union(v.literal("success"), v.literal("error"));
 const turnStatus = v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed"));
 const npcFactKey = v.union(v.literal("mood"), v.literal("status"), v.literal("memory"));
 const acceptedNpcUpdate = v.object({
@@ -115,6 +123,7 @@ const adventureDeleteResult = v.union(
     deletedCommands: v.number(),
     deletedNarrations: v.number(),
     deletedEvents: v.number(),
+    deletedUtilityMessages: v.number(),
     deletedStateDiffs: v.number(),
     deletedDirectorCalls: v.number(),
     deletedFacts: v.number(),
@@ -126,6 +135,7 @@ const adventureDeleteResult = v.union(
   v.object({ ok: v.literal(false), error: v.string() }),
 );
 const adventureListItem = v.object({
+  worldId: v.id("worlds"),
   _id: v.id("adventures"),
   name: v.string(),
   worldName: v.string(),
@@ -133,6 +143,13 @@ const adventureListItem = v.object({
   currentLocationName: v.optional(v.string()),
   turnCount: v.number(),
   lastPlayedAt: v.number(),
+});
+const worldContainerItem = v.object({
+  _id: v.id("worlds"),
+  name: v.string(),
+  description: v.string(),
+  sourceVersionNumber: v.number(),
+  adventures: v.array(adventureListItem),
 });
 const worldVersionCreateResult = v.union(
   v.object({ ok: v.literal(true), worldVersionId: v.id("worldVersions") }),
@@ -260,10 +277,16 @@ async function createAdventureFromBaseline(
   return adventureId;
 }
 
-async function ensureDemoWorldVersion(ctx: MutationCtx) {
+async function ensureSeededWorldVersion(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    baseline: AdventureBaseline;
+  },
+) {
   const existingWorld = await ctx.db
     .query("worlds")
-    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .withIndex("by_slug", (q) => q.eq("slug", args.slug))
     .unique();
 
   if (existingWorld?.currentWorldVersionId) {
@@ -277,13 +300,12 @@ async function ensureDemoWorldVersion(ctx: MutationCtx) {
     }
   }
 
-  const baseline = buildStormboundBaseline();
   const worldId =
     existingWorld?._id ??
     (await ctx.db.insert("worlds", {
-      slug: WORLD_SLUG,
-      name: baseline.world.name,
-      description: baseline.world.description,
+      slug: args.slug,
+      name: args.baseline.world.name,
+      description: args.baseline.world.description,
     }));
 
   const latest = await ctx.db
@@ -303,18 +325,33 @@ async function ensureDemoWorldVersion(ctx: MutationCtx) {
   const worldVersionId = await ctx.db.insert("worldVersions", {
     worldId,
     versionNumber: 1,
-    name: baseline.world.name,
-    description: baseline.world.description,
-    baseline,
+    name: args.baseline.world.name,
+    description: args.baseline.world.description,
+    baseline: args.baseline,
   });
   await ctx.db.patch(worldId, { currentWorldVersionId: worldVersionId });
 
-  return { worldId, worldVersionId, baseline };
+  return { worldId, worldVersionId, baseline: args.baseline };
+}
+
+async function ensureDemoWorldVersion(ctx: MutationCtx) {
+  return await ensureSeededWorldVersion(ctx, {
+    slug: WORLD_SLUG,
+    baseline: buildStormboundBaseline(),
+  });
+}
+
+async function ensureTutorialWorldVersion(ctx: MutationCtx) {
+  return await ensureSeededWorldVersion(ctx, {
+    slug: TUTORIAL_WORLD_SLUG,
+    baseline: buildTutorialBaseline(),
+  });
 }
 
 async function nextAdventureIdentity(
   ctx: MutationCtx,
   worldId: Id<"worlds">,
+  worldName: string,
   preferredName?: string,
 ) {
   const adventures = await ctx.db
@@ -322,8 +359,8 @@ async function nextAdventureIdentity(
     .withIndex("by_worldId", (q) => q.eq("worldId", worldId))
     .take(100);
   const ordinal = adventures.length + 1;
-  const name = preferredName?.trim().slice(0, 120) || `Stormbound Chapel Adventure ${ordinal}`;
-  const baseSlug = slugify(name) || `stormbound-chapel-adventure-${ordinal}`;
+  const name = preferredName?.trim().slice(0, 120) || `${worldName} Adventure ${ordinal}`;
+  const baseSlug = slugify(name) || `${slugify(worldName) || "adventure"}-${ordinal}`;
 
   for (let suffix = 0; suffix < 100; suffix += 1) {
     const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
@@ -544,6 +581,7 @@ export const seedDemoWorld = mutation({
   returns: v.id("adventures"),
   handler: async (ctx) => {
     await deleteDemoWorld(ctx);
+    await deleteTutorialWorld(ctx);
 
     const baseline = buildStormboundBaseline();
     const worldId = await ctx.db.insert("worlds", {
@@ -568,6 +606,7 @@ export const seedDemoWorld = mutation({
       worldVersionId,
       baseline,
     });
+    await ensureTutorialWorldVersion(ctx);
 
     return adventureId;
   },
@@ -589,65 +628,150 @@ export const listAdventures = query({
   args: {},
   returns: v.array(adventureListItem),
   handler: async (ctx) => {
-    const world = await ctx.db
-      .query("worlds")
-      .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
-      .unique();
-    if (!world) {
-      return [];
-    }
+    const worlds = (
+      await Promise.all([
+        ctx.db.query("worlds").withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG)).unique(),
+        ctx.db
+          .query("worlds")
+          .withIndex("by_slug", (q) => q.eq("slug", TUTORIAL_WORLD_SLUG))
+          .unique(),
+      ])
+    ).filter((world): world is Doc<"worlds"> => Boolean(world));
 
-    const adventures = await ctx.db
-      .query("adventures")
-      .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
-      .take(50);
+    const nestedItems = await Promise.all(
+      worlds.map(async (world) => {
+        const adventures = await ctx.db
+          .query("adventures")
+          .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+          .take(50);
 
-    const items = await Promise.all(
-      adventures.map(async (adventure) => {
-        const sourceVersion = await ctx.db.get(adventure.worldVersionId);
-        const player = adventure.currentPlayerActorId
-          ? await ctx.db.get(adventure.currentPlayerActorId)
-          : null;
-        const currentRoom = player ? await ctx.db.get(player.roomId) : null;
-        const latestTurn = await ctx.db
-          .query("turns")
-          .withIndex("by_adventureId_and_sequenceNumber", (q) =>
-            q.eq("adventureId", adventure._id),
-          )
-          .order("desc")
-          .take(1);
-        const turnCount = latestTurn[0]?.sequenceNumber ?? 0;
+        return await Promise.all(
+          adventures.map(async (adventure) => {
+            const sourceVersion = await ctx.db.get(adventure.worldVersionId);
+            const player = adventure.currentPlayerActorId
+              ? await ctx.db.get(adventure.currentPlayerActorId)
+              : null;
+            const currentRoom = player ? await ctx.db.get(player.roomId) : null;
+            const latestTurn = await ctx.db
+              .query("turns")
+              .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+                q.eq("adventureId", adventure._id),
+              )
+              .order("desc")
+              .take(1);
+            const turnCount = latestTurn[0]?.sequenceNumber ?? 0;
 
-        return {
-          _id: adventure._id,
-          name: adventure.name,
-          worldName: world.name,
-          sourceVersionNumber: sourceVersion?.versionNumber ?? 0,
-          currentLocationName: currentRoom?.name,
-          turnCount,
-          lastPlayedAt: latestTurn[0]?.completedAt ?? latestTurn[0]?._creationTime ?? adventure._creationTime,
-        };
+            return {
+              _id: adventure._id,
+              worldId: world._id,
+              name: adventure.name,
+              worldName: world.name,
+              sourceVersionNumber: sourceVersion?.versionNumber ?? 0,
+              currentLocationName: currentRoom?.name,
+              turnCount,
+              lastPlayedAt:
+                latestTurn[0]?.completedAt ?? latestTurn[0]?._creationTime ?? adventure._creationTime,
+            };
+          }),
+        );
       }),
     );
+    const items = nestedItems.flat();
 
     return items.sort((left, right) => right.lastPlayedAt - left.lastPlayedAt);
   },
 });
 
+export const listWorldContainers = query({
+  args: {},
+  returns: v.array(worldContainerItem),
+  handler: async (ctx) => {
+    const seededWorlds = (
+      await Promise.all([
+        ctx.db.query("worlds").withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG)).unique(),
+        ctx.db
+          .query("worlds")
+          .withIndex("by_slug", (q) => q.eq("slug", TUTORIAL_WORLD_SLUG))
+          .unique(),
+      ])
+    ).filter((world): world is Doc<"worlds"> => Boolean(world));
+
+    return await Promise.all(
+      seededWorlds.map(async (world) => {
+        const worldVersion = world.currentWorldVersionId
+          ? await ctx.db.get(world.currentWorldVersionId)
+          : null;
+        const adventures = await ctx.db
+          .query("adventures")
+          .withIndex("by_worldId", (q) => q.eq("worldId", world._id))
+          .take(50);
+        const adventureItems = await Promise.all(
+          adventures.map(async (adventure) => {
+            const sourceVersion = await ctx.db.get(adventure.worldVersionId);
+            const player = adventure.currentPlayerActorId
+              ? await ctx.db.get(adventure.currentPlayerActorId)
+              : null;
+            const currentRoom = player ? await ctx.db.get(player.roomId) : null;
+            const latestTurn = await ctx.db
+              .query("turns")
+              .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+                q.eq("adventureId", adventure._id),
+              )
+              .order("desc")
+              .take(1);
+            const turnCount = latestTurn[0]?.sequenceNumber ?? 0;
+            return {
+              _id: adventure._id,
+              worldId: world._id,
+              name: adventure.name,
+              worldName: world.name,
+              sourceVersionNumber: sourceVersion?.versionNumber ?? 0,
+              currentLocationName: currentRoom?.name,
+              turnCount,
+              lastPlayedAt:
+                latestTurn[0]?.completedAt ?? latestTurn[0]?._creationTime ?? adventure._creationTime,
+            };
+          }),
+        );
+
+        return {
+          _id: world._id,
+          name: world.name,
+          description: world.description,
+          sourceVersionNumber: worldVersion?.versionNumber ?? 0,
+          adventures: adventureItems.sort((left, right) => right.lastPlayedAt - left.lastPlayedAt),
+        };
+      }),
+    );
+  },
+});
+
 export const createAdventure = mutation({
   args: {
+    worldId: v.optional(v.id("worlds")),
     name: v.optional(v.string()),
   },
   returns: adventureCreateResult,
   handler: async (ctx, args) => {
-    const { worldId, worldVersionId, baseline } = await ensureDemoWorldVersion(ctx);
-    const identity = await nextAdventureIdentity(ctx, worldId, args.name);
+    const stormbound = await ensureDemoWorldVersion(ctx);
+    const tutorial = await ensureTutorialWorldVersion(ctx);
+    const selected =
+      args.worldId && args.worldId === tutorial.worldId
+        ? tutorial
+        : args.worldId && args.worldId === stormbound.worldId
+          ? stormbound
+          : stormbound;
+    const world = await ctx.db.get(selected.worldId);
+    if (!world) {
+      return { ok: false as const, error: "World could not be found." };
+    }
+    const identity = await nextAdventureIdentity(ctx, selected.worldId, world.name, args.name);
     const adventureId = await createAdventureFromBaseline(ctx, {
       slug: identity.slug,
       name: identity.name,
-      worldId,
-      worldVersionId,
-      baseline,
+      worldId: selected.worldId,
+      worldVersionId: selected.worldVersionId,
+      baseline: selected.baseline,
     });
 
     return { ok: true as const, adventureId };
@@ -665,6 +789,7 @@ export const deleteAdventure = mutation({
 
     const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
     const deletedEvents = await deleteEvents(ctx, args.adventureId);
+    const deletedUtilityMessages = await deleteUtilityMessages(ctx, args.adventureId);
     const deletedStateDiffs = await deleteStateDiffs(ctx, args.adventureId);
     const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.adventureId);
     const deletedCommands = await deleteCommands(ctx, args.adventureId);
@@ -684,6 +809,7 @@ export const deleteAdventure = mutation({
       deletedCommands,
       deletedNarrations,
       deletedEvents,
+      deletedUtilityMessages,
       deletedStateDiffs,
       deletedDirectorCalls,
       deletedFacts,
@@ -798,6 +924,11 @@ const feedEntry = v.object({
   createdAt: v.number(),
   turnId: v.optional(v.id("turns")),
   commandId: v.optional(v.id("commands")),
+  utilityMessageId: v.optional(v.id("utilityMessages")),
+  command: v.optional(v.string()),
+  input: v.optional(v.string()),
+  target: v.optional(v.string()),
+  status: v.optional(utilityStatus),
 });
 
 export const getSnapshot = query({
@@ -1194,6 +1325,57 @@ export const recordPassTurn = mutation({
   },
 });
 
+export const recordUtilityMessage = mutation({
+  args: {
+    adventureId: v.id("adventures"),
+    serverWriteToken: v.optional(v.string()),
+    input: v.string(),
+    command: v.string(),
+    target: v.optional(v.string()),
+    text: v.string(),
+    source: v.union(v.literal("engine"), v.literal("llm")),
+    status: utilityStatus,
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
+  },
+  returns: v.union(
+    v.object({ ok: v.literal(true), utilityMessageId: v.id("utilityMessages") }),
+    v.object({ ok: v.literal(false), error: v.string() }),
+  ),
+  handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return { ok: false as const, error: "Server write access is not configured." };
+    }
+
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false as const, error: "Adventure could not be found." };
+    }
+
+    const command = args.command.trim().toLowerCase();
+    const input = args.input.trim();
+    const text = args.text.trim();
+    if (!command || !input || !text) {
+      return { ok: false as const, error: "Utility command input and output are required." };
+    }
+
+    const utilityMessageId = await ctx.db.insert("utilityMessages", {
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
+      input: input.slice(0, 1000),
+      command: command.slice(0, 48),
+      ...(args.target?.trim() ? { target: args.target.trim().slice(0, 160) } : {}),
+      text: text.slice(0, 4000),
+      source: args.source,
+      status: args.status,
+      ...(args.provider ? { provider: args.provider.slice(0, 160) } : {}),
+      ...(args.model ? { model: args.model.slice(0, 160) } : {}),
+    });
+
+    return { ok: true as const, utilityMessageId };
+  },
+});
+
 function requireTurnMatchesCommand(
   turn: NonNullable<Doc<"turns">>,
   commandId: Id<"commands"> | undefined,
@@ -1406,6 +1588,7 @@ export const resetPlaytestWorld = mutation({
     deletedCommands: v.number(),
     deletedNarrations: v.number(),
     deletedEvents: v.number(),
+    deletedUtilityMessages: v.number(),
     deletedStateDiffs: v.number(),
     deletedDirectorCalls: v.number(),
     restoredFacts: v.number(),
@@ -1427,6 +1610,7 @@ export const resetPlaytestWorld = mutation({
 
     const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
     const deletedEvents = await deleteEvents(ctx, args.adventureId);
+    const deletedUtilityMessages = await deleteUtilityMessages(ctx, args.adventureId);
     const deletedStateDiffs = await deleteStateDiffs(ctx, args.adventureId);
     const deletedDirectorCalls = await deleteDirectorCalls(ctx, args.adventureId);
     const deletedCommands = await deleteCommands(ctx, args.adventureId);
@@ -1449,6 +1633,7 @@ export const resetPlaytestWorld = mutation({
       deletedCommands,
       deletedNarrations,
       deletedEvents,
+      deletedUtilityMessages,
       deletedStateDiffs,
       deletedDirectorCalls,
       restoredFacts: baseline.npcs.reduce((total, npc) => total + npc.facts.length, 0),
@@ -1920,6 +2105,18 @@ async function deleteEvents(ctx: MutationCtx, adventureId: Id<"adventures">) {
   return rows.length;
 }
 
+async function deleteUtilityMessages(ctx: MutationCtx, adventureId: Id<"adventures">) {
+  const rows = await ctx.db
+    .query("utilityMessages")
+    .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
+    .take(DEMO_RESET_ROW_LIMIT + 1);
+  assertDemoResetTableWithinLimit("utilityMessages", rows.length);
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+  return rows.length;
+}
+
 async function deleteStateDiffs(ctx: MutationCtx, adventureId: Id<"adventures">) {
   const rows = await ctx.db
     .query("stateDiffs")
@@ -1945,9 +2142,17 @@ async function deleteDirectorCalls(ctx: MutationCtx, adventureId: Id<"adventures
 }
 
 async function deleteDemoWorld(ctx: MutationCtx) {
+  await deleteWorldBySlug(ctx, WORLD_SLUG);
+}
+
+async function deleteTutorialWorld(ctx: MutationCtx) {
+  await deleteWorldBySlug(ctx, TUTORIAL_WORLD_SLUG);
+}
+
+async function deleteWorldBySlug(ctx: MutationCtx, slug: string) {
   const world = await ctx.db
     .query("worlds")
-    .withIndex("by_slug", (q) => q.eq("slug", WORLD_SLUG))
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
     .unique();
   if (!world) {
     return;
@@ -1962,6 +2167,7 @@ async function deleteDemoWorld(ctx: MutationCtx) {
   for (const adventure of adventures) {
     await deleteNarrations(ctx, adventure._id);
     await deleteEvents(ctx, adventure._id);
+    await deleteUtilityMessages(ctx, adventure._id);
     await deleteStateDiffs(ctx, adventure._id);
     await deleteDirectorCalls(ctx, adventure._id);
     await deleteCommands(ctx, adventure._id);

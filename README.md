@@ -4,7 +4,7 @@ Lorecraft is a local-first prototype for AI Dungeon-style play with database-bac
 
 The experiment is simple: can a small narrative world remember what changed because the world has explicit state, not because a long chat transcript happens to mention it?
 
-This is not a complete RPG. The current MVP is a playable persistent-world spike with one resettable demo world, a narrative story feed, an AI Game Master, inspectable debug state, NPC Cards, Location Cards, and bounded state mutation through Convex.
+This is not a complete RPG. The current MVP is a playable persistent-world spike with resettable demo worlds, a narrative story feed, an AI Game Master, inspectable debug state, NPC Cards, Location Cards, pre-turn utility commands, and bounded state mutation through Convex.
 
 ## Current Features
 
@@ -13,7 +13,9 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
 - Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
 - Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
-- Startup World container screen showing Stormbound Chapel with its local Adventures listed inside it, with each Adventure opened at `/adventures/<id>` and removable from the list.
+- Tutorial demo World for learning Act, Pass, `/help`, `/look`, and NPC presence.
+- Startup World container screen showing seeded Worlds with local Adventures listed inside them, with each Adventure opened at `/adventures/<id>` and removable from the list.
+- Pre-turn `/help` and `/look` utility commands that persist in the feed without incrementing turns or entering future Game Master story context.
 - Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
 - Location Cards with current-location context, known destination context, debug editing, and bounded movement.
@@ -153,7 +155,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, and reset Adventure location state.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 
@@ -169,7 +171,7 @@ npm run e2e:install
 |---|---|
 | `convex/schema.ts` | World, WorldVersion, Adventure, runtime table, and index definitions. |
 | `convex/world.ts` | Public Convex World/Adventure function contract, feed reconstruction, canonical state reads/writes, and mutation validation. |
-| `src/lib/world/stormbound-baseline.ts` | Stormbound Chapel seed constants and baseline builder. |
+| `src/lib/world/stormbound-baseline.ts` | Seeded World constants and baseline builders for Stormbound Chapel and Tutorial. |
 | `src/app/` | Thin App Router pages, route fallbacks, and API adapter files. |
 | `src/app/api/director/turn/route.ts` | Thin `/api/director/turn` Route Handler export. |
 | `src/server/director/` | Server-only Game Master turn request parsing, local route guards, orchestration, provider calls, persistence, extraction, and logging. |
@@ -207,4 +209,4 @@ These diagnostics can include prompt guidance, player text, model output, and hi
 
 Lorecraft should feel like a TTRPG-style Game Master: story-first play supported by structured Story Cards, durable memory, and eventually selective hidden adjudication for risky or consequential uncertainty.
 
-The long-term direction is not a lightweight MUD. Do not add slash commands, command lists, combat turns, HP, inventory, quest systems, or broad simulation controls until playtesting shows a concrete need.
+The long-term direction is not a lightweight MUD. Keep slash commands limited to useful pre-turn utilities unless playtesting proves a broader command surface is needed. Do not add combat turns, HP, inventory, quest systems, or broad simulation controls until there is a concrete need.

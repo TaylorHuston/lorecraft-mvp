@@ -12,11 +12,14 @@ The format is based on Keep a Changelog 1.1.0.
 - Startup World container screen for Stormbound Chapel, with local Adventures listed by turn count and last played date and opened at `/adventures/<id>`.
 - Home-screen deletion for local Adventures without changing the source WorldVersion.
 - Player-facing Pass turns that let the Game Master continue the current scene without adding player prose.
+- Pre-turn `/help` and `/look` utility commands that remain visible on reload without advancing the turn count.
+- Tutorial World for learning the basic play loop with a one-NPC starter room and a multi-NPC follow-up room.
 
 ### Changed
 
 - Runtime story state, debug edits, Game Master turns, state diffs, and reset behavior now target the selected Adventure instead of using the authored World as mutable play state.
 - Game Master prompts now continue from canonical Adventure state plus recent successful narration, while prior player commands and world events remain visible/debuggable but are not treated as normal future story context.
+- The startup screen now supports multiple seeded World containers instead of assuming Stormbound Chapel is the only World.
 
 ## [0.2.0] - 2026-07-01
 

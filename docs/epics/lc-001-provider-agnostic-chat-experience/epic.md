@@ -17,6 +17,7 @@ stories:
   - LC-001-S9
   - LC-001-S10
   - LC-001-S11
+  - LC-001-S13
 ---
 
 # LC-001 Provider-Agnostic Chat Experience
@@ -56,6 +57,7 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 | LC-001-S9 | implemented | Read-Only NPC Context | 2026-07-05 | Revalidated by extracted NPC/debug helpers, CI, Convex compile, and E2E gates. |
 | LC-001-S10 | implemented | Extracted NPC State Mutation | 2026-07-05 | Revalidated by turn-persistence helper extraction, CI, Convex compile, and E2E gates. |
 | LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Deterministic browser E2E passed. |
+| LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-05 | Adds `/help` and `/look` as utility actions that do not create turns or enter future Game Master narration history. |
 
 ## Stories
 
@@ -1745,6 +1747,112 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 
 - None.
 ## Cross-Story Concerns
+
+- Slash commands are allowed only as pre-turn utility actions unless a later Story explicitly expands that boundary. They must not become hidden turns, story narrations, state diffs, movement commands, inventory commands, combat commands, or a broad MUD command parser by accident.
+
+### Story LC-001-S13: Pre-Turn Slash Command Utilities
+
+Status: implemented
+Created: 2026-07-05
+Modified: 2026-07-05
+Last verified: 2026-07-05
+
+As a playtester, I want lightweight slash commands during my decision phase, so that I can inspect the current fiction or get command help without ending my turn.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Slash Command Input
+
+The system SHALL detect supported slash commands entered in the normal Act-expanded input and execute them as utility actions instead of narrative Acts.
+
+###### Scenario R1-S1: Help command
+
+- WHEN the player opens Act input and submits `/help`
+- THEN the system shows a utility result listing `/help` and `/look`
+- AND no turn is created
+- AND the turn number does not increment
+
+###### Scenario R1-S2: Unsupported command
+
+- WHEN the player submits an unsupported slash command such as `/dance`
+- THEN the system shows a utility error or help-oriented response
+- AND no turn is created
+- AND the input remains recoverable enough for the player to continue
+
+##### Requirement R2: Look Command
+
+The system SHALL support `/look` with an optional target and generate a player-facing inspection result from current Adventure context.
+
+###### Scenario R2-S1: Look around current scene
+
+- WHEN the player submits `/look`
+- THEN the backend builds a provider request from the current Location Card, present NPC Cards, visible objects, exits, and recent successful narration
+- AND the result describes what the player can currently observe
+- AND no canonical state is mutated
+
+###### Scenario R2-S2: Look at visible target
+
+- WHEN the player submits `/look Mira` and Mira is present or otherwise in current context
+- THEN the inspection result is grounded in Mira's canonical actor description and relevant current facts
+- AND recent narration may color the description without overriding canonical card truth
+
+###### Scenario R2-S3: Look at unknown target
+
+- WHEN the player submits `/look moonblade` and no visible/current-context target matches
+- THEN the system returns a clear utility result that the target is not something the player can currently inspect
+- AND no provider call is required for that negative result
+
+##### Requirement R3: Utility Feed Persistence And Prompt Exclusion
+
+The system SHALL persist slash-command results as Adventure-scoped utility feed entries that are visible on reload but excluded from future Game Master story prompts.
+
+###### Scenario R3-S1: Utility result survives reload
+
+- WHEN the player runs `/look`
+- AND reloads the Adventure
+- THEN the story stream still shows the utility result in its distinct visual style
+- AND the result is ordered with nearby feed entries by creation time
+
+###### Scenario R3-S2: Utility result is not story-visible history
+
+- WHEN the player later performs an Act or Pass turn
+- THEN the Game Master prompt includes canonical state and recent successful narrations
+- AND it does not include previous `/look` or `/help` output as normal narrative history
+
+###### Scenario R3-S3: Utility result does not affect turn lifecycle
+
+- WHEN the player runs one or more slash commands before acting
+- THEN the next Act or Pass turn receives the same next sequence number it would have received without those commands
+- AND no state extraction runs for the utility commands
+
+#### Implemented By
+
+| Path | Role | Recheck Trigger |
+|---|---|---|
+| `convex/schema.ts` | Defines Adventure-scoped `utilityMessages` for pre-turn slash command output. | Recheck when utility feed persistence changes. |
+| `convex/world.ts` | Records utility messages, exposes them in snapshots, and deletes them with Adventure reset/delete. | Recheck when utility persistence, reset, delete, or snapshot contracts change. |
+| `src/lib/world/convex-snapshot-read-model.ts` | Adds utility messages to the visible feed while keeping `loadStoryVisibleHistory` narration-only. | Recheck when feed reconstruction or Game Master history changes. |
+| `src/lib/director/slash-command.ts` | Parses supported and unsupported slash commands and provides deterministic help output. | Recheck when slash command syntax or supported commands change. |
+| `src/lib/director/look-prompt.ts` | Resolves `/look` targets and builds provider requests from current Adventure context. | Recheck when `/look` grounding or prompt context changes. |
+| `src/server/director/utility-request.ts`, `src/server/director/utility-route.ts`, `src/app/api/director/utility/route.ts` | Own server-side utility request validation, local route guard, provider call, and persistence orchestration. | Recheck when utility route behavior changes. |
+| `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx` | Dispatch same-input leading-slash commands, keep the decision phase open after utility success, and render utility feed entries distinctly. | Recheck when player input or story feed rendering changes. |
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| R1-S1 and R1-S2 | `npm run test -- src/lib/director/slash-command.test.ts src/app/api/director/utility/route.test.ts` | Supported and unsupported slash command input routes to utility behavior without turn creation or LLM config for `/help`. | Passing |
+| R2-S1 through R2-S3 | `src/app/api/director/utility/route.test.ts` | `/look` calls the provider for visible targets, uses canonical Adventure context, and returns deterministic no-provider output for unknown targets. | Passing |
+| R3-S1 through R3-S3 | `npm run e2e` | Browser path proves `/help` and `/look` utility entries render in the feed, do not close the decision phase, and leave the first real Act as Turn #1. | Passing |
+| Supporting gate | `npm run ci:required` | Lint, unit tests, typecheck, and production build pass with the utility route and feed changes. | Passing |
+
+#### Verification Gaps
+
+- Taylor manual browser confirmation remains pending for subjective utility styling and play feel; deterministic route and E2E behavior are passing.
+
+#### Story Notes
+
+- This Story reconciles the earlier MVP bias away from command parsing by limiting slash commands to pre-turn, read-only utility actions.
 
 
 ## Open Decisions
