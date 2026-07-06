@@ -353,14 +353,14 @@ export function WorldClient({
       >
         <div
           id="app-top-bar-inner"
-          className="pointer-events-auto flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
+          className="pointer-events-none flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
         >
           <div id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
             <span className="text-amber-300">Lorecraft</span>
             <span className="px-2 text-zinc-600">-</span>
             <span className="truncate text-zinc-300">{topBarWorldName}</span>
           </div>
-          <div id="top-bar-actions" className="flex items-center gap-2">
+          <div id="top-bar-actions" className="pointer-events-auto flex items-center gap-2">
             {adventureId ? (
               <button
                 id="back-to-adventures-button"

@@ -267,10 +267,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page).toHaveURL("/");
     await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
     await expect(page.locator("#world-container-list")).toContainText("Tutorial");
-    const stormboundContainer = page.locator("section[id^='world-container-']").filter({
-      hasText: "Stormbound Chapel",
-    });
-    await stormboundContainer.locator("button[id^='create-adventure-']").click();
+    await clickCreateAdventureForWorld(page, "Stormbound Chapel");
     await page.waitForURL(/\/adventures\/[^/]+$/);
     const temporaryAdventureId = page.url().split("/").pop();
     if (!temporaryAdventureId) {
@@ -290,10 +287,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(temporaryAdventureCard).toHaveCount(0);
     await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
 
-    const tutorialContainer = page.locator("section[id^='world-container-']").filter({
-      hasText: "Tutorial",
-    });
-    await tutorialContainer.locator("button[id^='create-adventure-']").click();
+    await clickCreateAdventureForWorld(page, "Tutorial");
     await page.waitForURL(/\/adventures\/[^/]+$/);
     await expect(page.locator("#story-stream")).toContainText("Guide Serin", {
       timeout: 30_000,
@@ -345,6 +339,20 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
+}
+
+async function clickCreateAdventureForWorld(page: import("@playwright/test").Page, worldName: string) {
+  const worldContainer = page.locator("section[id^='world-container-']").filter({
+    hasText: worldName,
+  });
+  const createButton = worldContainer.locator("button[id^='create-adventure-']");
+
+  await expect(worldContainer).toBeVisible();
+  await expect(createButton).toBeVisible();
+  await createButton.evaluate((element) => {
+    element.scrollIntoView({ block: "center", inline: "nearest" });
+  });
+  await createButton.click();
 }
 
 async function submitAct(page: import("@playwright/test").Page, input: string) {

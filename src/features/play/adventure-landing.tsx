@@ -52,7 +52,7 @@ export function AdventureLanding({
   return (
     <section
       id="adventure-landing"
-      className="mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 flex-col justify-center px-5 py-8 sm:px-8"
+      className="mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 flex-col justify-start px-5 py-8 sm:px-8"
     >
       <div id="adventure-landing-header" className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -88,7 +88,7 @@ export function AdventureLanding({
       ) : worlds.length > 0 ? (
         <div id="world-container-list" className="space-y-5">
           {worlds.map((world) => (
-            <section id={`world-container-${world._id}`} key={world._id} className="rounded-md bg-zinc-900/70">
+            <section id={`world-container-${world._id}`} key={world._id} className="scroll-mt-16 rounded-md bg-zinc-900/70">
               <div className="flex flex-col gap-3 border-b border-zinc-800 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-base font-medium text-zinc-100">{world.name}</h2>

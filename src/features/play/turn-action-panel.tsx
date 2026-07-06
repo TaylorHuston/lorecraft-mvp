@@ -251,7 +251,7 @@ export function TurnActionPanel({
                 placeholder="Type your response..."
                 rows={1}
                 disabled={disabled}
-                className="block h-24 min-h-24 w-full resize-none overflow-hidden rounded-xl bg-zinc-700/45 py-3 pl-4 pr-12 text-left text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-700/65"
+                className="block h-24 min-h-24 w-full resize-none overflow-hidden rounded-xl bg-zinc-700/45 py-3 pl-4 pr-12 text-left text-sm leading-6 text-zinc-100 outline-none ring-1 ring-transparent transition placeholder:text-zinc-500 focus:bg-zinc-700/65 focus-visible:ring-2 focus-visible:ring-amber-300/80"
               />
               <button
                 id="close-act-input-button"
