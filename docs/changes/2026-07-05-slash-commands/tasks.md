@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` changes requested; safe review fixes applied.
-- Last completed action: fixed review findings for offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
-- Next action: commit safe review fixes, then rerun `/sdd-review` for a fresh ready verdict.
+- Current state: `/sdd-review` changes requested; second safe review fix set applied.
+- Last completed action: fixed review findings for `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
+- Next action: commit this safe review fix set, then rerun `/sdd-review` for a fresh ready verdict.
 - Active branch/ref: `change/slash-commands-tutorial`
-- Expected dirty files: safe review fixes in implementation, tests, Epic docs, `tasks.md`, and `review.md`
+- Expected dirty files after remediation commit: none
 - Known blockers: none identified
 
 ## Task Checklist
@@ -102,6 +102,7 @@
 | 2026-07-05 | Forgiving `/look` target matching | main | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts` | Matched unique target tokens such as `/look Serin` to visible display names such as `Guide Serin` while preserving ambiguity handling. | `a82eb30` |
 | 2026-07-05 | LC-001-S13/R4 autocomplete | main + explorer `019f365b-34de-79c0-ad82-40f825780880` | `src/lib/director/slash-command-autocomplete.ts`, `src/lib/director/slash-command-autocomplete.test.ts`, `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, change artifacts, `README.md`, `CHANGELOG.md` | Added command and `/look` target autocomplete with keyboard/click acceptance, derived targets from current snapshot state, kept backend command parsing authoritative, and updated docs/evidence. | `6e03962` |
 | 2026-07-06 | Safe `/sdd-review` remediation | main + artifact/code/security reviewers | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts`, `convex/world.ts`, `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, LC-002 Epic, `review.md`, `tasks.md` | Fixed offscreen location inspection, scoped reseed deletion to Stormbound, restored empty first-run seed action, and reconciled stale Epic artifact structure/wording. | review remediation commit |
+| 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts`, `eslint.config.mjs`, `review.md`, `tasks.md` | Restricted `/look` provider prompts to observable actor description/status, added raw prompt regression coverage for private fact exclusion, and ignored generated Playwright output folders in ESLint. | review remediation commit |
 
 ## Verification Ledger
 
@@ -126,6 +127,9 @@
 | 2026-07-06 | `npm run typecheck` | broad supporting gate | TypeScript accepts review fixes. | Passed |
 | 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest still passes after empty-state seed action and review fixes. | Passed |
 | 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after review fixes. | Passed, 67 tests |
+| 2026-07-06 | `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | Proves parser, autocomplete, visible `/look` matching, offscreen location rejection, and non-observable NPC fact exclusion from `/look` provider prompts. | Passed, 14 tests |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest still passes after `/look` prompt privacy fix and lint ignore update. | Passed |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after the fresh review fixes. | Passed, 68 tests |
 
 ## Specialist Checkpoint
 
@@ -193,9 +197,9 @@
 - Superseded earlier Epic truth reconciled: complete
 - ADR status: not applicable
 - Changelog current: complete
-- `sdd-review` verdict: changes-requested, safe fixes applied; fresh rerun pending
+- `sdd-review` verdict: changes-requested, second safe fix set applied; fresh rerun pending
 - Review record: `docs/changes/2026-07-05-slash-commands/review.md`
-- `review.md` findings resolved: fixed in safe review pass; fresh rerun pending
+- `review.md` findings resolved: fixed in safe review passes; fresh rerun pending
 - Planning updates resolved: not applicable
 - Manual UI confirmation status: pending Taylor
 - PR / merge state: local implementation pending fresh review/merge

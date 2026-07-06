@@ -181,6 +181,28 @@ describe("Director utility route", () => {
     expect(mocks.mutation).toHaveBeenCalledTimes(1);
   });
 
+  it("omits non-observable NPC facts from /look provider requests", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(providerResponse("Mira stands near the aisle, watching the rain."));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(utilityRequest("/look Mira"));
+
+    expect(response.status).toBe(200);
+    const promptText = providerPromptText(fetchMock);
+    expect(promptText).toContain("A careful local with rain-dark hair.");
+    expect(promptText).toContain("status: waiting near the chapel aisle");
+    expect(promptText).not.toContain("secret temple childhood");
+    expect(promptText).not.toContain("tests strangers before trusting them");
+    expect(promptText).not.toContain("speaks in careful half answers");
+    expect(promptText).not.toContain("has not yet formed meaningful memories");
+    expect(promptText).not.toContain("Mira knows a hidden fact");
+    expect(promptText).not.toContain("mood: watchful");
+  });
+
   it("matches visible /look actors by a unique part of their display name", async () => {
     configureLlmEnv();
     const context = persistentContext();
@@ -216,6 +238,13 @@ describe("Director utility route", () => {
     );
   });
 });
+
+function providerPromptText(fetchMock: ReturnType<typeof vi.fn>) {
+  const body = fetchMock.mock.calls[0]?.[1]?.body;
+  expect(typeof body).toBe("string");
+  const parsed = JSON.parse(body as string) as { messages: Array<{ content: string }> };
+  return parsed.messages.map((message) => message.content).join("\n\n");
+}
 
 function utilityRequest(input: string) {
   return new Request("http://localhost/api/director/utility", {
@@ -293,8 +322,16 @@ function persistentContext() {
         role: "npc",
         description: "A careful local with rain-dark hair.",
         facts: [
+          { key: "background", value: "Mira grew up in a secret temple childhood.", source: "seed" },
+          { key: "persona", value: "Mira tests strangers before trusting them.", source: "seed" },
+          { key: "voice", value: "Mira speaks in careful half answers.", source: "seed" },
           { key: "mood", value: "watchful", source: "seed" },
           { key: "status", value: "waiting near the chapel aisle", source: "seed" },
+          {
+            key: "memory",
+            value: "Mira has not yet formed meaningful memories of Taylor.",
+            source: "seed",
+          },
           { key: "knowledge", value: "Mira knows a hidden fact.", source: "seed" },
         ],
       },

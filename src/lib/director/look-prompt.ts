@@ -18,6 +18,8 @@ const LOOK_SYSTEM_PROMPT = [
   "Return plain player-facing prose only.",
 ].join("\n");
 
+const OBSERVABLE_ACTOR_FACT_KEYS = new Set(["status"]);
+
 export function resolveLookTarget(
   context: DirectorContext,
   target: string | undefined,
@@ -184,7 +186,7 @@ export function buildLookRequest(
 
 function formatActor(actor: DirectorContext["actors"][number]) {
   const facts = actor.facts
-    .filter((fact) => fact.key !== "knowledge")
+    .filter((fact) => OBSERVABLE_ACTOR_FACT_KEYS.has(fact.key))
     .map((fact) => `${fact.key}: ${String(fact.value)}`)
     .join("; ");
   return `- ${actor.name} (${actor.key}, ${actor.role}): ${actor.description}${facts ? ` Facts: ${facts}` : ""}`;
