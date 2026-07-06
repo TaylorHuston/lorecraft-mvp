@@ -4,24 +4,24 @@
 
 changes-requested
 
-This fresh review found one additional blocking issue and applied a safe in-scope fix. Rerun `/sdd-review` for a fresh-context ready verdict before merge/closeout.
+This fresh review found artifact and documentation drift after the prior remediation commit and applied safe in-scope fixes. Rerun `/sdd-review` for a fresh-context ready verdict before merge/closeout.
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | pass after fix | Prior stale Epic wording was reconciled; this pass updated the stale review/tasks lifecycle state. |
-| Epic truth | pass after fix | LC-001-S13 is under Stories; LC-002 describes seeded Worlds including Tutorial. |
+| Change artifacts | pass after fix | Updated stale review/tasks lifecycle state after `d425b76`. |
+| Epic truth | pass after fix | LC-001-S13 is under Stories; LC-002 describes seeded Worlds including Tutorial; verification metadata updated to 2026-07-06. |
 | Requirements and Scenarios | pass | LC-001-S13 and LC-002/S5 Requirements map to implementation and verification. |
 | Story reference traceability | pass | Story labels remain stable and indexed. |
-| Tests and verification | pass | Focused route/parser/autocomplete tests, deterministic E2E, and required CI passed after fixes. |
+| Tests and verification | pass | Focused route/parser/autocomplete tests, deterministic E2E, and required CI passed. |
 | Manual UI confirmation | pass with pending status | `tasks.md` records a current walkthrough and `pending Taylor` status. |
 | Code review | pass after fix | Empty first-run landing path restored; reseed destructive scope narrowed; generated output lint fragility fixed. |
 | Visual / UX consistency | pass with suggestion | Autocomplete works; ARIA could be tightened later with a fuller combobox pattern. |
 | Security review | pass after fix | Offscreen `/look` location leak fixed; `/look` prompt input now excludes non-observable NPC facts; global reseed no longer deletes Tutorial. |
-| Documentation | pass after fix | README, data/persistence/architecture docs, and affected Epics are current. |
+| Documentation | pass after fix | README, data/persistence/architecture docs, and affected Epics are current after reseed-lifetime wording and metadata fixes. |
 | Changelog | pass | Public `Unreleased` entries cover slash utilities, autocomplete, Tutorial, and multi-World startup. |
-| Branch and merge readiness | blocked pending fresh rerun | A fresh safe review fix was applied; rerun review before merge. |
+| Branch and merge readiness | blocked pending fresh rerun | A safe artifact/doc fix was applied; rerun review before merge. |
 | PRD alignment | not applicable | No separate PRD update required for this scoped prototype change. |
 
 ## Findings
@@ -34,10 +34,12 @@ This fresh review found one additional blocking issue and applied a safe in-scop
 - [x] `docs/epics/lc-002-world-adventure-model/epic.md` - Epic-level Outcome/Current Scope and S1 evidence still described Stormbound Chapel as the only World container. Fixed to describe seeded Worlds and selected WorldVersion creation.
 - [x] `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` - LC-001-S13 was placed after `## Cross-Story Concerns`, outside the Stories section. Fixed by moving Cross-Story Concerns after LC-001-S13.
 - [x] `src/lib/director/look-prompt.ts` - `/look` provider requests included all current-scene NPC facts except `knowledge`, which could expose non-observable profile facts such as background, persona, voice, mood, or memory through a player-facing inspection result. Fixed by making `/look` actor facts allowlist-based and sending only observable current `status` alongside the actor description; added a raw provider request regression test.
+- [x] `docs/changes/2026-07-05-slash-commands/tasks.md` and `docs/changes/2026-07-05-slash-commands/review.md` - Lifecycle state still described the pre-`d425b76` remediation state, including an already-committed safe fix set as pending. Fixed by updating this review record and tasks resume/closeout state to the current safe doc-fix state.
 
 ### REQUIRED
 
-- None remaining after safe fixes in this pass.
+- [x] `docs/persistence-system.md` - Demo World Lifetime incorrectly said reseeding deletes both Stormbound Chapel and Tutorial Worlds. Fixed to state that `seedDemoWorld` replaces Stormbound Chapel and its runtime rows while ensuring Tutorial exists without deleting existing Tutorial Adventures.
+- [x] `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` and `docs/epics/lc-002-world-adventure-model/epic.md` - Epic frontmatter and affected Story metadata still had stale verification dates from before the 2026-07-06 review remediation. Fixed LC-001, LC-001-S13, LC-002, and S5 metadata to 2026-07-06.
 
 ### SUGGESTION
 
@@ -56,28 +58,28 @@ This fresh review found one additional blocking issue and applied a safe in-scop
 - Source branch/ref: `change/slash-commands-tutorial`
 - Target branch/ref: `develop`
 - Merge base: `89704db727aa9570e773222b727d324d91ed3fff`
-- Source-only commits before this fresh review fix: `76ba05b`, `a82eb30`, `6e03962`, `3cc24e3`, `743490f`
+- Source-only commits before this artifact/doc fix: `76ba05b`, `a82eb30`, `6e03962`, `3cc24e3`, `743490f`, `d425b76`
 - Target-only commits: none reported by `git log HEAD..develop`
 - Changed files: see `git diff --name-status develop...HEAD`
-- Diff stat: 29 files changed before this fresh review fix
-- Conflict check: `git merge-tree --write-tree develop HEAD` returned a tree hash before this fresh review fix
-- Dirty state: app repo was clean before review; fresh review fixes were isolated for a local remediation commit
+- Diff stat: 30 files changed before this artifact/doc fix
+- Conflict check: `git merge-tree --write-tree develop HEAD` returned a tree hash before this artifact/doc fix
+- Dirty state: app repo was clean before review; artifact/doc fixes were isolated for a local remediation commit
 - Branch policy: source `change/slash-commands-tutorial` to target `develop` matches app policy for routine product changes
 
 ## Delegated Review Passes
 
 | Pass | Reviewer | Result | Notes |
 |---|---|---|---|
-| Artifact truth | `019f3680-389b-72e3-a788-0c390dd0b62a` | changes-requested | Confirmed prior Epic fixes; found stale tasks/review wording from the earlier safe-fix pass. |
-| Frontend / UI | `019f3680-78aa-7fa0-825b-49352d1e7466` | pass with suggestion | Confirmed slash utility UI and Tutorial flow; suggested future autocomplete ARIA hardening. |
-| Security | `019f3680-58a5-7ac1-a159-068b940e16c3` | changes-requested | Found non-observable NPC facts in `/look` provider prompts; confirmed offscreen location and utility prompt-exclusion fixes. |
+| Artifact truth | `019f368a-5751-7a90-9a81-a4eaab63d46f` | changes-requested | Found stale lifecycle state, reseed documentation drift, and stale Epic verification metadata. |
+| Security | `019f368a-760b-7233-8299-3f9858eb22da` | pass | Confirmed offscreen location, Tutorial reseed, `/look` privacy, utility prompt-exclusion, local route guard, and lint ignore fixes. |
+| Frontend / UI | `019f368a-9621-7a13-9aee-e2de0479bcb9` | pass | Confirmed pre-turn utility behavior, utility feed rendering, autocomplete keyboard usability, E2E flow, and browser smoke at 390x844 and 1280x900. |
 
 ## PR / Merge Readiness
 
 - Source branch: `change/slash-commands-tutorial`
 - Target branch: `develop`
-- Conflict check: clean before this fresh review fix; rerun on fresh review
-- Commit state: fresh review fixes isolated for a local remediation commit
+- Conflict check: clean before this artifact/doc fix; rerun on fresh review
+- Commit state: artifact/doc fixes isolated for a local remediation commit
 - PR status: not requested
 - Merge status: blocked pending fresh `/sdd-review`
 
@@ -85,3 +87,4 @@ This fresh review found one additional blocking issue and applied a safe in-scop
 
 - 2026-07-06: Review created; blocking findings were fixed in the safe review pass. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Fresh review rerun found and fixed a `/look` NPC fact privacy issue and an ESLint generated-output ignore fragility. Focused tests, E2E, and `ci:required` passed after fixes. Rerun `/sdd-review` for a clean ready verdict.
+- 2026-07-06: Fresh review rerun found and fixed artifact/doc drift after `d425b76`: lifecycle state, reseed lifetime docs, and Epic verification metadata. Rerun `/sdd-review` for a clean ready verdict.

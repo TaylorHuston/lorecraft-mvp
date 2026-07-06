@@ -2,8 +2,8 @@
 id: LC-001
 status: implemented
 created: 2026-07-01
-modified: 2026-07-05
-last_verified: 2026-07-05
+modified: 2026-07-06
+last_verified: 2026-07-06
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -57,7 +57,7 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 | LC-001-S9 | implemented | Read-Only NPC Context | 2026-07-05 | Revalidated by extracted NPC/debug helpers, CI, Convex compile, and E2E gates. |
 | LC-001-S10 | implemented | Extracted NPC State Mutation | 2026-07-05 | Revalidated by turn-persistence helper extraction, CI, Convex compile, and E2E gates. |
 | LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Deterministic browser E2E passed. |
-| LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-05 | Adds `/help` and `/look` as utility actions that do not create turns or enter future Game Master narration history. |
+| LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-06 | Adds `/help` and `/look` as utility actions that do not create turns or enter future Game Master narration history. |
 
 ## Stories
 
@@ -65,8 +65,8 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-06
+Last verified: 2026-07-06
 
 As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 

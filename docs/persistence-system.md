@@ -133,7 +133,7 @@ This keeps story writing and persistence decisions separate. A future smaller ex
 
 ## Demo World Lifetime
 
-For this MVP experiment, the seeded demo Worlds are not durable product data. The seed mutation creates fresh deterministic Stormbound Chapel and Tutorial Worlds with immutable WorldVersions, plus a default Stormbound Chapel Adventure, then deletes the prior deterministic demo Worlds and their Adventures, WorldVersions, and runtime rows. Use Reset World when a playtest needs to return to the initial authored setup.
+For this MVP experiment, the seeded demo Worlds are not durable product data. The seed mutation creates a fresh deterministic Stormbound Chapel World with an immutable WorldVersion and a default Stormbound Chapel Adventure, deletes the prior deterministic Stormbound Chapel World and its Adventures, WorldVersions, and runtime rows, and ensures the Tutorial World exists without deleting existing Tutorial Adventures. Use Reset World when a Stormbound Chapel playtest needs to return to the initial authored setup.
 
 Reset Session is narrower: it deletes the selected Adventure's mutable runtime rows and recopies that Adventure's original source WorldVersion. If the World has a newer current WorldVersion, Reset Session does not upgrade the Adventure to it.
 

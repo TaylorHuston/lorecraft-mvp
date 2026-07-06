@@ -2,8 +2,8 @@
 id: LC-002
 status: draft
 created: 2026-07-01
-modified: 2026-07-02
-last_verified: 2026-07-02
+modified: 2026-07-06
+last_verified: 2026-07-06
 stories:
   - S1
   - S2
@@ -52,7 +52,7 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 | S2 | implemented | Adventure-Scoped Runtime State | 2026-07-01 | Runtime reads/writes and debug state use `adventureId`. |
 | S3 | implemented | World Version Edits Do Not Mutate Existing Adventures | 2026-07-01 | Live Convex isolation smoke proved v1 Adventure stayed unchanged after v2 source creation. |
 | S4 | implemented | Reset Adventure To Source Version | 2026-07-01 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
-| S5 | implemented | Tutorial World Seed | 2026-07-05 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
+| S5 | implemented | Tutorial World Seed | 2026-07-06 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
 
 ## Stories
 
@@ -282,8 +282,8 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 
 Status: implemented
 Created: 2026-07-05
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-06
+Last verified: 2026-07-06
 
 As a new playtester, I want a Tutorial World that teaches the basic interaction loop, so that I can learn Act, Pass, `/help`, `/look`, and NPC presence before entering a normal story world.
 
