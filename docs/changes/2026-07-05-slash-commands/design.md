@@ -13,6 +13,7 @@ The current startup screen is centered on one seeded World, Stormbound Chapel. A
 **Goals:**
 
 - Support `/help`, `/look`, and `/look <target>` from the same Act-expanded input.
+- Offer lightweight client-side autocomplete for supported slash commands and visible `/look` targets.
 - Persist slash-command results as Adventure-scoped utility feed entries.
 - Keep slash-command results out of turn numbering, turn state extraction, and future Game Master narration context.
 - Establish a reusable display and backend pattern for future pre-turn utility commands.
@@ -22,7 +23,7 @@ The current startup screen is centered on one seeded World, Stormbound Chapel. A
 
 **Non-Goals:**
 
-- No MUD-style movement parser, inventory commands, stats, combat, quest commands, or command autocomplete.
+- No MUD-style movement parser, inventory commands, stats, combat, quest commands, or broad command palette.
 - No state mutation from slash commands.
 - No target disambiguation UI beyond an MVP text target.
 - No rollback/retry implementation.
@@ -48,7 +49,9 @@ The current startup screen is centered on one seeded World, Stormbound Chapel. A
   - The home screen should list multiple World containers using the existing World/Adventure mental model.
   - Tutorial content can use existing locations, actors, facts, exits, opening narration, and Adventure copy mechanics.
 - Deferred scope:
-  - More commands, aliases, autocomplete, command palette UI, command mutation, and target disambiguation.
+  - More commands, aliases beyond displayed suggestions, command history, command palette UI, command mutation, and target disambiguation.
+  - Accepted during manual feedback:
+    - Client-side autocomplete for `/help`, `/look`, and visible `/look` targets.
   - Tutorial stages for item manipulation, combat, inventory, dice, quests, or builder workflows.
 - Story boundaries challenged:
   - This is not a UI-only Story because the main value depends on persistence and future prompt exclusion.
@@ -153,6 +156,28 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 - THEN the next Act or Pass turn receives the same next sequence number it would have received without those commands
 - AND no state extraction runs for the utility commands
 
+##### Requirement R4: Slash Command Autocomplete
+
+The system SHALL offer lightweight autocomplete inside the Act-expanded input for supported slash commands and visible `/look` targets without making autocomplete authoritative.
+
+###### Scenario R4-S1: Command suggestions
+
+- WHEN the player types `/`
+- THEN the input shows suggestions for `/help` and `/look`
+- AND the player can accept a suggestion without submitting a turn
+
+###### Scenario R4-S2: Look target suggestions
+
+- WHEN the player types `/look `
+- THEN the input suggests current visible inspection targets such as present NPCs and visible objects
+- AND selecting a target fills the input with `/look <target>`
+
+###### Scenario R4-S3: Autocomplete remains optional
+
+- WHEN the player ignores autocomplete and submits a valid slash command manually
+- THEN the command still uses the backend slash-command route
+- AND backend parsing and target validation remain authoritative
+
 ##### Implemented By
 
 - `convex/schema.ts` adds Adventure-scoped `utilityMessages`.
@@ -163,6 +188,7 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 - `src/app/api/director/utility/route.ts` exposes the utility route.
 - `src/lib/world/convex-snapshot-read-model.ts` loads utility messages into the visible feed while keeping story-visible history narration-only.
 - `src/features/play/world-client.tsx` and `src/features/play/turn-action-panel.tsx` route leading-slash input through utility handling and render distinct utility feed entries.
+- `src/lib/director/slash-command-autocomplete.ts` derives command and visible-target suggestions for the client input.
 
 ##### Verified By
 
@@ -172,6 +198,7 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 - `npm run convex:once`
 - `npm run e2e`
 - `npm run ci:required`
+- `npm run test -- src/lib/director/slash-command-autocomplete.test.ts`
 
 ##### Verification Gaps
 

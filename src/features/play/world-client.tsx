@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import type { SlashCommandAutocompleteTarget } from "@/lib/director/slash-command-autocomplete";
 import {
   buildTurnSequenceById,
   directorUpdateItems,
@@ -61,6 +62,12 @@ type DirectorPromptGuidance = {
   persistence: string;
 };
 
+type SlashCommandSnapshot = {
+  actors: Array<{ role: string; name: string }>;
+  objects: Array<{ name: string }>;
+  room: { name: string };
+};
+
 const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
   style: "Grounded, concise prose with concrete sensory detail. Keep the scene moving.",
   npcBehavior:
@@ -101,6 +108,10 @@ export function WorldClient({
   const snapshot = useQuery(api.world.getSnapshot, adventureId ? { adventureId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
+  const slashCommandTargets = useMemo(
+    () => (snapshot ? buildSlashCommandTargets(snapshot) : []),
+    [snapshot],
+  );
   const topBarWorldName = adventureId
     ? (snapshot?.world.name ?? "Loading world")
     : "Adventures";
@@ -455,6 +466,7 @@ export function WorldClient({
                   isSubmitting={isSubmitting}
                   notice={notice}
                   error={error}
+                  slashCommandTargets={slashCommandTargets}
                   onActSubmit={handleActSubmit}
                   onPass={handlePass}
                 />
@@ -566,6 +578,25 @@ export function WorldClient({
       </div>
     </main>
   );
+}
+
+function buildSlashCommandTargets(snapshot: SlashCommandSnapshot) {
+  const targets: SlashCommandAutocompleteTarget[] = [];
+
+  for (const actor of snapshot.actors) {
+    if (actor.role === "player") {
+      continue;
+    }
+    targets.push({ kind: "actor", label: actor.name });
+  }
+
+  for (const object of snapshot.objects) {
+    targets.push({ kind: "object", label: object.name });
+  }
+
+  targets.push({ kind: "location", label: snapshot.room.name });
+
+  return targets;
 }
 
 function GearIcon() {

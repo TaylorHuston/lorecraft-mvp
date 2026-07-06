@@ -1825,6 +1825,28 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 - THEN the next Act or Pass turn receives the same next sequence number it would have received without those commands
 - AND no state extraction runs for the utility commands
 
+##### Requirement R4: Slash Command Autocomplete
+
+The system SHALL offer lightweight autocomplete inside the Act-expanded input for supported slash commands and visible `/look` targets without making autocomplete authoritative.
+
+###### Scenario R4-S1: Command suggestions
+
+- WHEN the player types `/`
+- THEN the input shows suggestions for `/help` and `/look`
+- AND the player can accept a suggestion without submitting a turn
+
+###### Scenario R4-S2: Look target suggestions
+
+- WHEN the player types `/look `
+- THEN the input suggests current visible inspection targets such as present NPCs and visible objects
+- AND selecting a target fills the input with `/look <target>`
+
+###### Scenario R4-S3: Autocomplete remains optional
+
+- WHEN the player ignores autocomplete and submits a valid slash command manually
+- THEN the command still uses the backend slash-command route
+- AND backend parsing and target validation remain authoritative
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
@@ -1834,8 +1856,9 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 | `src/lib/world/convex-snapshot-read-model.ts` | Adds utility messages to the visible feed while keeping `loadStoryVisibleHistory` narration-only. | Recheck when feed reconstruction or Game Master history changes. |
 | `src/lib/director/slash-command.ts` | Parses supported and unsupported slash commands and provides deterministic help output. | Recheck when slash command syntax or supported commands change. |
 | `src/lib/director/look-prompt.ts` | Resolves `/look` targets and builds provider requests from current Adventure context. | Recheck when `/look` grounding or prompt context changes. |
+| `src/lib/director/slash-command-autocomplete.ts` | Derives browser autocomplete suggestions for supported commands and visible `/look` targets without replacing backend validation. | Recheck when command autocomplete behavior changes. |
 | `src/server/director/utility-request.ts`, `src/server/director/utility-route.ts`, `src/app/api/director/utility/route.ts` | Own server-side utility request validation, local route guard, provider call, and persistence orchestration. | Recheck when utility route behavior changes. |
-| `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx` | Dispatch same-input leading-slash commands, keep the decision phase open after utility success, and render utility feed entries distinctly. | Recheck when player input or story feed rendering changes. |
+| `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx` | Dispatch same-input leading-slash commands, keep the decision phase open after utility success, render utility feed entries distinctly, and present slash-command autocomplete suggestions. | Recheck when player input or story feed rendering changes. |
 
 #### Verified By
 
@@ -1844,6 +1867,7 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 | R1-S1 and R1-S2 | `npm run test -- src/lib/director/slash-command.test.ts src/app/api/director/utility/route.test.ts` | Supported and unsupported slash command input routes to utility behavior without turn creation or LLM config for `/help`. | Passing |
 | R2-S1 through R2-S3 | `src/app/api/director/utility/route.test.ts` | `/look` calls the provider for visible targets, uses canonical Adventure context, and returns deterministic no-provider output for unknown targets. | Passing |
 | R3-S1 through R3-S3 | `npm run e2e` | Browser path proves `/help` and `/look` utility entries render in the feed, do not close the decision phase, and leave the first real Act as Turn #1. | Passing |
+| R4-S1 through R4-S3 | `npm run test -- src/lib/director/slash-command-autocomplete.test.ts` and `npm run e2e` | Autocomplete suggests `/help`, `/look`, and visible `/look` targets while preserving manual backend slash-command submission. | Passing |
 | Supporting gate | `npm run ci:required` | Lint, unit tests, typecheck, and production build pass with the utility route and feed changes. | Passing |
 
 #### Verification Gaps

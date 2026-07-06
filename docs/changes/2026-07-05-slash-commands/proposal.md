@@ -15,6 +15,7 @@ This is also the right moment to add a second seeded World named `Tutorial`. Sto
   - `/look` describes what the player can currently see in the current scene.
   - `/look Mira` or `/look map` asks the LLM to describe the visible/current-context target from canonical state plus recent narration.
 - Add `/help` as deterministic engine output listing supported slash commands.
+- Add client-side autocomplete for supported slash commands and visible `/look` targets.
 - Render slash-command output as a reusable utility/inspection feed entry style, visually quieter than normal Game Master narration.
 - Persist utility results so reload/resume keeps them visible, while excluding them from future Game Master story-visible history.
 - Add a seeded Tutorial World and default Adventure path that can appear beside Stormbound Chapel on the startup screen.
@@ -47,12 +48,13 @@ This is also the right moment to add a second seeded World named `Tutorial`. Sto
   - `/look` does not consume or advance a turn.
   - Slash commands are things a player may do before they `Act` and end their turn.
   - `/look` accepts an optional target; no target means look around the current scene.
+  - Slash-command autocomplete should help with supported commands and visible `/look` targets, but backend command parsing remains authoritative.
   - Slash-command output appears in the story stream as a distinct utility/inspection block.
   - Slash commands are typed into the same Act-expanded input box; a leading `/` routes to command execution instead of closing the turn.
   - Add a second seeded World named `Tutorial`.
   - Tutorial should be intentionally structured as onboarding: first one room with one NPC, then a room with multiple NPCs, with later item-manipulation tutorial rooms deferred until item manipulation exists.
 - Deferred:
-  - `/retry`, rollback, inventory, stats, movement commands, command aliases, autocomplete, and command history.
+  - `/retry`, rollback, inventory, stats, movement commands, command aliases beyond autocomplete suggestions, and command history.
   - Letting slash commands mutate canonical state.
   - Polished command palette UI or mobile-specific command surfaces.
   - Tutorial content for object manipulation, combat, inventory, dice, quests, or builder workflows.

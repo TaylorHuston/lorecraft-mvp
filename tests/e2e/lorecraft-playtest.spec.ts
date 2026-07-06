@@ -7,8 +7,30 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
 
     await seedFreshWorld(page);
 
+    await page.locator("#act-turn-button").click();
+    const directorInput = page.locator("#director-input");
+    await expect(directorInput).toBeVisible();
+    await directorInput.fill("/");
+    await expect(page.locator("#slash-command-autocomplete")).toContainText("/help");
+    await expect(page.locator("#slash-command-autocomplete")).toContainText("/look");
+    await directorInput.press("ArrowDown");
+    await directorInput.press("ArrowUp");
+    await directorInput.fill("/l");
+    await directorInput.press("Enter");
+    await expect(directorInput).toHaveValue("/look ");
+    await directorInput.fill("/look Mi");
+    await expect(page.locator("#slash-command-autocomplete")).toContainText("Mira");
+    await directorInput.press("Tab");
+    await expect(directorInput).toHaveValue("/look Mira");
+    await directorInput.press("Enter");
+    await expect(page.locator("#story-feed [data-story-kind='utility']")).toContainText("Mira", {
+      timeout: 60_000,
+    });
+    await expect(directorInput).toBeVisible({ timeout: 60_000 });
+    await expect(directorInput).toHaveValue("");
+
     await submitSlashCommand(page, "/help");
-    await expect(page.locator("#story-feed [data-story-kind='utility']")).toContainText(
+    await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
       "Available commands:",
     );
     await submitSlashCommand(page, "/look moonblade");

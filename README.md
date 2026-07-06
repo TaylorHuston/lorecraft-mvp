@@ -15,7 +15,7 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
 - Tutorial demo World for learning Act, Pass, `/help`, `/look`, and NPC presence.
 - Startup World container screen showing seeded Worlds with local Adventures listed inside them, with each Adventure opened at `/adventures/<id>` and removable from the list.
-- Pre-turn `/help` and `/look` utility commands that persist in the feed without incrementing turns or entering future Game Master story context.
+- Pre-turn `/help` and `/look` utility commands, with autocomplete for supported commands and visible `/look` targets, that persist in the feed without incrementing turns or entering future Game Master story context.
 - Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
 - Location Cards with current-location context, known destination context, debug editing, and bounded movement.

@@ -13,6 +13,7 @@ The format is based on Keep a Changelog 1.1.0.
 - Home-screen deletion for local Adventures without changing the source WorldVersion.
 - Player-facing Pass turns that let the Game Master continue the current scene without adding player prose.
 - Pre-turn `/help` and `/look` utility commands that remain visible on reload without advancing the turn count.
+- Slash-command autocomplete for `/help`, `/look`, and visible `/look` targets.
 - Tutorial World for learning the basic play loop with a one-NPC starter room and a multi-NPC follow-up room.
 
 ### Changed

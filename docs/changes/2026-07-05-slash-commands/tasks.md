@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: implemented, pending `/sdd-review` and Taylor manual UI confirmation
-- Last completed action: implemented slash command utility messages, `/api/director/utility`, same-input slash dispatch, Tutorial World seed, multi-World home containers, docs, changelog, Epic reconciliation, and verification.
+- Current state: implemented autocomplete feedback, pending `/sdd-review` and Taylor manual UI confirmation.
+- Last completed action: added LC-001-S13/R4 slash-command autocomplete, updated docs/changelog, and verified focused tests, E2E, and required CI.
 - Next action: run `/sdd-review`; then address findings or close/merge with user approval.
 - Active branch/ref: `change/slash-commands-tutorial`
 - Expected dirty files: implementation, docs, tests, and active change artifacts for this change
@@ -49,6 +49,10 @@
       - [x] Scenario R3-S1: Utility result survives reload
       - [x] Scenario R3-S2: Utility result is not story-visible history
       - [x] Scenario R3-S3: Utility result does not affect turn lifecycle
+    - [x] Requirement R4: Slash Command Autocomplete
+      - [x] Scenario R4-S1: Command suggestions
+      - [x] Scenario R4-S2: Look target suggestions
+      - [x] Scenario R4-S3: Autocomplete remains optional
 - [x] 4.2 Implement `LC-002/S5` through focused BDD/TDD phases.
   - [x] Story: `LC-002/S5` - Tutorial World Seed
     - [x] Requirement R1: Seeded Tutorial World
@@ -95,6 +99,8 @@
 | 2026-07-05 | LC-001-S13 implementation | main + explorer `019f3639-30ae-7e51-bf6c-840d7982feb4` | `convex/schema.ts`, `convex/world.ts`, `src/lib/director/slash-command.ts`, `src/lib/director/look-prompt.ts`, `src/server/director/utility-*`, `src/app/api/director/utility/`, `src/features/play/*` | Added Adventure-scoped utility messages, `/help`, unsupported command handling, provider-backed `/look`, same-input slash dispatch, distinct utility feed rendering, reset/delete cleanup, and focused tests. | `implementation commit` |
 | 2026-07-05 | LC-002/S5 implementation | main | `src/lib/world/stormbound-baseline.ts`, `convex/world.ts`, `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts` | Added Tutorial seeded World, multi-World home containers, selected-World Adventure creation, and browser coverage for Tutorial Adventure creation. | `implementation commit` |
 | 2026-07-05 | Docs/changelog reconciliation | main | `README.md`, `CHANGELOG.md`, `docs/architecture.md`, `docs/data-model.md`, `docs/persistence-system.md`, LC-001 Epic, LC-002 Epic | Updated public/current-state docs and scenario-mapped Epic evidence for slash utilities and Tutorial World. | `implementation commit` |
+| 2026-07-05 | Forgiving `/look` target matching | main | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts` | Matched unique target tokens such as `/look Serin` to visible display names such as `Guide Serin` while preserving ambiguity handling. | `a82eb30` |
+| 2026-07-05 | LC-001-S13/R4 autocomplete | main + explorer `019f365b-34de-79c0-ad82-40f825780880` | `src/lib/director/slash-command-autocomplete.ts`, `src/lib/director/slash-command-autocomplete.test.ts`, `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, change artifacts, `README.md`, `CHANGELOG.md` | Added command and `/look` target autocomplete with keyboard/click acceptance, derived targets from current snapshot state, kept backend command parsing authoritative, and updated docs/evidence. | uncommitted |
 
 ## Verification Ledger
 
@@ -109,6 +115,12 @@
 | 2026-07-05 | `npm run convex:once` | Convex compile | Convex schema/functions compile with `utilityMessages`, Tutorial seed, and multi-World query changes after freeing local port 3210. | Passed |
 | 2026-07-05 | `npm run e2e` | deterministic E2E | Browser proves `/help` and `/look` utility feed entries, no turn increment before the first Act, existing play loop, reset/delete, Tutorial container listing, and Tutorial Adventure creation. | Passed |
 | 2026-07-05 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass cleanly. | Passed |
+| 2026-07-05 | `npm run test -- src/app/api/director/utility/route.test.ts` | focused automated test | Proves unique partial target matching for `/look Serin` against `Guide Serin`. | Passed |
+| 2026-07-05 | `npm run typecheck` | broad supporting gate | TypeScript accepts forgiving target matching. | Passed |
+| 2026-07-05 | `npm run test -- src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | Proves command suggestions, exact-command submission preservation, visible `/look` target suggestions, exact-target submission preservation, and non-command exclusion for LC-001-S13/R4. | Passed |
+| 2026-07-05 | `npm run typecheck` | broad supporting gate | TypeScript accepts autocomplete view model wiring and client component changes. | Passed |
+| 2026-07-05 | `npm run e2e` | deterministic E2E | Browser proves `/` command suggestions, `/l` acceptance into `/look `, `/look Mi` target suggestions, Tab acceptance to `/look Mira`, utility submission, and continued slash utility flow. | Passed |
+| 2026-07-05 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after autocomplete. | Passed, 66 tests |
 
 ## Specialist Checkpoint
 
@@ -116,6 +128,7 @@
 |---|---|---|---|---|---|
 | 2026-07-05 | Discovery / next LC-001-S13 implementation slice | Convex schema/functions/read models, Next.js route handlers, React input/feed UI, deterministic E2E | `convex/_generated/ai/guidelines.md`, `next-best-practices`, SDD apply specialist routing, explorer subagent | loaded / delegated | Use bounded Convex tables and validators, keep route orchestration server-owned, keep utility output out of narration history, and verify route/feed/turn lifecycle with focused tests plus E2E. |
 | 2026-07-05 | LC-002/S5 Tutorial implementation | Seed data, Convex world listing/create flow, home UI, E2E | `convex/_generated/ai/guidelines.md`, SDD apply specialist routing | loaded / skipped delegation | Kept Tutorial as existing baseline primitives and reused WorldVersion/Adventure copy mechanics; no new gameplay systems or static UI-only tutorial copy. |
+| 2026-07-05 | LC-001-S13/R4 autocomplete | React client input UI, keyboard interaction, browser-visible suggestions, E2E | `next-best-practices`, shared visual style guide, SDD apply specialist routing, explorer subagent `019f365b-34de-79c0-ad82-40f825780880` | loaded / delegated | Keep autocomplete client-presentational, derive suggestions from already-loaded snapshot view data, keep backend parsing authoritative, and verify with focused suggestion tests plus E2E. |
 
 ## Manual Feedback
 
@@ -126,6 +139,7 @@
 | 2026-07-05 | Slash command results should use a reusable distinct visual pattern. | requirement refinement | Planned `utility` feed style and reusable utility message shape. | incorporated |
 | 2026-07-05 | Slash commands should use the same Act-expanded input with leading `/`. | requirement refinement | Planned same-input dispatch. | incorporated |
 | 2026-07-05 | Add a seeded Tutorial World for learning the app, starting with one NPC and then a multi-NPC room. | scope expansion | Added LC-002 Tutorial World seed Story and kept future item manipulation deferred. | incorporated |
+| 2026-07-05 | Add autocomplete for slash commands. | scope expansion accepted by `/sdd-apply` | Added LC-001-S13/R4 for client-side command and `/look` target suggestions while keeping backend parsing authoritative. | incorporated |
 
 ## Planning Updates
 
@@ -144,11 +158,14 @@
   - Create or open a Tutorial Adventure.
   - Open an Adventure.
   - Open Act input.
+  - Type `/` and confirm `/help` and `/look` suggestions appear.
+  - Type `/look Mi`, accept the `Mira` suggestion with Tab or Enter, and confirm the input becomes `/look Mira`.
   - Submit `/help`, `/look`, `/look Mira`, and a normal Act.
   - Reload the Adventure.
 - Expected result:
   - Slash command outputs look distinct from story narration.
   - Slash commands do not increment the turn number or end the decision phase.
+  - Autocomplete helps fill commands and visible targets but manually typed commands still submit normally.
   - Normal Act still ends the turn and produces Game Master narration.
   - Utility outputs survive reload.
   - Tutorial starts in a one-NPC room and can lead to a multi-NPC room.
@@ -156,6 +173,7 @@
   - Utility entries feel too much like story narration.
   - `/look` should or should not call the LLM in specific target cases.
   - Same-input command routing creates confusing Act behavior.
+  - Autocomplete key behavior feels intrusive or fails to suggest expected visible targets.
 
 ## Blockers / Open Questions
 
