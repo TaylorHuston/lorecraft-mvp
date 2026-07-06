@@ -100,7 +100,7 @@ export function AdventureLanding({
                   type="button"
                   onClick={() => onCreateAdventure(world._id)}
                   disabled={creatingWorldId !== null || deletingAdventureId !== null}
-                  className="w-fit rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-fit scroll-mt-16 rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creatingWorldId === world._id ? "Creating" : "New Adventure"}
                 </button>
@@ -180,7 +180,7 @@ function AdventureRow({
           type="button"
           onClick={() => onSelectAdventure(adventure._id)}
           disabled={deletingAdventureId === adventure._id}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="scroll-mt-16 rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Continue
         </button>
@@ -189,7 +189,7 @@ function AdventureRow({
           type="button"
           onClick={() => onDeleteAdventure(adventure)}
           disabled={deletingAdventureId !== null}
-          className="rounded-md border border-rose-900/70 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-50"
+          className="scroll-mt-16 rounded-md border border-rose-900/70 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {deletingAdventureId === adventure._id ? "Deleting" : "Delete"}
         </button>

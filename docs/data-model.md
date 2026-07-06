@@ -13,7 +13,7 @@ Table: `worlds`
 
 A World is authored source material. It is not the mutable play session.
 
-For the current MVP, Stormbound Chapel and Tutorial are resettable demo source data. Reseeding creates fresh Worlds, WorldVersions, a default Stormbound Chapel Adventure, and an empty Tutorial container for local playtesting.
+For the current MVP, Stormbound Chapel and Tutorial are resettable demo source data. Reseeding replaces the deterministic Stormbound Chapel World, creates a fresh Stormbound Chapel WorldVersion and default Adventure, and ensures the Tutorial World exists without deleting existing Tutorial Adventures.
 
 | Field | Meaning |
 |---|---|

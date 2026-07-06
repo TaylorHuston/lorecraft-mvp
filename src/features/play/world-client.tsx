@@ -349,11 +349,11 @@ export function WorldClient({
     <main id="lorecraft-app" className="min-h-screen bg-[#090908] pt-12 text-zinc-100">
       <div
         id="app-top-bar"
-        className="fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
       >
         <div
           id="app-top-bar-inner"
-          className="flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
+          className="pointer-events-auto flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
         >
           <div id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
             <span className="text-amber-300">Lorecraft</span>

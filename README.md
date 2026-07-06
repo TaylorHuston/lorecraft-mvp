@@ -44,7 +44,6 @@ This repo does not currently include:
 - Multiplayer.
 - Combat, HP, inventory, stats, quests, rulesets, or dice systems.
 - A polished World Builder.
-- Polished reusable World Builder.
 - Marketplace, billing, creator tools, or public hosting.
 
 Remote/shared deployments are not production-ready. The current route guardrails are prototype safety checks, not a replacement for real authentication, ownership checks, rate limiting, or production operations.

@@ -1750,8 +1750,8 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 
 Status: implemented
 Created: 2026-07-05
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-06
+Last verified: 2026-07-06
 
 As a playtester, I want lightweight slash commands during my decision phase, so that I can inspect the current fiction or get command help without ending my turn.
 

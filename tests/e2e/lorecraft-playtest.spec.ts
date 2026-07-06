@@ -51,6 +51,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
 
     await page.reload();
+    const reloadedUtilityEntries = page.locator("#story-feed [data-story-kind='utility']");
+    await expect(reloadedUtilityEntries.filter({ hasText: "Mira" })).toBeVisible();
+    await expect(reloadedUtilityEntries.filter({ hasText: "Available commands:" })).toBeVisible();
+    await expect(
+      reloadedUtilityEntries.filter({ hasText: 'You do not see "moonblade" here to inspect.' }),
+    ).toBeVisible();
     await expect(page.locator("#story-stream")).toContainText(playerText);
     await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
     await openDebugPanel(page);

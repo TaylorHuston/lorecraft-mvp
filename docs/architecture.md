@@ -41,7 +41,7 @@ Lorecraft MVP is a Next.js + Convex persistent-world prototype. It tests whether
 - Transcript mode is a comparison mode built from Adventure seed text plus transcript, not live canonical state mutation.
 - Debug UI can expose technical state, but player-facing UI should remain narrative-first.
 - Debug write and full debug snapshot surfaces are local/dev-oriented. They require `LORECRAFT_ENABLE_DEBUG_ROUTES=1` in a non-production process.
-- `/api/director/turn` is local-only by default. Remote use requires explicit opt-in plus a server-held Convex write token, and still needs real auth before production.
+- `/api/director/turn` and `/api/director/utility` are local-only by default. Remote use requires explicit opt-in plus a server-held Convex write token, and still needs real auth before production.
 
 ## Related Docs
 

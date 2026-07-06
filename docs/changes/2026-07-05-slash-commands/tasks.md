@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` changes requested; third safe artifact/doc fix set applied.
-- Last completed action: fixed review findings for stale lifecycle state, Demo World Lifetime reseed wording, Epic verification metadata, `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
-- Next action: commit this safe artifact/doc fix set, then rerun `/sdd-review` for a fresh ready verdict.
+- Current state: `/sdd-review` changes requested; fourth safe review fix set applied.
+- Last completed action: fixed review findings for fixed-header interception during startup Adventure creation, missing utility reload-persistence E2E coverage, post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, duplicate README wording, stale lifecycle state, Demo World Lifetime reseed wording, Epic verification metadata, `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
+- Next action: rerun `/sdd-review` for a fresh ready verdict.
 - Active branch/ref: `change/slash-commands-tutorial`
 - Expected dirty files after remediation commit: none
 - Known blockers: none identified
@@ -104,6 +104,7 @@
 | 2026-07-06 | Safe `/sdd-review` remediation | main + artifact/code/security reviewers | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts`, `convex/world.ts`, `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, LC-001 Epic, LC-002 Epic, `review.md`, `tasks.md` | Fixed offscreen location inspection, scoped reseed deletion to Stormbound, restored empty first-run seed action, and reconciled stale Epic artifact structure/wording. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/lib/director/look-prompt.ts`, `src/app/api/director/utility/route.test.ts`, `eslint.config.mjs`, `review.md`, `tasks.md` | Restricted `/look` provider prompts to observable actor description/status, added raw prompt regression coverage for private fact exclusion, and ignored generated Playwright output folders in ESLint. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` artifact remediation | main + artifact/frontend/security reviewers | `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md`, `docs/persistence-system.md`, LC-001 Epic, LC-002 Epic | Reconciled post-`d425b76` lifecycle state, reseed lifetime wording, and Epic verification metadata. Security and frontend delegated passes were clean. | review remediation commit |
+| 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md`, `docs/data-model.md`, `docs/deployment.md`, `docs/architecture.md`, LC-001 Epic, `README.md` | Fixed fixed-header interception during startup Adventure creation, added utility reload-persistence E2E coverage, reconciled post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, and duplicate README wording. | review remediation commit |
 
 ## Verification Ledger
 
@@ -134,6 +135,10 @@
 | 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass at HEAD `d425b76` before artifact-only doc fixes. | Passed, 68 tests |
 | 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes at HEAD `d425b76` before artifact-only doc fixes. | Passed |
 | 2026-07-06 | Delegated frontend browser smoke | browser smoke | Autocomplete accepted `/look Mira`, stayed within viewport, and had no horizontal overflow at 390x844 and 1280x900. | Passed |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass at HEAD `388fbcb` before artifact-only doc fixes. | Passed, 68 tests |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes at HEAD `388fbcb` before artifact-only doc fixes. | Passed |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes after fixed-header click remediation and utility reload-persistence assertions. | Passed |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after the fourth safe review fix set. | Passed, 68 tests |
 
 ## Specialist Checkpoint
 
@@ -201,7 +206,7 @@
 - Superseded earlier Epic truth reconciled: complete
 - ADR status: not applicable
 - Changelog current: complete
-- `sdd-review` verdict: changes-requested, third safe artifact/doc fix set applied; fresh rerun pending
+- `sdd-review` verdict: changes-requested, fourth safe review fix set applied; fresh rerun pending
 - Review record: `docs/changes/2026-07-05-slash-commands/review.md`
 - `review.md` findings resolved: fixed in safe review passes; fresh rerun pending
 - Planning updates resolved: not applicable
