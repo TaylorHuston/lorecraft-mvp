@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` passed locally; ready to merge into `develop` and close.
-- Last completed action: local review found no blocking or required findings; `npm run ci:required` passed.
-- Next action: merge `change/story-guide-actions` into `develop`, move this change folder to `docs/changes/closed/`, and commit closeout.
-- Active branch/ref: `change/story-guide-actions`
-- Expected dirty files: review ledger update pending commit before merge.
+- Current state: closed after local merge to `develop`.
+- Last completed action: merged `change/story-guide-actions` into `develop` as `036c34c` and moved this change folder to `docs/changes/closed/`.
+- Next action: none for this change.
+- Active branch/ref: `develop`
+- Expected dirty files: none in the app repo after closeout commit.
 - Known blockers: none
 
 ## Task Checklist
@@ -72,8 +72,8 @@
 - [x] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -170,6 +170,6 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - `review.md` findings resolved: not applicable
 - Planning updates resolved: not applicable
 - Manual UI confirmation status: accepted gap
-- PR / merge state: authorized by `/close and merge`; pending local merge to `develop`
+- PR / merge state: merged locally to `develop` as `036c34c`
 - Deferred scope accepted: live-provider Guide/extraction quality and subjective play feel remain manual/empirical
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes
