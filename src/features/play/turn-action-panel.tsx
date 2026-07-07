@@ -1,13 +1,19 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getSlashCommandAutocomplete,
+  type SlashCommandAutocompleteSuggestion,
+  type SlashCommandAutocompleteTarget,
+} from "@/lib/director/slash-command-autocomplete";
 
 type TurnActionPanelProps = {
   disabled: boolean;
   isSubmitting: boolean;
   notice: string | null;
   error: string | null;
-  onActSubmit: (input: string) => Promise<boolean>;
+  slashCommandTargets: SlashCommandAutocompleteTarget[];
+  onActSubmit: (input: string) => Promise<"close" | "keep-open" | false>;
   onPass: () => Promise<boolean>;
 };
 
@@ -16,6 +22,7 @@ export function TurnActionPanel({
   isSubmitting,
   notice,
   error,
+  slashCommandTargets,
   onActSubmit,
   onPass,
 }: TurnActionPanelProps) {
@@ -23,8 +30,23 @@ export function TurnActionPanel({
   const [isActInputOpen, setIsActInputOpen] = useState(false);
   const [isActInputClosing, setIsActInputClosing] = useState(false);
   const [isTurnControlsSettling, setIsTurnControlsSettling] = useState(false);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const directorInputRef = useRef<HTMLTextAreaElement | null>(null);
   const actInputCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autocompleteSuggestions = useMemo(
+    () => getSlashCommandAutocomplete(input, slashCommandTargets),
+    [input, slashCommandTargets],
+  );
+  const boundedActiveSuggestionIndex = Math.min(
+    activeSuggestionIndex,
+    Math.max(autocompleteSuggestions.length - 1, 0),
+  );
+  const shouldShowAutocomplete =
+    isActInputOpen && isAutocompleteOpen && autocompleteSuggestions.length > 0 && !isSubmitting;
+  const activeSuggestion = shouldShowAutocomplete
+    ? autocompleteSuggestions[boundedActiveSuggestionIndex]
+    : undefined;
 
   useEffect(() => {
     if (!isActInputOpen || isSubmitting) {
@@ -57,15 +79,23 @@ export function TurnActionPanel({
     }
 
     setInput("");
-    const ok = await onActSubmit(submittedInput);
-    if (ok) {
+    setIsAutocompleteOpen(false);
+    const result = await onActSubmit(submittedInput);
+    if (result === "close") {
       setIsActInputOpen(false);
+      setIsActInputClosing(false);
+      setIsTurnControlsSettling(false);
+      return;
+    }
+    if (result === "keep-open") {
+      setIsActInputOpen(true);
       setIsActInputClosing(false);
       setIsTurnControlsSettling(false);
       return;
     }
 
     setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
+    setIsAutocompleteOpen(false);
     setIsActInputOpen(true);
   }
 
@@ -81,6 +111,7 @@ export function TurnActionPanel({
     setIsTurnControlsSettling(false);
     setIsActInputClosing(false);
     setIsActInputOpen(true);
+    setIsAutocompleteOpen(false);
   }
 
   function handleCancelAct() {
@@ -89,6 +120,7 @@ export function TurnActionPanel({
     }
 
     setIsActInputClosing(true);
+    setIsAutocompleteOpen(false);
     actInputCloseTimer.current = setTimeout(() => {
       setIsActInputOpen(false);
       setIsActInputClosing(false);
@@ -106,12 +138,73 @@ export function TurnActionPanel({
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (shouldShowAutocomplete) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActiveSuggestionIndex((current) => (current + 1) % autocompleteSuggestions.length);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveSuggestionIndex(
+          (current) => (current - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length,
+        );
+        return;
+      }
+
+      if (event.key === "Tab") {
+        event.preventDefault();
+        acceptAutocompleteSuggestion(activeSuggestion);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsAutocompleteOpen(false);
+        return;
+      }
+    }
+
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    if (shouldShowAutocomplete && activeSuggestion) {
+      event.preventDefault();
+      acceptAutocompleteSuggestion(activeSuggestion);
       return;
     }
 
     event.preventDefault();
     event.currentTarget.form?.requestSubmit();
+  }
+
+  function handleInputChange(value: string, textarea: HTMLTextAreaElement) {
+    setInput(value);
+    setIsAutocompleteOpen(value.trimStart().startsWith("/"));
+    setActiveSuggestionIndex(0);
+    resizeDirectorInput(textarea);
+  }
+
+  function acceptAutocompleteSuggestion(suggestion: SlashCommandAutocompleteSuggestion | undefined) {
+    if (!suggestion) {
+      return;
+    }
+
+    const nextInput = suggestion.value === "/look" ? "/look " : suggestion.value;
+    setInput(nextInput);
+    setIsAutocompleteOpen(false);
+    setActiveSuggestionIndex(0);
+    window.requestAnimationFrame(() => {
+      const textarea = directorInputRef.current;
+      if (!textarea) {
+        return;
+      }
+      resizeDirectorInput(textarea);
+      textarea.focus();
+      textarea.setSelectionRange(nextInput.length, nextInput.length);
+    });
   }
 
   function resizeDirectorInput(textarea: HTMLTextAreaElement) {
@@ -143,16 +236,22 @@ export function TurnActionPanel({
                 id="director-input"
                 ref={directorInputRef}
                 aria-labelledby="turn-action-prompt"
+                aria-autocomplete="list"
+                aria-controls={shouldShowAutocomplete ? "slash-command-autocomplete" : undefined}
+                aria-activedescendant={
+                  shouldShowAutocomplete
+                    ? `slash-command-suggestion-${boundedActiveSuggestionIndex}`
+                    : undefined
+                }
                 value={input}
                 onChange={(event) => {
-                  setInput(event.target.value);
-                  resizeDirectorInput(event.currentTarget);
+                  handleInputChange(event.target.value, event.currentTarget);
                 }}
                 onKeyDown={handleInputKeyDown}
                 placeholder="Type your response..."
                 rows={1}
                 disabled={disabled}
-                className="block h-24 min-h-24 w-full resize-none overflow-hidden rounded-xl bg-zinc-700/45 py-3 pl-4 pr-12 text-left text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-700/65"
+                className="block h-24 min-h-24 w-full resize-none overflow-hidden rounded-xl bg-zinc-700/45 py-3 pl-4 pr-12 text-left text-sm leading-6 text-zinc-100 outline-none ring-1 ring-transparent transition placeholder:text-zinc-500 focus:bg-zinc-700/65 focus-visible:ring-2 focus-visible:ring-amber-300/80"
               />
               <button
                 id="close-act-input-button"
@@ -164,6 +263,14 @@ export function TurnActionPanel({
               >
                 ×
               </button>
+              {shouldShowAutocomplete ? (
+                <SlashCommandAutocomplete
+                  suggestions={autocompleteSuggestions}
+                  activeIndex={boundedActiveSuggestionIndex}
+                  onActiveIndexChange={setActiveSuggestionIndex}
+                  onAccept={acceptAutocompleteSuggestion}
+                />
+              ) : null}
             </div>
           ) : (
             <div
@@ -214,6 +321,53 @@ export function TurnActionPanel({
         ) : null}
       </div>
     </form>
+  );
+}
+
+function SlashCommandAutocomplete({
+  suggestions,
+  activeIndex,
+  onActiveIndexChange,
+  onAccept,
+}: {
+  suggestions: SlashCommandAutocompleteSuggestion[];
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  onAccept: (suggestion: SlashCommandAutocompleteSuggestion) => void;
+}) {
+  return (
+    <div
+      id="slash-command-autocomplete"
+      role="listbox"
+      aria-label="Slash command suggestions"
+      className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border border-zinc-700/70 bg-zinc-900/95 text-sm shadow-xl shadow-black/35"
+    >
+      {suggestions.map((suggestion, index) => {
+        const isActive = index === activeIndex;
+        return (
+          <button
+            id={`slash-command-suggestion-${index}`}
+            key={`${suggestion.value}-${suggestion.detail}`}
+            type="button"
+            role="option"
+            aria-selected={isActive}
+            onMouseEnter={() => onActiveIndexChange(index)}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onAccept(suggestion);
+            }}
+            className={`flex w-full items-start justify-between gap-4 px-3 py-2 text-left transition ${
+              isActive
+                ? "bg-amber-300/15 text-amber-100"
+                : "text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100"
+            }`}
+          >
+            <span className="font-medium">{suggestion.label}</span>
+            <span className="text-xs leading-5 text-zinc-400">{suggestion.detail}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

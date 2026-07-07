@@ -169,6 +169,21 @@ export default defineSchema({
     .index("by_adventureId", ["adventureId"])
     .index("by_adventureId_and_turnId", ["adventureId", "turnId"]),
 
+  utilityMessages: defineTable({
+    worldId: v.id("worlds"),
+    adventureId: v.id("adventures"),
+    input: v.string(),
+    command: v.string(),
+    target: v.optional(v.string()),
+    text: v.string(),
+    source: v.union(v.literal("engine"), v.literal("llm")),
+    status: v.union(v.literal("success"), v.literal("error")),
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
+  })
+    .index("by_worldId", ["worldId"])
+    .index("by_adventureId", ["adventureId"]),
+
   stateDiffs: defineTable({
     worldId: v.id("worlds"),
     adventureId: v.optional(v.id("adventures")),

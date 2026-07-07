@@ -5,7 +5,7 @@ modified: 2026-06-30
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports one authored demo World, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, bounded Game Master calls, and a tiny readable NPC state surface.
+The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, pre-turn utility messages, bounded Game Master calls, and a tiny readable NPC state surface.
 
 ## World
 
@@ -13,11 +13,11 @@ Table: `worlds`
 
 A World is authored source material. It is not the mutable play session.
 
-For the current MVP, the Stormbound Chapel World is resettable demo source data. Reseeding creates a fresh World, WorldVersion, and default Adventure for local playtesting.
+For the current MVP, Stormbound Chapel and Tutorial are resettable demo source data. Reseeding replaces the deterministic Stormbound Chapel World, creates a fresh Stormbound Chapel WorldVersion and default Adventure, and ensures the Tutorial World exists without deleting existing Tutorial Adventures.
 
 | Field | Meaning |
 |---|---|
-| `slug` | Human-readable identifier for the seeded demo world. The MVP uses the deterministic slug `stormbound-chapel-default`. |
+| `slug` | Human-readable identifier for the seeded demo world. The MVP uses deterministic slugs such as `stormbound-chapel-default` and `tutorial`. |
 | `name` | Display name shown to the player/debug UI. |
 | `description` | Stable baseline description of the world. Used as Game Master context. |
 | `currentWorldVersionId` | The current authored version used for future Adventures. |
@@ -64,7 +64,7 @@ An Adventure is a playable copy created from one WorldVersion.
 
 Strategy:
 
-- The default app opens a World container screen for Stormbound Chapel at `/`. The container lists local Adventures with turn count and last played date, and lets the player continue, create, or delete local Adventures. Each opened Adventure has its own URL at `/adventures/<id>`.
+- The default app opens a World container screen at `/`. It lists seeded World containers such as Stormbound Chapel and Tutorial, each with its own local Adventures, turn count, last played date, create action, and delete action. Each opened Adventure has its own URL at `/adventures/<id>`.
 - Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
 - Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
 - Delete Adventure removes that Adventure and its Adventure-owned runtime rows. It does not delete the source World or WorldVersion.
@@ -219,7 +219,7 @@ These remain facts until graph queries, visibility rules, or creator UI pressure
 
 Table: `commands`
 
-A command records player input. The name is historical; current MVP inputs are narrative text, not parsed commands.
+A command records turn-ending player input. The name is historical; current MVP command rows are narrative text for Act turns, not slash-command utility actions.
 
 | Field | Meaning |
 |---|---|
@@ -236,6 +236,33 @@ Strategy:
 - Use `turnId` as the durable grouping boundary for narrations, events, state diffs, and Game Master calls.
 - Keep `commandId` on child rows as a direct link back to the player text.
 - Do not treat player input as interpreted truth until the backend records accepted state.
+
+## Utility Message
+
+Table: `utilityMessages`
+
+A utility message records a pre-turn slash-command result that the player should see later, without creating a turn or becoming normal future Game Master narration history.
+
+| Field | Meaning |
+|---|---|
+| `worldId` | Source World metadata. |
+| `adventureId` | Owning Adventure runtime state. |
+| `input` | Original trimmed slash command, such as `/help` or `/look Mira`. |
+| `command` | Parsed command name, such as `help`, `look`, or an unsupported command name. |
+| `target` | Optional parsed target text for commands such as `/look Mira`. |
+| `text` | Player-facing utility result. |
+| `source` | `engine` for deterministic local output or `llm` for provider-backed look prose. |
+| `status` | `success` or `error`. Error rows are still visible utility feedback. |
+| `provider` | Optional provider host for provider-backed utility results. |
+| `model` | Optional model id for provider-backed utility results. |
+
+Strategy:
+
+- Utility messages are Adventure-scoped feed entries, not turns, commands, narrations, events, or state diffs.
+- `/help`, unsupported commands, and unknown `/look` targets use deterministic engine output.
+- Valid `/look` requests may call the provider for observational prose, but they do not run state extraction or mutate canonical state.
+- Utility messages are included in the visible feed and reset/delete with the Adventure.
+- Utility messages are excluded from `loadStoryVisibleHistory` and transcript history, so future Game Master turns read canonical state and successful narrations rather than utility output.
 
 ## Turn
 
@@ -404,21 +431,27 @@ Strategy:
 
 ## Derived Feed Entry
 
-There is no `feedEntries` table. Feed entries are derived by combining commands, narrations, and events.
+There is no `feedEntries` table. Feed entries are derived by combining commands, narrations, events, and utility messages.
 
 | Field | Meaning |
 |---|---|
-| `id` | Stable derived ID with a prefix, such as `command:<id>`, `narration:<id>`, or `event:<id>`. |
-| `kind` | `player`, `director`, or `event`. |
+| `id` | Stable derived ID with a prefix, such as `command:<id>`, `narration:<id>`, `event:<id>`, or `utility:<id>`. |
+| `kind` | `player`, `director`, `event`, or `utility`. |
 | `text` | Text to display. |
 | `source` | Source label from the underlying row. |
 | `createdAt` | Creation time from the underlying row. |
 | `turnId` | Optional scoped turn that caused the entry. |
 | `commandId` | Optional direct player-input link. |
+| `utilityMessageId` | Optional utility-message link for pre-turn slash command output. |
+| `command` | Optional parsed utility command name. |
+| `input` | Optional original utility input. |
+| `target` | Optional utility target. |
+| `status` | Optional utility status. |
 
 Strategy:
 
 - Keep feed derived until editing, branching, streaming, or multiplayer ordering requires a timeline table.
+- Utility entries are player-visible helper output. They are intentionally not turn-numbered and not included in story-visible Game Master history.
 - Use stable derived IDs as React keys.
 
 ## Local Debug Log

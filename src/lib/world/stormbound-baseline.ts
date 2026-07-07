@@ -26,6 +26,7 @@ export type AdventureBaseline = {
 };
 
 export const WORLD_SLUG = "stormbound-chapel-default";
+export const TUTORIAL_WORLD_SLUG = "tutorial";
 export const DEFAULT_ADVENTURE_SLUG = "stormbound-chapel-default-adventure";
 export const PLAYER_KEY = "taylor";
 export const NPC_PROFILE_FACT_KEYS_FOR_WRITE = [
@@ -294,5 +295,125 @@ export function buildStormboundBaseline(): AdventureBaseline {
     })),
     initialEvent: "The Stormbound Chapel Adventure was created from its source WorldVersion.",
     initialNarration: "You stand in the chapel while rain works at the shutters.",
+  };
+}
+
+export function buildTutorialBaseline(): AdventureBaseline {
+  return {
+    world: {
+      name: "Tutorial",
+      description:
+        "A guided onboarding world for learning Lorecraft's Act, Pass, /help, /look, and NPC presence mechanics.",
+    },
+    rooms: [
+      {
+        key: "threshold",
+        name: "Threshold Room",
+        description:
+          "A quiet stone room with chalk marks on the floor and a single lantern beside the exit. Guide Serin waits near a low table.",
+      },
+      {
+        key: "common-room",
+        name: "Common Room",
+        description:
+          "A wider practice room with benches, a wall map, and enough space for several people to speak without crowding each other.",
+      },
+    ],
+    exits: [
+      { fromRoomKey: "threshold", toRoomKey: "common-room", label: "forward", visible: true },
+      { fromRoomKey: "common-room", toRoomKey: "threshold", label: "back", visible: true },
+    ],
+    player: {
+      key: PLAYER_KEY,
+      name: "Taylor",
+      description: "The playtester learning how to steer a Lorecraft scene.",
+      roomKey: "threshold",
+    },
+    npcs: [
+      {
+        key: "guide-serin",
+        name: "Guide Serin",
+        description:
+          "A calm instructor in a dark travel coat, with silver spectacles and a habit of leaving room for the player's choice.",
+        roomKey: "threshold",
+        facts: [
+          {
+            key: "background",
+            value:
+              "Serin teaches new travelers how to speak, inspect, wait, and notice who is actually present before acting.",
+          },
+          {
+            key: "persona",
+            value:
+              "Patient, direct, and gently theatrical. Serin prefers examples over lectures.",
+          },
+          {
+            key: "voice",
+            value:
+              "Warm and concise, with occasional stage-manager phrasing. Serin invites action without explaining interface mechanics out of character.",
+          },
+          { key: "mood", value: "attentive" },
+          {
+            key: "status",
+            value: "waiting beside the low table, ready to demonstrate the basics",
+          },
+          { key: "memory", value: "Serin has just met Taylor at the tutorial threshold." },
+          {
+            key: "knowledge",
+            value:
+              "Serin knows this room is meant to teach /help, /look, Act, and Pass before Taylor enters the common room.",
+          },
+        ],
+      },
+      {
+        key: "mara",
+        name: "Mara",
+        description:
+          "A sharp-eyed scout with a green sash and mud on her boots.",
+        roomKey: "common-room",
+        facts: [
+          { key: "persona", value: "Alert, brisk, and skeptical until addressed directly." },
+          { key: "voice", value: "Short practical sentences, often framed as field advice." },
+          { key: "mood", value: "focused" },
+          { key: "status", value: "studying the wall map with one hand on a bench" },
+          { key: "memory", value: "Mara has not yet spoken with Taylor." },
+        ],
+      },
+      {
+        key: "orin",
+        name: "Orin",
+        description:
+          "A broad apprentice with ink on his sleeves and an uncertain smile.",
+        roomKey: "common-room",
+        facts: [
+          { key: "persona", value: "Earnest, curious, and quick to answer when someone seems unsure." },
+          { key: "voice", value: "Plain, enthusiastic, and sometimes a little too explanatory." },
+          { key: "mood", value: "eager" },
+          { key: "status", value: "standing by the benches, watching for a chance to help" },
+          { key: "memory", value: "Orin has not yet spoken with Taylor." },
+        ],
+      },
+    ],
+    objects: [
+      {
+        key: "low-table",
+        name: "Low Table",
+        description: "A low table holding blank cards, a candle stub, and a smooth black stone.",
+        roomKey: "threshold",
+        visible: true,
+        facts: [{ key: "tutorial_hint", value: "This object can be inspected with /look." }],
+      },
+      {
+        key: "wall-map",
+        name: "Wall Map",
+        description: "A simple wall map showing the threshold room and the common room.",
+        roomKey: "common-room",
+        visible: true,
+        facts: [{ key: "tutorial_hint", value: "The map suggests this tutorial will grow later." }],
+      },
+    ],
+    initialEvent: "The Tutorial Adventure was created from its source WorldVersion.",
+    initialNarration:
+      "You stand in a quiet threshold room. Guide Serin nods toward the lantern and the low table. \"Start by noticing,\" Serin says. \"Ask for help if you need it, look around, then act when you are ready. Or pass, and see what the room does without you.\"",
   };
 }

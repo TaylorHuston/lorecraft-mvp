@@ -29,6 +29,10 @@ body {
     sans-serif;
 }
 
+html {
+  scroll-padding-top: 4rem;
+}
+
 :where(
   a[href],
   button:not(:disabled),

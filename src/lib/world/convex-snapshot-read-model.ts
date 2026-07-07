@@ -204,7 +204,7 @@ export async function loadVisibleExits(
 }
 
 export async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, limit: number) {
-  const [commands, narrations, events] = await Promise.all([
+  const [commands, narrations, events, utilityMessages] = await Promise.all([
     ctx.db
       .query("commands")
       .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
@@ -217,6 +217,11 @@ export async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, lim
       .take(limit),
     ctx.db
       .query("events")
+      .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
+      .order("desc")
+      .take(limit),
+    ctx.db
+      .query("utilityMessages")
       .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
       .order("desc")
       .take(limit),
@@ -249,6 +254,18 @@ export async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, lim
       createdAt: event._creationTime,
       ...(event.turnId ? { turnId: event.turnId } : {}),
       ...(event.commandId ? { commandId: event.commandId } : {}),
+    })),
+    ...utilityMessages.map((message) => ({
+      id: `utility:${message._id}`,
+      kind: "utility" as const,
+      text: message.text,
+      source: message.source,
+      createdAt: message._creationTime,
+      utilityMessageId: message._id,
+      command: message.command,
+      input: message.input,
+      status: message.status,
+      ...(message.target ? { target: message.target } : {}),
     })),
   ].sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }

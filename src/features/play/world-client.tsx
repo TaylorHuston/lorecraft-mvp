@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import type { SlashCommandAutocompleteTarget } from "@/lib/director/slash-command-autocomplete";
 import {
   buildTurnSequenceById,
   directorUpdateItems,
@@ -44,10 +45,27 @@ type DirectorTurnResponse =
       error: string;
     };
 
+type DirectorUtilityResponse =
+  | {
+      ok: true;
+      message: string;
+      command: "help" | "look";
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 type DirectorPromptGuidance = {
   style: string;
   npcBehavior: string;
   persistence: string;
+};
+
+type SlashCommandSnapshot = {
+  actors: Array<{ role: string; name: string }>;
+  objects: Array<{ name: string }>;
+  room: { name: string };
 };
 
 const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
@@ -64,7 +82,7 @@ export function WorldClient({
   initialAdventureId?: Id<"adventures"> | null;
 }) {
   const router = useRouter();
-  const adventures = useQuery(api.world.listAdventures);
+  const worldContainers = useQuery(api.world.listWorldContainers);
   const seedWorld = useMutation(api.world.seedDemoWorld);
   const createAdventure = useMutation(api.world.createAdventure);
   const deleteAdventure = useMutation(api.world.deleteAdventure);
@@ -76,7 +94,7 @@ export function WorldClient({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [isCreatingAdventure, setIsCreatingAdventure] = useState(false);
+  const [creatingWorldId, setCreatingWorldId] = useState<Id<"worlds"> | null>(null);
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
@@ -86,10 +104,14 @@ export function WorldClient({
   const storyScrollerRef = useRef<HTMLElement | null>(null);
 
   const adventureId = selectedAdventureId;
-  const isLoadingAdventures = selectedAdventureId === null && adventures === undefined;
+  const isLoadingAdventures = selectedAdventureId === null && worldContainers === undefined;
   const snapshot = useQuery(api.world.getSnapshot, adventureId ? { adventureId } : "skip");
   const feedLength = snapshot?.feed.length ?? 0;
   const turnSequenceById = snapshot ? buildTurnSequenceById(snapshot.turns) : new Map<string, number>();
+  const slashCommandTargets = useMemo(
+    () => (snapshot ? buildSlashCommandTargets(snapshot) : []),
+    [snapshot],
+  );
   const topBarWorldName = adventureId
     ? (snapshot?.world.name ?? "Loading world")
     : "Adventures";
@@ -135,19 +157,23 @@ export function WorldClient({
     }
   }
 
-  async function handleCreateAdventure() {
+  async function handleCreateAdventure(worldId: Id<"worlds">) {
     setError(null);
     setNotice(null);
-    setIsCreatingAdventure(true);
+    setCreatingWorldId(worldId);
     try {
-      const result = await createAdventure({});
+      const result = await createAdventure({ worldId });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setSelectedAdventureId(result.adventureId);
       router.push(`/adventures/${result.adventureId}`);
       resetLocalDraftState();
     } catch (createError) {
       setError(errorMessage(createError));
     } finally {
-      setIsCreatingAdventure(false);
+      setCreatingWorldId(null);
     }
   }
 
@@ -224,19 +250,62 @@ export function WorldClient({
   }
 
   async function handlePass() {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
       return false;
     }
 
     return await submitTurn({ trigger: "pass" });
   }
 
-  async function handleActSubmit(input: string) {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || isCreatingAdventure) {
+  async function handleActSubmit(input: string): Promise<"close" | "keep-open" | false> {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
       return false;
     }
 
-    return await submitTurn({ trigger: "act", input });
+    if (input.trim().startsWith("/")) {
+      return await submitUtilityCommand(input);
+    }
+
+    const submitted = await submitTurn({ trigger: "act", input });
+    return submitted ? "close" : false;
+  }
+
+  async function submitUtilityCommand(input: string): Promise<"keep-open" | false> {
+    if (!adventureId) {
+      return false;
+    }
+
+    setError(null);
+    setNotice(null);
+    setIsSubmitting(true);
+    try {
+      const npcSavesFlushed = await npcDebug.flushQueuedSaves();
+      const locationSavesFlushed = await locationDebug.flushActiveSaves();
+      if (!npcSavesFlushed || !locationSavesFlushed) {
+        return false;
+      }
+
+      const response = await fetch("/api/director/utility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adventureId,
+          input,
+          promptGuidance,
+        }),
+      });
+      const result = (await response.json()) as DirectorUtilityResponse;
+      if (!response.ok || !result.ok) {
+        setError(result.ok ? "The utility command failed." : result.error);
+        return false;
+      }
+      return "keep-open";
+    } catch (submitError) {
+      setError(errorMessage(submitError));
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function submitTurn(turn: { trigger: "act"; input: string } | { trigger: "pass" }) {
@@ -280,18 +349,18 @@ export function WorldClient({
     <main id="lorecraft-app" className="min-h-screen bg-[#090908] pt-12 text-zinc-100">
       <div
         id="app-top-bar"
-        className="fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
       >
         <div
           id="app-top-bar-inner"
-          className="flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
+          className="pointer-events-none flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
         >
           <div id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
             <span className="text-amber-300">Lorecraft</span>
             <span className="px-2 text-zinc-600">-</span>
             <span className="truncate text-zinc-300">{topBarWorldName}</span>
           </div>
-          <div id="top-bar-actions" className="flex items-center gap-2">
+          <div id="top-bar-actions" className="pointer-events-auto flex items-center gap-2">
             {adventureId ? (
               <button
                 id="back-to-adventures-button"
@@ -333,13 +402,15 @@ export function WorldClient({
           <div id="story-panel-content" className="flex min-h-0 flex-1 flex-col gap-4">
             {!adventureId ? (
               <AdventureLanding
-                adventures={adventures ?? []}
+                worlds={worldContainers ?? []}
                 isLoading={isLoadingAdventures}
-                isCreatingAdventure={isCreatingAdventure}
+                isSeeding={isSeeding}
+                creatingWorldId={creatingWorldId}
                 deletingAdventureId={deletingAdventureId}
                 error={error}
                 notice={notice}
-                onCreateAdventure={() => void handleCreateAdventure()}
+                onSeedWorld={() => void handleSeed()}
+                onCreateAdventure={(worldId) => void handleCreateAdventure(worldId)}
                 onSelectAdventure={handleSelectAdventure}
                 onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}
               />
@@ -378,7 +449,7 @@ export function WorldClient({
                             id={entry.id}
                             kind={entry.kind}
                             text={entry.text}
-                            turnNumber={entry.turnId ? turnSequenceById.get(entry.turnId) : undefined}
+                            turnNumber={entry.kind !== "utility" && entry.turnId ? turnSequenceById.get(entry.turnId) : undefined}
                           />
                         ))}
                       </div>
@@ -393,10 +464,11 @@ export function WorldClient({
                 </section>
 
                 <TurnActionPanel
-                  disabled={isSeeding || isResetting || isCreatingAdventure}
+                  disabled={isSeeding || isResetting || creatingWorldId !== null}
                   isSubmitting={isSubmitting}
                   notice={notice}
                   error={error}
+                  slashCommandTargets={slashCommandTargets}
                   onActSubmit={handleActSubmit}
                   onPass={handlePass}
                 />
@@ -510,6 +582,25 @@ export function WorldClient({
   );
 }
 
+function buildSlashCommandTargets(snapshot: SlashCommandSnapshot) {
+  const targets: SlashCommandAutocompleteTarget[] = [];
+
+  for (const actor of snapshot.actors) {
+    if (actor.role === "player") {
+      continue;
+    }
+    targets.push({ kind: "actor", label: actor.name });
+  }
+
+  for (const object of snapshot.objects) {
+    targets.push({ kind: "object", label: object.name });
+  }
+
+  targets.push({ kind: "location", label: snapshot.room.name });
+
+  return targets;
+}
+
 function GearIcon() {
   return (
     <svg
@@ -535,7 +626,7 @@ function StoryEntry({
   turnNumber,
 }: {
   id: string;
-  kind: "player" | "director" | "event";
+  kind: "player" | "director" | "event" | "utility";
   text: string;
   turnNumber?: number;
 }) {
@@ -567,6 +658,22 @@ function StoryEntry({
     );
   }
 
+  if (kind === "utility") {
+    return (
+      <StoryEntryShell id={entryDomId} kind={kind} turnNumber={undefined}>
+        <aside
+          id={`${entryDomId}-utility-message`}
+          className="max-w-2xl rounded-xl bg-zinc-800/45 px-4 py-3 text-sm leading-6 text-zinc-300"
+        >
+          <p className="mb-2 text-[0.68rem] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            Utility
+          </p>
+          <p className="whitespace-pre-wrap">{text}</p>
+        </aside>
+      </StoryEntryShell>
+    );
+  }
+
   return (
     <StoryEntryShell id={entryDomId} kind={kind} turnNumber={turnNumber}>
       <article id={`${entryDomId}-game-master-narration`}>
@@ -585,7 +692,7 @@ function StoryEntryShell({
   children,
 }: {
   id: string;
-  kind: "player" | "director" | "event";
+  kind: "player" | "director" | "event" | "utility";
   turnNumber?: number;
   children: React.ReactNode;
 }) {

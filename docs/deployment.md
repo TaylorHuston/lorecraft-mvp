@@ -30,7 +30,7 @@ Create or update this runbook before any production release. It must define:
 
 ## Prototype Guardrails
 
-The current Game Master route is local-first. `/api/director/turn` rejects non-local requests unless `LORECRAFT_ALLOW_REMOTE_DIRECTOR=1` is explicitly set. Remote/shared deployments also need `LORECRAFT_SERVER_WRITE_TOKEN` configured so the route can make server-owned Convex context/write calls in production.
+The current Game Master routes are local-first. `/api/director/turn` and `/api/director/utility` reject non-local requests unless `LORECRAFT_ALLOW_REMOTE_DIRECTOR=1` is explicitly set. Remote/shared deployments also need `LORECRAFT_SERVER_WRITE_TOKEN` configured so these routes can make server-owned Convex context/write calls in production.
 
 This is a prototype guardrail, not product auth. Before production release, replace or supplement it with real user authentication, world ownership checks, rate limiting, and a split between player-facing state and developer/debug state.
 

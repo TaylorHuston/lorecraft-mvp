@@ -2,7 +2,7 @@ export const NPC_FACT_KEYS = ["mood", "status", "memory"] as const;
 
 export type NpcFactKey = (typeof NPC_FACT_KEYS)[number];
 
-export type FeedEntryKind = "player" | "director" | "event";
+export type FeedEntryKind = "player" | "director" | "event" | "utility";
 
 export type DirectorFeedEntry = {
   id: string;
@@ -12,6 +12,11 @@ export type DirectorFeedEntry = {
   createdAt: number;
   turnId?: string;
   commandId?: string;
+  utilityMessageId?: string;
+  command?: string;
+  input?: string;
+  target?: string;
+  status?: "success" | "error";
 };
 
 export type DirectorActor = {
@@ -147,7 +152,7 @@ export type DirectorMessage = {
 export type DirectorMode = "persistent" | "transcript";
 export type TurnTrigger = "act" | "pass";
 export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
-export type DirectorCallRole = "story_generation" | "npc_state_extraction";
+export type DirectorCallRole = "story_generation" | "npc_state_extraction" | "utility_look";
 export type SceneBeatSource = "engine" | "llm" | "fallback";
 
 export type DirectorRequestSummary = {
