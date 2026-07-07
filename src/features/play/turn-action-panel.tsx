@@ -315,15 +315,6 @@ export function TurnActionPanel({
                 Act
               </button>
               <button
-                id="pass-turn-button"
-                type="button"
-                onClick={handlePass}
-                disabled={disabled}
-                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
-              >
-                Pass
-              </button>
-              <button
                 id="story-turn-button"
                 type="button"
                 onClick={() => handleActionMode("story")}
@@ -340,6 +331,15 @@ export function TurnActionPanel({
                 className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
               >
                 Guide
+              </button>
+              <button
+                id="pass-turn-button"
+                type="button"
+                onClick={handlePass}
+                disabled={disabled}
+                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
+              >
+                Pass
               </button>
             </div>
           )}
