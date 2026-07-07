@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Current state: implementation complete; ready for `/sdd-review`
-- Last completed action: Story/Guide backend, UI, deterministic tests, E2E, Epic truth, changelog, and supporting docs were reconciled.
+- Last completed action: Story/Guide backend, UI, deterministic tests, E2E, Epic truth, changelog, and supporting docs were committed as `6384ce2`.
 - Next action: run `/sdd-review` as the local integration gate, then address findings or close/merge with user approval.
 - Active branch/ref: `change/story-guide-actions`
 - Expected dirty files: Story/Guide implementation, focused tests, E2E, `docs/changes/2026-07-07-story-guide-actions/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, and `docs/testing.md`.
@@ -81,9 +81,9 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-07 | Proposed Story/Guide action scope | main, `/sdd-propose` | `proposal.md`, `design.md`, `tasks.md` | Planning artifacts drafted | uncommitted |
-| 2026-07-07 | Discovery and delegation | main, `sdd-apply`; backend/frontend subagents | change artifacts, Epic, Convex/route/prompt/UI surfaces | Branch created and implementation slices delegated; code edits pending | uncommitted |
-| 2026-07-07 | LC-001-S14/R1-R4 implementation | main orchestrator with backend/frontend subagents | Convex schema/functions, route parsing/orchestration, prompt categories, play UI, read model, E2E fixture path | Story inserts and Guide turns implemented with focused tests, E2E coverage, docs, changelog, and Epic truth reconciled | uncommitted |
+| 2026-07-07 | Proposed Story/Guide action scope | main, `/sdd-propose` | `proposal.md`, `design.md`, `tasks.md` | Planning artifacts drafted | `6384ce2` |
+| 2026-07-07 | Discovery and delegation | main, `sdd-apply`; backend/frontend subagents | change artifacts, Epic, Convex/route/prompt/UI surfaces | Branch created and implementation slices delegated | `6384ce2` |
+| 2026-07-07 | LC-001-S14/R1-R4 implementation | main orchestrator with backend/frontend subagents | Convex schema/functions, route parsing/orchestration, prompt categories, play UI, read model, E2E fixture path | Story inserts and Guide turns implemented with focused tests, E2E coverage, docs, changelog, and Epic truth reconciled | `6384ce2` |
 
 ## Specialist Checkpoint
 
