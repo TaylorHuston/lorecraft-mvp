@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` changes requested; sixth safe review fix set applied.
-- Last completed action: fixed review findings for E2E-created Tutorial Adventure cleanup, fixed-header inner-container interception during startup Adventure creation, landing scroll alignment for long Adventure lists, Act input focus visibility, post-`e34cf50` lifecycle state, stale review bundle facts, manual UI status checkbox state, fixed-header interception during startup Adventure creation, missing utility reload-persistence E2E coverage, post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, duplicate README wording, stale lifecycle state, Demo World Lifetime reseed wording, Epic verification metadata, `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
-- Next action: rerun `/sdd-review` for a fresh ready verdict.
+- Current state: `/sdd-review` ready; awaiting Taylor authorization for merge-and-close.
+- Last completed action: completed fresh ready review after `bd85349`; focused utility tests, Convex compile, deterministic E2E, required CI, whitespace check, and merge-tree passed with no unresolved blocking or required findings.
+- Next action: merge into `develop` and close this change only after Taylor authorizes merge-and-close.
 - Active branch/ref: `change/slash-commands-tutorial`
 - Expected dirty files after remediation commit: none
 - Known blockers: none identified
@@ -84,8 +84,8 @@
 - [x] 6.3 Record review outcome as `review.md` or a clean review ledger note.
 - [x] 6.4 Address review findings or explicitly defer accepted non-blocking risks.
 - [x] 6.5 Record manual UI confirmation status.
-- [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not contain stale implementation status.
-- [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
+- [x] 6.6 Confirm proposal/design/tasks/review artifacts do not contain stale implementation status.
+- [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 6.8 Merge only after `sdd-review` is ready and user authorization allows it.
 - [ ] 6.9 After review/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -107,6 +107,7 @@
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md`, `docs/data-model.md`, `docs/deployment.md`, `docs/architecture.md`, LC-001 Epic, `README.md` | Fixed fixed-header interception during startup Adventure creation, added utility reload-persistence E2E coverage, reconciled post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, and duplicate README wording. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx`, `src/features/play/turn-action-panel.tsx`, `src/app/globals.css`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md` | Fixed fixed-header inner-container click interception, global landing scroll alignment, long-list landing overflow, Act input focus visibility, deterministic E2E card clicking, and post-`e34cf50` lifecycle/review bundle/manual UI status artifacts. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + Taylor feedback | `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md` | Added cleanup for E2E-created Tutorial Adventures and a defensive finally block for temporary Adventure deletion. | review remediation commit |
+| 2026-07-06 | Fresh `/sdd-review` ready rerun | main | `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md` | Verified the branch clean after all safe fixes and updated review/tasks lifecycle state to ready pending Taylor-authorized merge-and-close. | review record update |
 
 ## Verification Ledger
 
@@ -149,6 +150,12 @@
 | 2026-07-06 | `npx eslint tests/e2e/lorecraft-playtest.spec.ts` | focused lint | Edited E2E cleanup test file satisfies lint. | Passed |
 | 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes while deleting both temporary Stormbound and Tutorial Adventures created by the test. | Passed, 1 browser test |
 | 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after the sixth safe review fix set. | Passed, 68 tests |
+| 2026-07-06 | `git diff --check` | whitespace check | Full source branch diff has no whitespace errors on the fresh ready rerun. | Passed |
+| 2026-07-06 | `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | Parser, autocomplete, visible `/look` matching, offscreen location rejection, and provider prompt privacy remain green. | Passed, 14 tests |
+| 2026-07-06 | `npm run convex:once` | Convex compile | Convex schema/functions compile with utility messages, multi-World seed/listing, and Adventure cleanup. | Passed |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest remains green after all safe fixes, including Tutorial Adventure cleanup. | Passed, 1 browser test |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass on the fresh ready rerun. | Passed, 68 tests |
+| 2026-07-06 | `git merge-tree --write-tree develop HEAD` | merge readiness | Source branch merges cleanly into `develop` before the ready review-record update. | Passed, tree `803331d3d57b1305ffaba7f7c83f9d0868daee3d` |
 
 ## Specialist Checkpoint
 
@@ -216,11 +223,11 @@
 - Superseded earlier Epic truth reconciled: complete
 - ADR status: not applicable
 - Changelog current: complete
-- `sdd-review` verdict: changes-requested, sixth safe review fix set applied; fresh rerun pending
+- `sdd-review` verdict: ready; merge-and-close pending Taylor authorization
 - Review record: `docs/changes/2026-07-05-slash-commands/review.md`
-- `review.md` findings resolved: fixed in safe review passes; fresh rerun pending
+- `review.md` findings resolved: complete
 - Planning updates resolved: not applicable
 - Manual UI confirmation status: pending Taylor
-- PR / merge state: local implementation pending fresh review/merge
+- PR / merge state: local implementation ready; merge not performed
 - Deferred scope accepted: recorded
 - Change moved to `docs/changes/closed/`: no

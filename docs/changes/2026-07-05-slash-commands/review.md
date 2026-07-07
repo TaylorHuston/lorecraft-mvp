@@ -2,26 +2,26 @@
 
 ## Verdict
 
-changes-requested
+ready
 
-This fresh review found additional UI verification, accessibility, E2E cleanup, and artifact drift after the prior remediation commit and applied safe in-scope fixes. Rerun `/sdd-review` for a fresh-context ready verdict before merge/closeout.
+This fresh review rerun found no unresolved blocking or required findings. The source branch is ready for local integration into `develop` once Taylor authorizes merge-and-close.
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | pass after fix | Updated stale review/tasks lifecycle state after `e34cf50`. |
-| Epic truth | pass after fix | LC-001-S13 is under Stories; LC-002 describes seeded Worlds including Tutorial; verification metadata updated to 2026-07-06. |
+| Change artifacts | pass | Proposal, design, tasks, and this review now agree with the current implementation, branch, verification, and lifecycle state. |
+| Epic truth | pass | LC-001-S13 is under Stories; LC-002 describes seeded Worlds including Tutorial; verification metadata updated to 2026-07-06. |
 | Requirements and Scenarios | pass | LC-001-S13 and LC-002/S5 Requirements map to implementation and verification. |
 | Story reference traceability | pass | Story labels remain stable and indexed. |
-| Tests and verification | pass after fix | Focused route/parser/autocomplete tests, deterministic E2E, and required CI passed after adding utility reload-persistence coverage and temporary Adventure cleanup. |
+| Tests and verification | pass | Focused route/parser/autocomplete tests, Convex compile, deterministic E2E, and required CI passed on this fresh review rerun. |
 | Manual UI confirmation | pass with pending status | `tasks.md` records a current walkthrough and `pending Taylor` status. |
-| Code review | pass after fix | Empty first-run landing path restored; reseed destructive scope narrowed; generated output lint fragility fixed. |
-| Visual / UX consistency | pass after fix with suggestion | Fixed startup Adventure buttons, top-bar pointer-event behavior, landing scroll alignment for long Adventure lists, and Act input focus visibility; autocomplete works, but ARIA could be tightened later with a fuller combobox pattern. |
-| Security review | pass after fix | Offscreen `/look` location leak fixed; `/look` prompt input now excludes non-observable NPC facts; global reseed no longer deletes Tutorial. |
-| Documentation | pass after fix | README, data/persistence/architecture docs, and affected Epics are current after reseed-lifetime wording, metadata, and duplicate README wording fixes. |
+| Code review | pass | Empty first-run landing path restored; reseed destructive scope narrowed; utility route/read model/test cleanup are coherent. |
+| Visual / UX consistency | pass with suggestion | Fixed startup Adventure buttons, top-bar pointer-event behavior, landing scroll alignment for long Adventure lists, and Act input focus visibility; autocomplete works, but ARIA could be tightened later with a fuller combobox pattern. |
+| Security review | pass | Offscreen `/look` location leak fixed; `/look` prompt input now excludes non-observable NPC facts; global reseed no longer deletes Tutorial. |
+| Documentation | pass | README, data/persistence/architecture/deployment docs, change artifacts, and affected Epics are current for this change. |
 | Changelog | pass | Public `Unreleased` entries cover slash utilities, autocomplete, Tutorial, and multi-World startup. |
-| Branch and merge readiness | blocked pending fresh rerun | A safe artifact/doc fix was applied; rerun review before merge. |
+| Branch and merge readiness | pass | Source `change/slash-commands-tutorial` targets `develop`, merge-tree is clean, and app repo was clean before this review-record update. |
 | PRD alignment | not applicable | No separate PRD update required for this scoped prototype change. |
 
 ## Findings
@@ -76,18 +76,23 @@ This fresh review found additional UI verification, accessibility, E2E cleanup, 
 | `npx eslint tests/e2e/lorecraft-playtest.spec.ts` | focused lint | E2E cleanup file | Passed | Edited E2E cleanup test file satisfies lint. |
 | `npm run e2e` | deterministic E2E | LC-001-S13, LC-002/S5, first-run seed helper | Passed, 1 browser test | Browser path remains green while deleting both temporary Stormbound and Tutorial Adventures created by the test. |
 | `npm run ci:required` | broad supporting gate | full local required gate | Passed, 68 tests | Lint, unit tests, typecheck, and production build pass after the sixth safe review fix set. |
+| `git diff --check` | whitespace check | full source branch | Passed | Source branch diff has no whitespace errors on the fresh ready rerun. |
+| `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | LC-001-S13/R1, R2, R4 | Passed, 14 tests | Parser, autocomplete, visible `/look` matching, offscreen location rejection, and provider prompt privacy remain green. |
+| `npm run convex:once` | Convex compile | LC-001-S13 and LC-002/S5 persistence/seed functions | Passed | Convex schema and functions compile with utility messages, multi-World seed/listing, and Adventure cleanup. |
+| `npm run e2e` | deterministic E2E | LC-001-S13, LC-002/S5, first-run seed helper | Passed, 1 browser test | Browser path remains green after all safe fixes, including Tutorial Adventure cleanup. |
+| `npm run ci:required` | broad supporting gate | full local required gate | Passed, 68 tests | Lint, unit tests, typecheck, and production build pass on the fresh ready rerun. |
 
 ## Review Bundle
 
 - Source branch/ref: `change/slash-commands-tutorial`
 - Target branch/ref: `develop`
 - Merge base: `89704db727aa9570e773222b727d324d91ed3fff`
-- Source-only commits before this safe fix: `76ba05b`, `a82eb30`, `6e03962`, `3cc24e3`, `743490f`, `d425b76`, `388fbcb`, `e34cf50`
+- Source-only commits reviewed before this ready-record update: `76ba05b`, `a82eb30`, `6e03962`, `3cc24e3`, `743490f`, `d425b76`, `388fbcb`, `e34cf50`, `e85ccd5`, `bd85349`
 - Target-only commits: none reported by `git log HEAD..develop`
 - Changed files: see `git diff --name-status develop...HEAD`
-- Diff stat: 31 files changed before this safe fix
-- Conflict check: `git merge-tree --write-tree develop HEAD` returned a tree hash before this safe fix
-- Dirty state: app repo was clean before review; safe fixes were isolated for a local remediation commit
+- Diff stat: 32 files changed before this ready-record update
+- Conflict check: `git merge-tree --write-tree develop HEAD` returned tree hash `803331d3d57b1305ffaba7f7c83f9d0868daee3d` before this ready-record update
+- Dirty state: app repo was clean before this ready-record update
 - Branch policy: source `change/slash-commands-tutorial` to target `develop` matches app policy for routine product changes
 
 ## Delegated Review Passes
@@ -97,15 +102,16 @@ This fresh review found additional UI verification, accessibility, E2E cleanup, 
 | Artifact truth | `019f36a5-2968-75b3-a4ef-36a3fc2e0fc6` | changes-requested | Found post-`e34cf50` lifecycle/review bundle drift and the manual UI status checkbox mismatch. |
 | Security | `019f36a5-4fca-7cd2-ab26-f8a941ff4457` | pass | Found no additional blocking, required, or suggested security findings for the local/prototype posture. |
 | Frontend / UI | `019f36a5-7902-7fa0-b7fa-3b64c369947d` | changes-requested | Reproduced fixed-header click interception and flagged missing visible focus indication on the Act textarea. |
+| Fresh ready rerun | main thread | pass | Subagent spawning was skipped because the available subagent tool only permits spawning when the user explicitly asks for delegation; the main thread reran source/diff review and all relevant verification gates. |
 
 ## PR / Merge Readiness
 
 - Source branch: `change/slash-commands-tutorial`
 - Target branch: `develop`
-- Conflict check: clean before this safe fix; rerun on fresh review
-- Commit state: safe fixes isolated for a local remediation commit
+- Conflict check: clean before this ready-record update
+- Commit state: implementation and safe fixes are committed; this ready review record is an artifact-only update
 - PR status: not requested
-- Merge status: blocked pending fresh `/sdd-review`
+- Merge status: ready for local merge-and-close after Taylor authorization
 
 ## Review Log
 
@@ -115,3 +121,4 @@ This fresh review found additional UI verification, accessibility, E2E cleanup, 
 - 2026-07-06: Fresh review rerun found and fixed UI verification, artifact, and doc drift after `388fbcb`: fixed-header click interception, missing utility reload-persistence E2E coverage, lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, and duplicate README wording. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Fresh review rerun found and fixed UI verification, accessibility, and artifact drift after `e34cf50`: fixed-header inner-container click interception, landing scroll alignment for long Adventure lists, Act input focus visibility, lifecycle state, review bundle facts, and manual UI status checkbox state. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Taylor feedback identified that E2E-created Tutorial Adventures were accumulating locally. Fixed the browser test to delete temporary Tutorial Adventures and defensively clean up tracked temporary Adventure ids on failure. Rerun `/sdd-review` for a clean ready verdict.
+- 2026-07-06: Fresh review rerun after `bd85349` found no unresolved blocking or required findings. Focused utility tests, Convex compile, deterministic E2E, required CI, whitespace check, and merge-tree all passed. Ready for local merge-and-close after Taylor authorization.
