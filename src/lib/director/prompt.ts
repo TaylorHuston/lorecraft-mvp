@@ -52,13 +52,17 @@ export function buildDirectorRequest(
     sceneBeatSource?: SceneBeatSource;
     sceneBeatReason?: string;
     turnTrigger?: TurnTrigger;
+    guideGuidance?: string;
   } = {},
 ): DirectorRequest {
   const prompt = buildPromptComponents(context, playerInput, {
     promptGuidance: options.promptGuidance,
     requiredSceneBeat: options.requiredSceneBeat,
     turnTrigger: options.turnTrigger,
+    guideGuidance: options.guideGuidance,
   });
+  const guideGuidanceLength =
+    options.turnTrigger === "guide" ? (options.guideGuidance?.trim().length ?? 0) : 0;
   const generationSettings = options.generationSettings
     ? { ...options.generationSettings, responseFormat: "text" as const }
     : undefined;
@@ -79,6 +83,7 @@ export function buildDirectorRequest(
       roomKey: context.room.key,
       turnTrigger: prompt.turnTrigger,
       playerInputLength: playerInput?.length ?? 0,
+      ...(guideGuidanceLength > 0 ? { guideGuidanceLength } : {}),
       recentFeedCount: prompt.recentFeed.length,
       actorKeys: context.actors.map((actor) => actor.key),
       npcFactKeys: NPC_FACT_KEYS.filter((key) =>
@@ -360,23 +365,38 @@ function buildPromptComponents(
     promptGuidance?: DirectorPromptGuidance;
     requiredSceneBeat?: RequiredSceneBeat;
     turnTrigger?: TurnTrigger;
+    guideGuidance?: string;
   },
 ) {
   const turnTrigger = options.turnTrigger ?? "act";
   const actionInput = playerInput ?? "";
-  const storyVisibleHistory = (context.storyVisibleHistory ?? context.recentFeed.filter((entry) => entry.kind === "director")).slice(
-    -RECENT_FEED_LIMIT,
-  );
+  const guideGuidance = options.guideGuidance?.trim() ?? "";
+  const storyVisibleHistory = (
+    context.storyVisibleHistory ??
+    context.recentFeed.filter((entry) => entry.kind === "director" || entry.kind === "story")
+  ).slice(-RECENT_FEED_LIMIT);
   const requiredSceneBeat =
-    options.requiredSceneBeat ?? (turnTrigger === "pass" ? passSceneBeat() : deriveRequiredSceneBeat(context, actionInput));
+    options.requiredSceneBeat ??
+    (turnTrigger === "pass"
+      ? passSceneBeat()
+      : turnTrigger === "guide"
+        ? guideSceneBeat()
+        : deriveRequiredSceneBeat(context, actionInput));
   const promptGuidance = normalizePromptGuidance(options.promptGuidance);
   const lastAction = {
     trigger: turnTrigger,
-    rawInput: actionInput,
-    inferredMode: turnTrigger === "pass" ? ("pass" as const) : inferPlayerInputMode(actionInput),
+    rawInput: turnTrigger === "guide" ? guideGuidance : actionInput,
+    inferredMode:
+      turnTrigger === "pass"
+        ? ("pass" as const)
+        : turnTrigger === "guide"
+          ? ("guide" as const)
+          : inferPlayerInputMode(actionInput),
     directive:
       turnTrigger === "pass"
         ? "The player passes. Continue the scene from accepted narration and canonical state without inventing a new player action."
+        : turnTrigger === "guide"
+          ? "Follow this hidden Guide steering for the next Game Master narration. Treat it as private direction, not as canonical player prose, action, dialogue, or transcript."
         : "Resolve this player input now before advancing the scene. Treat it as intent, not already-canonical prose.",
   };
   const npcProfiles = context.npcProfiles ?? buildNpcProfiles(context.actors);
@@ -453,6 +473,7 @@ function buildPromptComponents(
     npcProfiles,
     knownLocations,
     readOnlyKnowledgeKeys,
+    guideGuidanceLength: guideGuidance.length,
   };
 }
 
@@ -533,8 +554,11 @@ function buildPersistentAiInstructions({
     "Prefer complete sentences and a clean stopping point over extra detail.",
     requiredSceneBeat.kind === "pass"
       ? "The player has passed. Advance the scene without inventing a new player action."
+      : requiredSceneBeat.kind === "guide"
+        ? "The player has provided hidden Guide steering. Follow it for this response, but do not treat it as already-canonical story prose or player action."
       : "Resolve Current Input before advancing; do not merely restate it.",
     "Stop after resolving the current input; do not continue into the player's next action.",
+    "Treat player-authored Story entries in Recent Story as accepted canonical scene content.",
     "Treat Location Cards as canonical scene truth. Known Locations are the only valid movement destinations; do not invent new locations.",
     "Treat NPC Cards as canonical story memory, including descriptions, personality, voice, current status, memory, and private knowledge.",
     "Keep fleeting gestures and reactions in narration. Durable NPC state is evaluated separately after this prose.",
@@ -602,12 +626,16 @@ function buildNpcStateExtractionUserPrompt(components: {
     "Use mood for the NPC's current emotional posture.",
     "Use status for durable current condition or situation that should affect later narration.",
     "Use memory for a compact rolling summary of meaningful direct interactions with the player.",
+    "Only update a field when the completed Game Master Narration directly supports that exact durable condition.",
+    "Do not intensify narration into stronger facts. For example, 'ledger slipping slightly' does not support 'dropping his ledger'.",
     "Do not update description, background, persona, voice, knowledge, location, inventory, health, or rules-like stats.",
-    "Do not update for momentary gestures, incidental movement, eye contact, posture, tone, or obvious reactions that the recent story already covers.",
+    "Do not update for momentary gestures, incidental movement, eye contact, posture, tone, startles, flinches, gasps, brief freezing, or obvious reactions that the recent story already covers.",
+    "Before proposing an update, ask whether the fact should still matter three turns from now. If not, leave it in narration.",
     "Do not invent hidden consequences. If no durable NPC state changed, return an empty npcUpdates array.",
     "Actor movement is separate from NPC facts. Propose actorMoves only when Current Input clearly attempts travel and the completed narration confirms the actor reached or entered an existing Known Location.",
     "Allowed actorMoves actors: the player and NPCs present in the Location Card.",
     "Allowed actorMoves destinations: Known Locations only. Never create a location.",
+    "If the turn trigger is Guide, treat hidden guidance as private steering, not player prose; durable changes must be justified by the completed Game Master Narration.",
   ];
 
   if (!components.requiredSceneBeat.allowsNpcUpdates) {
@@ -838,12 +866,24 @@ function formatCurrentInput(currentTurn: {
     ].join("\n");
   }
 
+  if (currentTurn.trigger === "guide") {
+    return [
+      "Turn trigger: Guide.",
+      currentTurn.rawInput ? `[Hidden Guide]\n> ${currentTurn.rawInput}` : "[Hidden Guide omitted from this request.]",
+      currentTurn.directive,
+      "The hidden Guide text is current-turn steering only. It is not a player action, dialogue, or accepted story paragraph.",
+    ].join("\n");
+  }
+
   return [`Turn trigger: Act.`, `> ${currentTurn.rawInput}`, currentTurn.directive].join("\n");
 }
 
 function formatRecentStoryEntry(entry: PromptFeedEntry) {
   if (entry.kind === "player") {
     return `> ${entry.text}`;
+  }
+  if (entry.kind === "story") {
+    return `[Player-authored Story] ${entry.text}`;
   }
   if (entry.kind === "event") {
     return `[Event] ${entry.text}`;
@@ -891,7 +931,7 @@ function buildConversationFocus(
 
 function buildPersistentSceneDirective(
   sceneBeat: RequiredSceneBeat,
-  inferredMode: ReturnType<typeof inferPlayerInputMode> | "pass",
+  inferredMode: ReturnType<typeof inferPlayerInputMode> | "pass" | "guide",
   npcProfiles: ReturnType<typeof buildNpcProfiles>,
 ) {
   const targetProfile = sceneBeat.targetActorKey
@@ -910,6 +950,8 @@ function buildPersistentSceneDirective(
     task:
       inferredMode === "pass"
         ? "Resolve currentTurn.pass by continuing the scene from accepted narration and canonical state."
+        : inferredMode === "guide"
+          ? "Resolve currentTurn.guide by following hidden current-turn steering while preserving canonical scene truth."
         : "Resolve currentTurn.playerInput now before advancing the scene.",
     lastActionMode: inferredMode,
     targetActorKey: sceneBeat.targetActorKey,
@@ -921,6 +963,8 @@ function buildPersistentSceneDirective(
       ? "The target NPC must answer, refuse, deflect, warn, lie, ask back, act, or intentionally stay silent in this response. Do not stop after setup or repeat the player's question without resolution."
       : inferredMode === "pass"
         ? "Advance the scene one short beat from existing tension, NPC agenda, environment, or consequences. Do not invent a new player action."
+        : inferredMode === "guide"
+          ? "Follow the hidden Guide steering for one short story beat. Do not reveal or quote the Guide text as player prose."
         : "Resolve the player's intent directly. Do not replay setup or copy player input as the whole response.",
     npcAttributePolicy:
       "If the player asks about an NPC's appearance, identity, background, personality, voice, mood, status, memory, or knowledge, answer from npcCards/npcProfiles instead of inventing conflicting details.",
@@ -1011,6 +1055,16 @@ function passSceneBeat(): RequiredSceneBeat {
     allowsNpcUpdates: true,
     instruction:
       "The player passes. Continue the scene one short beat from accepted narration and canonical state without inventing a new player action.",
+  };
+}
+
+function guideSceneBeat(): RequiredSceneBeat {
+  return {
+    kind: "guide",
+    expectsNpcResponse: false,
+    allowsNpcUpdates: true,
+    instruction:
+      "The player provides hidden Guide steering. Use it as private current-turn direction for the next story beat, not as canonical player prose, action, or dialogue.",
   };
 }
 

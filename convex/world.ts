@@ -48,16 +48,19 @@ type DebugNpcWriteResult = {
 const DEMO_RESET_ROW_LIMIT = 500;
 const DEBUG_CREATED_LOCATION_LIMIT = 25;
 const DEBUG_CREATED_NPC_LIMIT = 25;
+const STORY_INSERT_MAX_LENGTH = 4000;
+const GUIDE_GUIDANCE_MAX_LENGTH = 1200;
 
 const factValue = v.union(v.string(), v.number(), v.boolean(), v.null());
 const actorRole = v.union(v.literal("player"), v.literal("npc"));
 const feedKind = v.union(
   v.literal("player"),
+  v.literal("story"),
   v.literal("director"),
   v.literal("event"),
   v.literal("utility"),
 );
-const turnTrigger = v.union(v.literal("act"), v.literal("pass"));
+const turnTrigger = v.union(v.literal("act"), v.literal("pass"), v.literal("guide"));
 const directorStatus = v.union(
   v.literal("success"),
   v.literal("provider_error"),
@@ -155,9 +158,30 @@ const worldVersionCreateResult = v.union(
   v.object({ ok: v.literal(true), worldVersionId: v.id("worldVersions") }),
   v.object({ ok: v.literal(false), error: v.string() }),
 );
+const storyInsertResult = v.union(
+  v.object({ ok: v.literal(true), narrationId: v.id("narrations") }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
 
 function normalized(input: string) {
   return input.trim().toLowerCase();
+}
+
+function validatePlayerAuthoredText(
+  value: string,
+  args: { label: string; maxLength: number },
+): { ok: true; text: string } | { ok: false; error: string } {
+  const text = value.trim();
+  if (!text) {
+    return { ok: false, error: `${args.label} is required.` };
+  }
+  if (!/[A-Za-z0-9]/.test(text)) {
+    return { ok: false, error: `${args.label} must include words or numbers.` };
+  }
+  if (text.length > args.maxLength) {
+    return { ok: false, error: `${args.label} must be ${args.maxLength} characters or less.` };
+  }
+  return { ok: true, text };
 }
 
 function actorSubjectId(actorKey: string) {
@@ -1037,6 +1061,7 @@ export const getSnapshot = query({
           actorId: v.id("actors"),
           commandId: v.optional(v.id("commands")),
           trigger: v.optional(turnTrigger),
+          hiddenGuidance: v.optional(v.string()),
           status: turnStatus,
           error: v.optional(v.string()),
           completedAt: v.optional(v.number()),
@@ -1324,6 +1349,96 @@ export const recordPassTurn = mutation({
   },
 });
 
+export const recordGuideTurn = mutation({
+  args: {
+    adventureId: v.id("adventures"),
+    guidance: v.string(),
+    serverWriteToken: v.optional(v.string()),
+  },
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      turnId: v.id("turns"),
+      sequenceNumber: v.number(),
+    }),
+    v.object({ ok: v.literal(false), error: v.string() }),
+  ),
+  handler: async (ctx, args) => {
+    if (!serverWriteAuthorized(args.serverWriteToken)) {
+      return { ok: false as const, error: "Server write access is not configured." };
+    }
+
+    const guidance = validatePlayerAuthoredText(args.guidance, {
+      label: "Guide guidance",
+      maxLength: GUIDE_GUIDANCE_MAX_LENGTH,
+    });
+    if (!guidance.ok) {
+      return { ok: false as const, error: guidance.error };
+    }
+
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure?.currentPlayerActorId) {
+      return { ok: false as const, error: "No active player exists in this Adventure yet." };
+    }
+
+    const player = await ctx.db.get(adventure.currentPlayerActorId);
+    if (!player) {
+      return { ok: false as const, error: "The active player could not be loaded." };
+    }
+
+    const previousTurn = await ctx.db
+      .query("turns")
+      .withIndex("by_adventureId_and_sequenceNumber", (q) =>
+        q.eq("adventureId", args.adventureId),
+      )
+      .order("desc")
+      .take(1);
+    const sequenceNumber = (previousTurn[0]?.sequenceNumber ?? 0) + 1;
+    const turnId = await ctx.db.insert("turns", {
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
+      sequenceNumber,
+      actorId: player._id,
+      trigger: "guide",
+      hiddenGuidance: guidance.text,
+      status: "pending",
+    });
+
+    return { ok: true as const, turnId, sequenceNumber };
+  },
+});
+
+export const recordStoryInsert = mutation({
+  args: {
+    adventureId: v.id("adventures"),
+    text: v.string(),
+  },
+  returns: storyInsertResult,
+  handler: async (ctx, args) => {
+    const text = validatePlayerAuthoredText(args.text, {
+      label: "Story text",
+      maxLength: STORY_INSERT_MAX_LENGTH,
+    });
+    if (!text.ok) {
+      return { ok: false as const, error: text.error };
+    }
+
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure?.currentPlayerActorId) {
+      return { ok: false as const, error: "No active player exists in this Adventure yet." };
+    }
+
+    const narrationId = await ctx.db.insert("narrations", {
+      worldId: adventure.worldId,
+      adventureId: args.adventureId,
+      text: text.text,
+      source: "player",
+    });
+
+    return { ok: true as const, narrationId };
+  },
+});
+
 export const recordUtilityMessage = mutation({
   args: {
     adventureId: v.id("adventures"),
@@ -1384,9 +1499,9 @@ function requireTurnMatchesCommand(
     throw new Error("Turn is not in the expected status.");
   }
 
-  if ((turn.trigger ?? "act") === "pass") {
+  if ((turn.trigger ?? "act") === "pass" || turn.trigger === "guide") {
     if (turn.commandId || commandId) {
-      throw new Error("Pass turns must not reference a command.");
+      throw new Error("Commandless turns must not reference a command.");
     }
     return;
   }

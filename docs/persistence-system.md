@@ -17,7 +17,7 @@ In the MVP, that state is intentionally small:
 - WorldVersions describe the authored baseline.
 - Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
-- Commands, narrations, events, and utility messages reconstruct the visible play feed.
+- Commands, narrations, Story inserts, events, and utility messages reconstruct the visible play feed.
 - Turns group each resolved story beat with the Game Master work it caused.
 - State diffs record accepted mutations.
 - Game Master calls and local logs explain what happened during LLM/provider interactions.
@@ -36,7 +36,7 @@ Persistent mode gives the Game Master current Location Cards, known locations, a
 
 Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the current action or Pass trigger, completed narration, current Location Card, Known Locations, NPC Cards, and the same story-visible narration history as story generation, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 
-The Game Master may not directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations can change only through the bounded extractor and Convex validation.
+The Game Master may not directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations can change only through the bounded extractor and Convex validation. The extractor is also bounded by completed narration support: it cannot turn a transient beat or weaker phrase into a stronger durable fact just because that fact would be dramatic.
 
 ### Recent Context Is Not Durable Truth
 
@@ -79,22 +79,32 @@ Early adjudication should be deliberately small:
 
 Do not add character stats, inventory, combat rounds, relationship scores, spell slots, or NPC schedules preemptively. Start from Story Cards and prompt quality; add adjudication only when pure narration creates repeated arbitrary or consequence-free outcomes.
 
-## How A Narrative Turn Works
+## How Story, Guide, And Narrative Turns Work
+
+Story, Guide, Act, Pass, and slash utilities are deliberately different categories.
+
+- `Story` records player-authored canonical prose as a visible Story insert. It does not call the provider, create a turn, run extraction, or mutate state by itself.
+- `Guide` creates a resolving turn from hidden current-turn steering. The raw Guide text is not shown in the story stream and is not future story-visible history.
+- `Act` creates a resolving turn with player prose and a command row.
+- `Pass` creates a resolving turn without player prose or a command row.
+- Slash utilities such as `/help` and `/look` remain pre-turn helper output.
+
+Story inserts let the player set a little more scene before the next resolving turn. The next Act, Pass, or Guide prompt includes recent Story inserts as accepted scene content, but durable state changes still wait for a later Game Master narration plus extractor validation.
 
 Current synchronous flow:
 
-1. The player either submits narrative input or clicks Pass.
+1. The player either submits narrative input, clicks Pass, or submits hidden Guide steering.
 2. The route validates the request and LLM configuration.
 3. The route loads bounded Game Master context from Convex.
-4. Convex creates a pending turn with the next Adventure-scoped sequence number and a trigger of `act` or `pass`.
-5. For action turns, Convex records the player input command and links it to the turn. Pass turns do not create command rows or fake player prose.
-6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded story-visible narration history, current input or Pass directive, and output guidance.
+4. Convex creates a pending turn with the next Adventure-scoped sequence number and a trigger of `act`, `pass`, or `guide`.
+5. For action turns, Convex records the player input command and links it to the turn. Pass and Guide turns do not create command rows or fake player prose.
+6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded story-visible narration history, current input, Pass directive, or hidden Guide directive, and output guidance.
 7. The provider returns player-facing story prose.
 8. The backend parses the prose into a normalized turn result with `narration` and an empty `npcUpdates` array.
 9. Convex records the Game Master call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
 10. On success, Convex stores the narration and marks the turn `succeeded`.
 11. Persistent mode runs a separate JSON state extraction request after successful narration.
-12. The backend validates proposed NPC updates and actor moves. Accepted NPC updates can change `mood`, `status`, and `memory`; accepted actor moves can move the player or current-scene NPCs to existing locations.
+12. The backend validates proposed NPC updates and actor moves. Accepted NPC updates can change `mood`, `status`, and `memory`; accepted actor moves can move the player or current-scene NPCs to existing locations. Momentary or overreaching NPC fact proposals are ignored and retained as debug evidence. For Guide turns, extraction sees the Guide trigger and completed narration but not the raw Guide text as canonical player prose.
 13. Convex records accepted mutations as canonical facts or actor `roomId` changes plus turn-scoped state diffs. Ignored proposals remain debug evidence.
 14. On provider or output failure after the turn exists, Convex keeps the turn and Game Master call, keeps the command for action turns, marks the turn `failed`, and does not store fake narration or state changes.
 15. The UI updates from Convex state.
@@ -118,6 +128,14 @@ Current commands:
 Utility command results are persisted as `utilityMessages` so reload/resume keeps them visible in the feed. They do not create rows in `turns`, `commands`, `narrations`, `events`, or `stateDiffs`, and they do not run post-narration state extraction.
 
 The prompt boundary is explicit: future Game Master turns use canonical Adventure state plus `loadStoryVisibleHistory`, which reads successful narrations and seed narration. Utility output is excluded from that history. If a player learns something from `/look` and then acts on it, the later Act is what the Game Master evaluates as story input.
+
+## Story Inserts And Guide Turns
+
+Story inserts are narration-like rows with `source = "player"`. They are visible in the story stream, survive reload, and enter `loadStoryVisibleHistory` with a label that tells the Game Master they are accepted canonical scene content.
+
+Story inserts are not state mutation. If the player authors "the lantern shatters" as Story setup, the next resolving turn can narrate consequences from that setup, but durable facts or actor movement still need the normal post-narration extraction and validation path.
+
+Guide turns are commandless turns with `trigger = "guide"` and capped `hiddenGuidance`. The story-generation request includes the hidden Guide as current-turn steering. The resulting Game Master narration is normal story-visible narration. Raw Guide text remains debug evidence and is excluded from player-facing feed text, future story-visible history, and extraction as canonical player prose.
 
 ## Game Master Modes
 
@@ -172,7 +190,7 @@ The provider request uses a canonical opening seed plus the actual player/Game M
 
 ## NPC State Strategy
 
-The current MVP keeps NPC state deliberately small. The seeded demo NPCs, currently Mira, Brother Alden, Rowan, and Lena, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior. The Game Master does not mutate them directly in prose; a separate extractor may propose bounded `mood`, `status`, and `memory` updates after narration, and Convex validates those proposals before they become canonical.
+The current MVP keeps NPC state deliberately small. The seeded demo NPCs, currently Mira, Brother Alden, Rowan, and Lena, have stable actor descriptions plus readable actor facts. Those fields ground narration and NPC behavior. The Game Master does not mutate them directly in prose; a separate extractor may propose bounded `mood`, `status`, and `memory` updates after narration, and Convex validates those proposals before they become canonical. The validation boundary is intentionally conservative: if the proposed fact would not still matter several turns later, or if it says more than the completed narration actually established, it should stay in narration instead of becoming state.
 
 ### `description`
 
@@ -233,7 +251,7 @@ Good examples:
 - `angry at Taylor`
 - `relieved but guarded`
 
-`mood` should shape near-term behavior, but it should not become biography or a full relationship summary. In the current MVP it may be updated only by the post-narration extractor when the completed story clearly creates a durable mood change.
+`mood` should shape near-term behavior, but it should not become biography, physical incapacity, or a full relationship summary. In the current MVP it may be updated only by the post-narration extractor when the completed story clearly creates a durable affective change.
 
 ### `status`
 
@@ -253,7 +271,7 @@ Avoid storing momentary beats as status:
 - `looked at Taylor`
 - `was pushed`
 
-Those can stay in narration or recent feed unless they create an ongoing condition. In the current MVP, stored `status` may be updated only by the post-narration extractor when the completed story clearly creates a durable circumstance.
+Those can stay in narration or recent feed unless they create an ongoing condition. In the current MVP, stored `status` may be updated only by the post-narration extractor when the completed story clearly creates a durable circumstance. The backend rejects extractor proposals that intensify narration into stronger facts without direct textual support.
 
 ### `memory`
 
@@ -298,7 +316,8 @@ Persistent Game Master requests are still stateless, but the prompt is no longer
 - Conversation focus, which is a non-durable hint derived from the current target or recent player-addressed NPC for ambiguous follow-up dialogue.
 - Hidden NPC knowledge, which comes from current-scene `knowledge` facts.
 - Recent Story, which is bounded story-visible history from successful narrations plus seed narration. Prior player commands and event records are intentionally excluded from normal persistent-mode future story context.
-- Current Input, which is either the current narrative action text or an explicit Pass directive.
+- Recent Story also includes player-authored Story inserts as accepted scene content.
+- Current Input, which is either the current narrative action text, an explicit Pass directive, or hidden Guide steering.
 - Required scene beat, which is deterministic guidance derived from player input and present actors in persistent mode, or a Pass beat when the player yields the turn.
 - Last action, which frames the current player input as intent the Game Master must resolve rather than prose to copy, or frames Pass as a request to continue without inventing player action.
 - Scene directive, which is near-output guidance for prompt priority, target NPC, conflict handling, response requirements, and NPC attribute questions.
@@ -315,12 +334,15 @@ The visible play feed is reconstructed from persisted rows:
 
 - Player input from `commands`.
 - Game Master prose from `narrations`.
+- Player-authored Story inserts from `narrations.source = "player"`.
 - Concise happenings from `events`.
 - Pre-turn slash command output from `utilityMessages`.
 
 Events are currently shown in the feed because they help us inspect whether the world is changing. If they become noisy, we can filter them later without changing what the canonical state is.
 
 Utility messages are shown because they are useful player-visible inspection results. They are visually distinct, do not have turn numbers, and are not part of future Game Master story context.
+
+Story inserts are shown as canonical story prose with a distinct label. They are not turn-numbered, but they are part of future Game Master story context.
 
 Feed entries include `turnId` when they were caused by a narrative turn, but the player-facing stream should still read as a story rather than as rigid turn cards. Turn grouping belongs in backend/debug surfaces until the story UI needs it.
 

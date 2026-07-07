@@ -1,0 +1,149 @@
+import { describe, expect, it } from "vitest";
+import type { QueryCtx } from "../../../convex/_generated/server";
+import { loadFeed, loadStoryVisibleHistory, loadTranscript } from "./convex-snapshot-read-model";
+
+describe("Convex snapshot read model", () => {
+  it("shows player Story inserts as distinct feed entries", async () => {
+    const ctx = fakeQueryCtx({
+      commands: [],
+      narrations: [
+        row("narration-seed", { text: "Rain lashes the chapel.", source: "seed" }),
+        row("narration-story", {
+          text: "You chalk a circle around the lantern.",
+          source: "player",
+        }),
+        row("narration-llm", {
+          text: "Mira watches the circle in silence.",
+          source: "llm",
+          turnId: "turn-1",
+        }),
+      ],
+      events: [],
+      utilityMessages: [],
+      turns: [row("turn-1", { status: "succeeded" })],
+    });
+
+    const feed = await loadFeed(ctx, "adventure-1" as never, 20);
+
+    expect(feed.map((entry) => ({ id: entry.id, kind: entry.kind, source: entry.source }))).toEqual([
+      { id: "narration:narration-seed", kind: "director", source: "seed" },
+      { id: "narration:narration-story", kind: "story", source: "player" },
+      { id: "narration:narration-llm", kind: "director", source: "llm" },
+    ]);
+  });
+
+  it("includes Story inserts in future story-visible history and excludes failed turns", async () => {
+    const ctx = fakeQueryCtx({
+      commands: [],
+      narrations: [
+        row("narration-seed", { text: "Rain lashes the chapel.", source: "seed" }),
+        row("narration-story", {
+          text: "You chalk a circle around the lantern.",
+          source: "player",
+        }),
+        row("narration-success", {
+          text: "Mira studies the chalk circle.",
+          source: "llm",
+          turnId: "turn-success",
+        }),
+        row("narration-failed", {
+          text: "This failed turn should not enter prompt history.",
+          source: "llm",
+          turnId: "turn-failed",
+        }),
+      ],
+      events: [],
+      utilityMessages: [],
+      turns: [
+        row("turn-success", { status: "succeeded" }),
+        row("turn-failed", { status: "failed" }),
+      ],
+    });
+
+    const history = await loadStoryVisibleHistory(ctx, "adventure-1" as never, 20);
+
+    expect(history.map((entry) => ({ id: entry.id, kind: entry.kind, source: entry.source }))).toEqual([
+      { id: "narration:narration-seed", kind: "director", source: "seed" },
+      { id: "narration:narration-story", kind: "story", source: "player" },
+      { id: "narration:narration-success", kind: "director", source: "llm" },
+    ]);
+  });
+
+  it("includes Story inserts as transcript narration without seed narration", async () => {
+    const ctx = fakeQueryCtx({
+      commands: [
+        row("command-act", {
+          input: "I ask Mira what she hears.",
+          turnId: "turn-success",
+        }),
+      ],
+      narrations: [
+        row("narration-seed", { text: "Rain lashes the chapel.", source: "seed" }),
+        row("narration-story", {
+          text: "The altar candle burns blue before anyone touches it.",
+          source: "player",
+        }),
+        row("narration-success", {
+          text: "Mira listens to the rain.",
+          source: "llm",
+          turnId: "turn-success",
+        }),
+      ],
+    });
+
+    const transcript = await loadTranscript(ctx, "adventure-1" as never, 20);
+
+    expect(transcript.map((entry) => ({ id: entry.id, kind: entry.kind, source: entry.source }))).toEqual([
+      { id: "command:command-act", kind: "player", source: "player" },
+      { id: "narration:narration-story", kind: "story", source: "player" },
+      { id: "narration:narration-success", kind: "director", source: "llm" },
+    ]);
+  });
+});
+
+function row(_id: string, values: Record<string, unknown>) {
+  return {
+    _id,
+    _creationTime: nextCreationTime(),
+    adventureId: "adventure-1",
+    worldId: "world-1",
+    ...values,
+  };
+}
+
+let creationTime = 0;
+function nextCreationTime() {
+  creationTime += 1;
+  return creationTime;
+}
+
+function fakeQueryCtx(tables: Record<string, Array<Record<string, unknown>>>) {
+  return {
+    db: {
+      query(table: string) {
+        let rows = [...(tables[table] ?? [])];
+        return {
+          withIndex() {
+            return this;
+          },
+          order(direction: "asc" | "desc") {
+            rows = rows.sort((left, right) =>
+              direction === "desc"
+                ? Number(right._creationTime) - Number(left._creationTime)
+                : Number(left._creationTime) - Number(right._creationTime),
+            );
+            return this;
+          },
+          async take(limit: number) {
+            return rows.slice(0, limit);
+          },
+        };
+      },
+      async get(id: string) {
+        return Object.values(tables)
+          .flat()
+          .find((record) => record._id === id) ?? null;
+      },
+    },
+  } as unknown as QueryCtx;
+}

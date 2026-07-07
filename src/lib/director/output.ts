@@ -273,6 +273,43 @@ export function applySceneBeatPersistenceBoundary(
   };
 }
 
+export function applyNarrationSupportBoundary(
+  validatedUpdates: ValidatedNpcUpdates,
+  narration: string,
+): ValidatedNpcUpdates {
+  if (validatedUpdates.acceptedUpdates.length === 0) {
+    return validatedUpdates;
+  }
+
+  const acceptedUpdates: AcceptedNpcUpdate[] = [];
+  const ignoredUpdates: IgnoredNpcUpdate[] = [...validatedUpdates.ignoredUpdates];
+
+  for (const update of validatedUpdates.acceptedUpdates) {
+    const supportedChanges: AcceptedNpcFactChange[] = [];
+
+    for (const change of update.changes) {
+      const rejectionReason = npcFactNarrationRejectionReason(change, narration);
+      if (rejectionReason) {
+        ignoredUpdates.push({
+          actorKey: update.actorKey,
+          field: change.key,
+          reason: rejectionReason,
+          valuePreview: previewValue(change.value),
+        });
+        continue;
+      }
+
+      supportedChanges.push(change);
+    }
+
+    if (supportedChanges.length > 0) {
+      acceptedUpdates.push({ ...update, changes: supportedChanges });
+    }
+  }
+
+  return { acceptedUpdates, ignoredUpdates };
+}
+
 export function validateActorMoves(
   parsedMoves: ParsedActorMove[],
   currentSceneActors: DirectorActor[],
@@ -369,6 +406,40 @@ export function validateActorMoves(
   }
 
   return { acceptedMoves, ignoredMoves };
+}
+
+function npcFactNarrationRejectionReason(change: AcceptedNpcFactChange, narration: string) {
+  if (change.key === "status" && looksLikeMomentaryStatus(change.value)) {
+    return "NPC status update describes a momentary beat, not a durable condition.";
+  }
+
+  if (change.key === "mood" && looksLikePhysicalIncapacity(change.value)) {
+    return "NPC mood update encodes physical incapacity instead of an affective state.";
+  }
+
+  if (change.key === "status" && intensifiesLedgerSlip(change.value, narration)) {
+    return "NPC status update intensifies the completed narration beyond textual support.";
+  }
+
+  return null;
+}
+
+function looksLikeMomentaryStatus(value: string) {
+  return /\b(?:flinches?|flinching|gasps?|gasping|glances?|glancing|looks?|looking|recoils?|recoiling|stares?|staring|stumbles?|stumbling|slips?|slipping|drops?|dropping|freezes?|frozen)\b/i.test(
+    value,
+  );
+}
+
+function looksLikePhysicalIncapacity(value: string) {
+  return /\b(?:paraly[sz]ed|unable to move|cannot move|can't move)\b/i.test(value);
+}
+
+function intensifiesLedgerSlip(value: string, narration: string) {
+  return /\b(?:drops?|dropping)\b/i.test(value) &&
+    /\bledger\b/i.test(value) &&
+    /\bledger\b/i.test(narration) &&
+    /\bslipp(?:ing|ed|s)\b/i.test(narration) &&
+    !/\bdropp(?:ing|ed|s)\b/i.test(narration);
 }
 
 function normalizeNpcUpdate(update: unknown): ParsedNpcUpdate {

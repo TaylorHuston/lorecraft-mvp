@@ -5,7 +5,7 @@ modified: 2026-06-30
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, pre-turn utility messages, bounded Game Master calls, and a tiny readable NPC state surface.
+The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, and a tiny readable NPC state surface.
 
 ## World
 
@@ -199,6 +199,7 @@ Strategy:
 - Actor `description` is stable visible identity: physical presentation and immediately legible role. Put biography in `background`, behavior in `persona`, dialogue style in `voice`, current circumstance in `status`, and direct player history in `memory`.
 - `knowledge` can shape narration and dialogue, but it is not automatically player-visible.
 - Game Master-authored NPC mutation is allowed only through the post-narration extractor for `mood`, `status`, and `memory`.
+- Extracted NPC facts must be directly supported by the completed narration. The backend rejects momentary beats and intensified interpretations, such as treating a ledger slipping as proof that it was dropped.
 - Game Master-authored actor movement is allowed only through the post-narration extractor for current-scene actors moving to existing locations.
 - Debug NPC edits are canonical Convex demo-world actor rows and actor facts. They can change profile values in prompt context, and Reset Session restores seeded NPCs while removing debug-created NPCs.
 - Clearing an editable NPC fact in the debug UI removes that manual canonical fact instead of leaving the previous value in prompt context.
@@ -268,7 +269,7 @@ Strategy:
 
 Table: `turns`
 
-A turn is one persisted resolved story beat. It may be triggered by player action text or by Pass.
+A turn is one persisted resolved story beat. It may be triggered by player action text, by Pass, or by hidden Guide steering.
 
 | Field | Meaning |
 |---|---|
@@ -276,8 +277,9 @@ A turn is one persisted resolved story beat. It may be triggered by player actio
 | `adventureId` | Owning Adventure runtime state. |
 | `sequenceNumber` | Adventure-scoped ordering number assigned when the player input becomes persisted history. |
 | `actorId` | Actor who initiated the turn. |
-| `commandId` | Optional player input row for action turns. Pass turns do not create command rows. |
-| `trigger` | Optional trigger for local compatibility: `act` or `pass`. New turns write this explicitly; old rows without it should be read as `act`. |
+| `commandId` | Optional player input row for action turns. Pass and Guide turns do not create command rows. |
+| `trigger` | Optional trigger for local compatibility: `act`, `pass`, or `guide`. New turns write this explicitly; old rows without it should be read as `act`. |
+| `hiddenGuidance` | Optional raw Guide text for a Guide turn. It is diagnostic/current-turn steering, not player-facing story prose or future story-visible history. |
 | `status` | Lifecycle state: `pending`, `succeeded`, or `failed`. |
 | `error` | Optional failure message when provider or output handling fails after the turn exists. |
 | `completedAt` | Optional timestamp set when the turn reaches a terminal state. |
@@ -288,6 +290,7 @@ Strategy:
 - A turn is created only after the request is valid enough to become persisted game history.
 - Failed provider/output attempts remain as failed turns with linked Game Master call records and, for action turns, linked commands.
 - A Pass turn advances the story without storing fake player prose.
+- A Guide turn advances the story from hidden current-turn steering without creating a command row or showing the raw Guide text in the story stream.
 - Malformed request bodies, missing LLM configuration, invalid Adventure ids, and missing Adventure state are rejected before a turn exists.
 - Future rollback should attach snapshots to turn boundaries, but snapshots and restore behavior are deferred.
 
@@ -295,7 +298,7 @@ Strategy:
 
 Table: `narrations`
 
-A narration is player-facing prose from the engine or Game Master.
+A narration is player-facing prose from the engine, the Game Master, or a player-authored Story insert.
 
 | Field | Meaning |
 |---|---|
@@ -304,12 +307,13 @@ A narration is player-facing prose from the engine or Game Master.
 | `turnId` | Optional scoped turn that caused this narration. Seed/legacy rows may omit it. |
 | `commandId` | Optional player input that caused this narration. |
 | `text` | Player-facing prose. |
-| `source` | `seed`, `engine`, or `llm`. |
+| `source` | `seed`, `engine`, `llm`, or `player`. |
 
 Strategy:
 
 - Narration is part of the visible feed.
 - Narration can contain transient beats without making them durable state.
+- A player-source narration is a Story insert. It is accepted canonical scene prose, but it is not a turn, command, provider call, extraction run, state diff, or event by itself.
 - If a narrated change must matter later, persist a fact and state diff too.
 - In transcript Game Master mode, LLM narrations still persist even though canonical world mutations are disabled.
 
@@ -410,8 +414,8 @@ There is no separate prompt table. Game Master prompt context is derived per tur
 | `locationCard` | Derived from the current room/location, room facts, visible objects, exits, and present actors | Canonical current-location card for persistent Game Master context. |
 | `knownLocations` | Derived from Adventure-owned room rows | Compact list of valid movement destinations for the current Adventure. |
 | `npcCards` | Rendered from current-scene NPC profiles | Card-like story memory the Game Master should treat as canonical NPC context. |
-| `recentStory` | Derived from successful narrations plus seed narration | Bounded story-visible history without prior player commands, event records, internal turn IDs, or command IDs. |
-| `currentInput` | Current request body and turn trigger | The player's narrative intent for action turns, or an explicit Pass directive for pass turns. |
+| `recentStory` | Derived from successful narrations, seed narration, and player-authored Story inserts | Bounded story-visible history without prior player commands, raw Guide text, utility output, event records, internal turn IDs, or command IDs. |
+| `currentInput` | Current request body and turn trigger | The player's narrative intent for action turns, an explicit Pass directive for pass turns, or hidden current-turn Guide steering. |
 | `gameMasterNarration` | Completed story-generation call | Extractor-only input containing the player-facing narration to inspect for durable NPC changes. |
 | `output` | Backend output contract | Story generation asks for player-facing prose only; state extraction asks for JSON `npcUpdates` and `actorMoves`. |
 
@@ -423,6 +427,8 @@ Strategy:
 - Persistent story generation now uses `outputContract: "plain_prose"` and requests player-facing narration only. The backend wraps that prose as a parsed response with an empty `npcUpdates` array.
 - Structured mutation lives in a separate extractor step so story prose and state-diff JSON can use different prompts, settings, or models.
 - Prior commands and event records remain persisted and visible/debuggable, but they are not part of normal persistent-mode future Game Master story context.
+- Player-authored Story inserts are part of normal persistent-mode future Game Master story context.
+- Raw Guide text is current-turn steering only. It can be inspected through debug turn/call evidence, but it is excluded from future story-visible history and from the extraction prompt as canonical player prose.
 - The post-narration extractor uses the same `recentStory` policy as story generation.
 - Persistent prompt priority is explicit: `currentInput` comes first; `locationCard`, `knownLocations`, `npcCards`, and `world` are canonical current scene truth; `recentStory` is lower-priority continuity and may contain stale prose.
 - If `recentStory` conflicts with `locationCard`, `knownLocations`, `npcCards`, or `world`, the Game Master should follow the canonical card/world context.
@@ -436,7 +442,7 @@ There is no `feedEntries` table. Feed entries are derived by combining commands,
 | Field | Meaning |
 |---|---|
 | `id` | Stable derived ID with a prefix, such as `command:<id>`, `narration:<id>`, `event:<id>`, or `utility:<id>`. |
-| `kind` | `player`, `director`, `event`, or `utility`. |
+| `kind` | `player`, `director`, `story`, `event`, or `utility`. |
 | `text` | Text to display. |
 | `source` | Source label from the underlying row. |
 | `createdAt` | Creation time from the underlying row. |
@@ -451,6 +457,7 @@ There is no `feedEntries` table. Feed entries are derived by combining commands,
 Strategy:
 
 - Keep feed derived until editing, branching, streaming, or multiplayer ordering requires a timeline table.
+- Story entries are player-authored canonical prose from `narrations.source = "player"`. They are visible and story-visible, but not turn-numbered.
 - Utility entries are player-visible helper output. They are intentionally not turn-numbered and not included in story-visible Game Master history.
 - Use stable derived IDs as React keys.
 

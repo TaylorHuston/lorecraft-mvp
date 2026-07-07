@@ -7,13 +7,18 @@ import {
   type SlashCommandAutocompleteTarget,
 } from "@/lib/director/slash-command-autocomplete";
 
+type ActionMode = "act" | "story" | "guide";
+type SubmitResult = "close" | "keep-open" | false;
+
 type TurnActionPanelProps = {
   disabled: boolean;
   isSubmitting: boolean;
   notice: string | null;
   error: string | null;
   slashCommandTargets: SlashCommandAutocompleteTarget[];
-  onActSubmit: (input: string) => Promise<"close" | "keep-open" | false>;
+  onActSubmit: (input: string) => Promise<SubmitResult>;
+  onStorySubmit: (input: string) => Promise<SubmitResult>;
+  onGuideSubmit: (input: string) => Promise<SubmitResult>;
   onPass: () => Promise<boolean>;
 };
 
@@ -24,16 +29,19 @@ export function TurnActionPanel({
   error,
   slashCommandTargets,
   onActSubmit,
+  onStorySubmit,
+  onGuideSubmit,
   onPass,
 }: TurnActionPanelProps) {
   const [input, setInput] = useState("");
-  const [isActInputOpen, setIsActInputOpen] = useState(false);
-  const [isActInputClosing, setIsActInputClosing] = useState(false);
+  const [activeMode, setActiveMode] = useState<ActionMode | null>(null);
+  const [isInputClosing, setIsInputClosing] = useState(false);
   const [isTurnControlsSettling, setIsTurnControlsSettling] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const directorInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const actInputCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeModeConfig = activeMode ? ACTION_MODE_CONFIG[activeMode] : null;
   const autocompleteSuggestions = useMemo(
     () => getSlashCommandAutocomplete(input, slashCommandTargets),
     [input, slashCommandTargets],
@@ -43,13 +51,16 @@ export function TurnActionPanel({
     Math.max(autocompleteSuggestions.length - 1, 0),
   );
   const shouldShowAutocomplete =
-    isActInputOpen && isAutocompleteOpen && autocompleteSuggestions.length > 0 && !isSubmitting;
+    activeMode === "act" &&
+    isAutocompleteOpen &&
+    autocompleteSuggestions.length > 0 &&
+    !isSubmitting;
   const activeSuggestion = shouldShowAutocomplete
     ? autocompleteSuggestions[boundedActiveSuggestionIndex]
     : undefined;
 
   useEffect(() => {
-    if (!isActInputOpen || isSubmitting) {
+    if (!activeMode || isSubmitting) {
       return;
     }
 
@@ -57,74 +68,86 @@ export function TurnActionPanel({
       resizeDirectorInput(directorInputRef.current);
       directorInputRef.current.focus();
     }
-  }, [isActInputOpen, isSubmitting]);
+  }, [activeMode, isSubmitting]);
 
   useEffect(() => {
     return () => {
-      if (actInputCloseTimer.current) {
-        clearTimeout(actInputCloseTimer.current);
+      if (inputCloseTimer.current) {
+        clearTimeout(inputCloseTimer.current);
       }
     };
   }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void submitActInput();
+    void submitActionInput();
   }
 
-  async function submitActInput() {
+  async function submitActionInput() {
     const submittedInput = input.trim();
-    if (!isActInputOpen || !submittedInput || isSubmitting || disabled) {
+    if (!activeMode || !submittedInput || isSubmitting || disabled) {
       return;
     }
 
     setInput("");
     setIsAutocompleteOpen(false);
-    const result = await onActSubmit(submittedInput);
+    const result = await submitForMode(activeMode, submittedInput);
     if (result === "close") {
-      setIsActInputOpen(false);
-      setIsActInputClosing(false);
+      setActiveMode(null);
+      setIsInputClosing(false);
       setIsTurnControlsSettling(false);
       return;
     }
     if (result === "keep-open") {
-      setIsActInputOpen(true);
-      setIsActInputClosing(false);
+      setActiveMode(activeMode);
+      setIsInputClosing(false);
       setIsTurnControlsSettling(false);
       return;
     }
 
     setInput((currentInput) => (currentInput.trim() ? currentInput : submittedInput));
     setIsAutocompleteOpen(false);
-    setIsActInputOpen(true);
+    setActiveMode(activeMode);
   }
 
-  function handleAct() {
+  function submitForMode(mode: ActionMode, submittedInput: string) {
+    if (mode === "story") {
+      return onStorySubmit(submittedInput);
+    }
+    if (mode === "guide") {
+      return onGuideSubmit(submittedInput);
+    }
+    return onActSubmit(submittedInput);
+  }
+
+  function handleActionMode(mode: ActionMode) {
     if (isSubmitting || disabled) {
       return;
     }
 
-    if (actInputCloseTimer.current) {
-      clearTimeout(actInputCloseTimer.current);
-      actInputCloseTimer.current = null;
+    if (inputCloseTimer.current) {
+      clearTimeout(inputCloseTimer.current);
+      inputCloseTimer.current = null;
     }
     setIsTurnControlsSettling(false);
-    setIsActInputClosing(false);
-    setIsActInputOpen(true);
+    setIsInputClosing(false);
+    setActiveMode(mode);
     setIsAutocompleteOpen(false);
+    setActiveSuggestionIndex(0);
   }
 
-  function handleCancelAct() {
-    if (isSubmitting || isActInputClosing) {
+  function handleCancelAction() {
+    if (isSubmitting || isInputClosing) {
       return;
     }
 
-    setIsActInputClosing(true);
+    setIsInputClosing(true);
     setIsAutocompleteOpen(false);
-    actInputCloseTimer.current = setTimeout(() => {
-      setIsActInputOpen(false);
-      setIsActInputClosing(false);
-      actInputCloseTimer.current = null;
+    inputCloseTimer.current = setTimeout(() => {
+      setActiveMode(null);
+      setInput("");
+      setIsInputClosing(false);
+      inputCloseTimer.current = null;
       setIsTurnControlsSettling(true);
     }, 160);
   }
@@ -182,7 +205,7 @@ export function TurnActionPanel({
 
   function handleInputChange(value: string, textarea: HTMLTextAreaElement) {
     setInput(value);
-    setIsAutocompleteOpen(value.trimStart().startsWith("/"));
+    setIsAutocompleteOpen(activeMode === "act" && value.trimStart().startsWith("/"));
     setActiveSuggestionIndex(0);
     resizeDirectorInput(textarea);
   }
@@ -228,15 +251,16 @@ export function TurnActionPanel({
           >
             What do you do?
           </p>
-          {isActInputOpen ? (
+          {activeModeConfig ? (
             <div
-              className={`${isActInputClosing ? "turn-response-area-exit" : "turn-response-area-enter"} relative mt-3`}
+              className={`${isInputClosing ? "turn-response-area-exit" : "turn-response-area-enter"} relative mt-3`}
             >
               <textarea
-                id="director-input"
+                id={activeModeConfig.inputId}
                 ref={directorInputRef}
                 aria-labelledby="turn-action-prompt"
-                aria-autocomplete="list"
+                aria-describedby={activeModeConfig.helpId}
+                aria-autocomplete={activeMode === "act" ? "list" : "none"}
                 aria-controls={shouldShowAutocomplete ? "slash-command-autocomplete" : undefined}
                 aria-activedescendant={
                   shouldShowAutocomplete
@@ -248,17 +272,20 @@ export function TurnActionPanel({
                   handleInputChange(event.target.value, event.currentTarget);
                 }}
                 onKeyDown={handleInputKeyDown}
-                placeholder="Type your response..."
+                placeholder={activeModeConfig.placeholder}
                 rows={1}
                 disabled={disabled}
                 className="block h-24 min-h-24 w-full resize-none overflow-hidden rounded-xl bg-zinc-700/45 py-3 pl-4 pr-12 text-left text-sm leading-6 text-zinc-100 outline-none ring-1 ring-transparent transition placeholder:text-zinc-500 focus:bg-zinc-700/65 focus-visible:ring-2 focus-visible:ring-amber-300/80"
               />
+              <p id={activeModeConfig.helpId} className="mt-2 text-xs leading-5 text-zinc-500">
+                {activeModeConfig.help}
+              </p>
               <button
-                id="close-act-input-button"
+                id={activeModeConfig.closeButtonId}
                 type="button"
                 aria-label="Return to turn actions"
-                onClick={handleCancelAct}
-                disabled={isSubmitting || isActInputClosing}
+                onClick={handleCancelAction}
+                disabled={isSubmitting || isInputClosing}
                 className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-lg text-lg leading-none text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 ×
@@ -275,24 +302,42 @@ export function TurnActionPanel({
           ) : (
             <div
               id="turn-controls"
-              className="mt-3 flex justify-start gap-2"
+              className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-start"
               onPointerLeave={() => setIsTurnControlsSettling(false)}
             >
               <button
                 id="act-turn-button"
                 type="button"
-                onClick={handleAct}
+                onClick={() => handleActionMode("act")}
                 disabled={disabled}
-                className={`flex h-12 w-28 items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
+                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
               >
                 Act
+              </button>
+              <button
+                id="story-turn-button"
+                type="button"
+                onClick={() => handleActionMode("story")}
+                disabled={disabled}
+                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
+              >
+                Story
+              </button>
+              <button
+                id="guide-turn-button"
+                type="button"
+                onClick={() => handleActionMode("guide")}
+                disabled={disabled}
+                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
+              >
+                Guide
               </button>
               <button
                 id="pass-turn-button"
                 type="button"
                 onClick={handlePass}
                 disabled={disabled}
-                className={`flex h-12 w-28 items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
+                className={`flex h-12 w-full items-center justify-center rounded-xl bg-zinc-700/80 text-sm font-semibold text-zinc-100 transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-28 ${isTurnControlsSettling ? "" : "hover:bg-zinc-200 hover:text-zinc-950"}`}
               >
                 Pass
               </button>
@@ -323,6 +368,39 @@ export function TurnActionPanel({
     </form>
   );
 }
+
+const ACTION_MODE_CONFIG: Record<
+  ActionMode,
+  {
+    inputId: string;
+    closeButtonId: string;
+    helpId: string;
+    placeholder: string;
+    help: string;
+  }
+> = {
+  act: {
+    inputId: "director-input",
+    closeButtonId: "close-act-input-button",
+    helpId: "act-input-help",
+    placeholder: "Type your response...",
+    help: "Act resolves what your character does next. Slash utilities work here.",
+  },
+  story: {
+    inputId: "story-action-input",
+    closeButtonId: "close-story-input-button",
+    helpId: "story-input-help",
+    placeholder: "Add a scene beat...",
+    help: "Story becomes accepted scene prose before the next resolving turn.",
+  },
+  guide: {
+    inputId: "guide-action-input",
+    closeButtonId: "close-guide-input-button",
+    helpId: "guide-input-help",
+    placeholder: "Steer the next narration...",
+    help: "Guide is private direction for the Game Master, not visible story text.",
+  },
+};
 
 function SlashCommandAutocomplete({
   suggestions,

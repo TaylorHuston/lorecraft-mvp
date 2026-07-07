@@ -76,7 +76,7 @@ export function turnSummaryItems(turns: unknown[]) {
     const sequenceNumber =
       typeof turn.sequenceNumber === "number" ? `#${turn.sequenceNumber}` : "Unsequenced";
     const status = typeof turn.status === "string" ? turn.status : "unknown";
-    const trigger = turn.trigger === "pass" ? "Pass" : "Act";
+    const trigger = turn.trigger === "pass" ? "Pass" : turn.trigger === "guide" ? "Guide" : "Act";
     const input = typeof turn.playerInput === "string" ? ` - ${turn.playerInput}` : "";
     const counts = [
       countLabel(turn.narrationCount, "narration"),

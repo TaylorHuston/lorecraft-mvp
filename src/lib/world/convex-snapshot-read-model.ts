@@ -239,7 +239,7 @@ export async function loadFeed(ctx: QueryCtx, adventureId: Id<"adventures">, lim
     })),
     ...narrations.map((narration) => ({
       id: `narration:${narration._id}`,
-      kind: "director" as const,
+      kind: narration.source === "player" ? ("story" as const) : ("director" as const),
       text: narration.text,
       source: narration.source,
       createdAt: narration._creationTime,
@@ -292,7 +292,7 @@ export async function loadStoryVisibleHistory(
     .filter((narration) => narration.source === "seed" || !narration.turnId || successfulTurnIds.has(narration.turnId))
     .map((narration) => ({
       id: `narration:${narration._id}`,
-      kind: "director" as const,
+      kind: narration.source === "player" ? ("story" as const) : ("director" as const),
       text: narration.text,
       source: narration.source,
       createdAt: narration._creationTime,
@@ -330,7 +330,7 @@ export async function loadTranscript(ctx: QueryCtx, adventureId: Id<"adventures"
       .filter((narration) => narration.source !== "seed")
       .map((narration) => ({
         id: `narration:${narration._id}`,
-        kind: "director" as const,
+        kind: narration.source === "player" ? ("story" as const) : ("director" as const),
         text: narration.text,
         source: narration.source,
         createdAt: narration._creationTime,
@@ -435,6 +435,7 @@ async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, l
         sequenceNumber: turn.sequenceNumber,
         actorId: turn.actorId,
         trigger: turn.trigger,
+        ...(turn.hiddenGuidance !== undefined ? { hiddenGuidance: turn.hiddenGuidance } : {}),
         status: turn.status,
         narrationCount: narrations.length,
         eventCount: events.length,

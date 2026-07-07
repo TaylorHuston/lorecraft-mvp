@@ -23,6 +23,7 @@ vi.mock("@/lib/director/debug-log", () => ({
 }));
 
 import { POST } from "./route";
+import { readDirectorTurnBody } from "@/server/director/turn-request";
 
 const originalEnv = { ...process.env };
 
@@ -167,6 +168,129 @@ describe("Game Master turn route preflight", () => {
     );
   });
 
+  it("parses Guide request bodies with hidden guidance and no player input", async () => {
+    await expect(
+      readDirectorTurnBody(
+        turnRequest({
+          adventureId: "valid-adventure-id",
+          trigger: "guide",
+          guidance: "  Make Mira reveal the bell clue without quoting this instruction.  ",
+        }),
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      body: {
+        adventureId: "valid-adventure-id",
+        input: null,
+        turnTrigger: "guide",
+        guideGuidance: "Make Mira reveal the bell clue without quoting this instruction.",
+        promptGuidance: undefined,
+      },
+    });
+  });
+
+  it("rejects Guide request bodies without non-empty guidance", async () => {
+    await expect(
+      readDirectorTurnBody(
+        turnRequest({ adventureId: "valid-adventure-id", trigger: "guide", guidance: "   " }),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      error: "Guide guidance is required.",
+    });
+  });
+
+  it("records a successful Guide turn without command or visible raw guidance", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    mocks.mutation
+      .mockResolvedValueOnce({ ok: true, turnId: "turn-guide-1", sequenceNumber: 1 })
+      .mockResolvedValue(undefined);
+    const requestBodies: Array<{ messages: Array<{ content: string }> }> = [];
+    const fetchMock = vi.fn().mockImplementation(async (_input, init) => {
+      requestBodies.push(JSON.parse(String(init?.body)));
+      return requestBodies.length === 1
+        ? providerResponse("Mira lowers her voice and names the midnight bell.")
+        : providerResponse(JSON.stringify({ npcUpdates: [], actorMoves: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const guidance = "Make Mira reveal the bell clue without exposing this guidance.";
+    const response = await POST(
+      turnRequest({
+        adventureId: "valid-adventure-id",
+        trigger: "guide",
+        guidance,
+      }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      narration: "Mira lowers her voice and names the midnight bell.",
+      acceptedUpdates: [],
+      ignoredUpdates: [],
+    });
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const mutationCalls = mocks.mutation.mock.calls;
+    expect(mutationCalls).toHaveLength(3);
+    expect(mutationCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        adventureId: "valid-adventure-id",
+        guidance,
+      }),
+    );
+    expect(mutationCalls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        turnId: "turn-guide-1",
+        requestSummary: expect.objectContaining({
+          turnTrigger: "guide",
+          guideGuidanceLength: guidance.length,
+          requiredSceneBeat: expect.objectContaining({ kind: "guide" }),
+        }),
+      }),
+    );
+    expect(mutationCalls[1]?.[1]).not.toEqual(
+      expect.objectContaining({ commandId: expect.anything() }),
+    );
+    expect(mutationCalls[2]?.[1]).toEqual(
+      expect.objectContaining({
+        requestSummary: expect.objectContaining({
+          turnTrigger: "guide",
+          requiredSceneBeat: expect.objectContaining({ kind: "guide" }),
+        }),
+      }),
+    );
+    expect(requestBodies[0]?.messages.at(-1)?.content).toContain("[Hidden Guide]");
+    expect(requestBodies[0]?.messages.at(-1)?.content).toContain(guidance);
+    expect(requestBodies[1]?.messages.at(-1)?.content).toContain("[Hidden Guide omitted");
+    expect(requestBodies[1]?.messages.at(-1)?.content).not.toContain(guidance);
+  });
+
+  it("rejects Guide turns in transcript mode before creating a turn", async () => {
+    process.env.LORECRAFT_DIRECTOR_MODE = "transcript";
+    configureLlmEnv();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(
+      turnRequest({
+        adventureId: "valid-adventure-id",
+        trigger: "guide",
+        guidance: "Steer the next narration privately.",
+      }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Guide turns are not supported in transcript mode.",
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.mutation).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("persists a failed Pass turn without fake command or narration", async () => {
     configureLlmEnv();
     mocks.query.mockResolvedValueOnce(persistentContext());
@@ -268,14 +392,97 @@ describe("Game Master turn route preflight", () => {
       }),
     );
   });
+
+  it("records overreaching momentary extraction updates as ignored state", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    mocks.mutation
+      .mockResolvedValueOnce({ ok: true, turnId: "turn-1", commandId: "command-1" })
+      .mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          providerResponse(
+            "The heavy chapel doors splinter inward. Mira gasps, stumbling backward toward the shadows of the aisle, while Brother Alden freezes, the ledger slipping slightly from his grasp as he stares in paralyzed horror at the intruder.",
+          ),
+        )
+        .mockResolvedValueOnce(
+          providerResponse(
+            JSON.stringify({
+              npcUpdates: [
+                {
+                  actorKey: "mira",
+                  reason: "Mira is paralyzed with horror by the ghoul's appearance.",
+                  changes: {
+                    mood: "paralyzed",
+                    status: "frozen in horror, stumbling backward toward the shadows",
+                  },
+                },
+              ],
+              actorMoves: [],
+            }),
+          ),
+        ),
+    );
+
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      narration:
+        "The heavy chapel doors splinter inward. Mira gasps, stumbling backward toward the shadows of the aisle, while Brother Alden freezes, the ledger slipping slightly from his grasp as he stares in paralyzed horror at the intruder.",
+      acceptedUpdates: [],
+      ignoredUpdates: [
+        {
+          actorKey: "mira",
+          field: "mood",
+          reason: "NPC mood update encodes physical incapacity instead of an affective state.",
+          valuePreview: "paralyzed",
+        },
+        {
+          actorKey: "mira",
+          field: "status",
+          reason: "NPC status update describes a momentary beat, not a durable condition.",
+          valuePreview: "frozen in horror, stumbling backward toward the shadows",
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.objectContaining({
+        status: "success",
+        acceptedUpdates: [],
+        ignoredUpdates: [
+          {
+            actorKey: "mira",
+            field: "mood",
+            reason: "NPC mood update encodes physical incapacity instead of an affective state.",
+            valuePreview: "paralyzed",
+          },
+          {
+            actorKey: "mira",
+            field: "status",
+            reason: "NPC status update describes a momentary beat, not a durable condition.",
+            valuePreview: "frozen in horror, stumbling backward toward the shadows",
+          },
+        ],
+      }),
+    );
+  });
 });
 
 function turnRequest({
   adventureId,
   trigger = "act",
+  guidance,
 }: {
   adventureId: string;
-  trigger?: "act" | "pass";
+  trigger?: "act" | "pass" | "guide";
+  guidance?: string;
 }) {
   return new Request("http://localhost/api/director/turn", {
     method: "POST",
@@ -284,6 +491,7 @@ function turnRequest({
       adventureId,
       trigger,
       ...(trigger === "act" ? { input: "I ask Mira about the storm." } : {}),
+      ...(trigger === "guide" ? { guidance } : {}),
     }),
   });
 }

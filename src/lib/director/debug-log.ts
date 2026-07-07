@@ -1,5 +1,6 @@
 import { mkdir, appendFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
+import type { TurnTrigger } from "./types";
 
 type DebugLogEnv = Record<string, string | undefined>;
 
@@ -11,7 +12,7 @@ export type DirectorDebugLogEntry = {
   worldVersionId?: string;
   turnId?: string;
   commandId?: string;
-  turnTrigger?: "act" | "pass";
+  turnTrigger?: TurnTrigger;
   playerInput?: string;
   provider?: string;
   model?: string;

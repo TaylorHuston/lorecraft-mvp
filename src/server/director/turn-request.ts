@@ -4,6 +4,8 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { validateNarrativeInput } from "@/lib/director/input";
 import type { TurnTrigger } from "@/lib/director/types";
 
+const GUIDE_GUIDANCE_MAX_LENGTH = 1200;
+
 export function isLocalDirectorRequest(request: Request) {
   if (process.env.LORECRAFT_ALLOW_REMOTE_DIRECTOR === "1") {
     return true;
@@ -49,12 +51,20 @@ export async function readDirectorTurnBody(request: Request) {
   }
 
   let input: string | null = null;
+  let guideGuidance: string | undefined;
   if (turnTrigger.value === "act") {
     const inputResult = validateNarrativeInput(parsed.input);
     if (!inputResult.ok) {
       return inputResult;
     }
     input = inputResult.input;
+  }
+  if (turnTrigger.value === "guide") {
+    const guidanceResult = readGuideGuidance(parsed.guidance);
+    if (!guidanceResult.ok) {
+      return guidanceResult;
+    }
+    guideGuidance = guidanceResult.value;
   }
 
   const promptGuidance = readPromptGuidance(parsed.promptGuidance);
@@ -68,6 +78,7 @@ export async function readDirectorTurnBody(request: Request) {
       adventureId: parsed.adventureId as Id<"adventures">,
       input,
       turnTrigger: turnTrigger.value,
+      guideGuidance,
       promptGuidance: promptGuidance.value,
     },
   };
@@ -101,7 +112,29 @@ function readTurnTrigger(value: unknown): { ok: true; value: TurnTrigger } | { o
   if (value === "pass") {
     return { ok: true, value: "pass" };
   }
-  return { ok: false, error: 'trigger must be "act" or "pass" when provided.' };
+  if (value === "guide") {
+    return { ok: true, value: "guide" };
+  }
+  return { ok: false, error: 'trigger must be "act", "pass", or "guide" when provided.' };
+}
+
+function readGuideGuidance(value: unknown) {
+  if (typeof value !== "string") {
+    return { ok: false as const, error: "Guide guidance is required." };
+  }
+
+  const guidance = value.trim();
+  if (!guidance) {
+    return { ok: false as const, error: "Guide guidance is required." };
+  }
+  if (!/[A-Za-z0-9]/.test(guidance)) {
+    return { ok: false as const, error: "Guide guidance must include words or numbers." };
+  }
+  if (guidance.length > GUIDE_GUIDANCE_MAX_LENGTH) {
+    return { ok: false as const, error: `Guide guidance must be ${GUIDE_GUIDANCE_MAX_LENGTH} characters or less.` };
+  }
+
+  return { ok: true as const, value: guidance };
 }
 
 function readPromptGuidance(value: unknown) {
