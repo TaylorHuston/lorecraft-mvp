@@ -392,6 +392,87 @@ describe("Game Master turn route preflight", () => {
       }),
     );
   });
+
+  it("records overreaching momentary extraction updates as ignored state", async () => {
+    configureLlmEnv();
+    mocks.query.mockResolvedValueOnce(persistentContext());
+    mocks.mutation
+      .mockResolvedValueOnce({ ok: true, turnId: "turn-1", commandId: "command-1" })
+      .mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          providerResponse(
+            "The heavy chapel doors splinter inward. Mira gasps, stumbling backward toward the shadows of the aisle, while Brother Alden freezes, the ledger slipping slightly from his grasp as he stares in paralyzed horror at the intruder.",
+          ),
+        )
+        .mockResolvedValueOnce(
+          providerResponse(
+            JSON.stringify({
+              npcUpdates: [
+                {
+                  actorKey: "mira",
+                  reason: "Mira is paralyzed with horror by the ghoul's appearance.",
+                  changes: {
+                    mood: "paralyzed",
+                    status: "frozen in horror, stumbling backward toward the shadows",
+                  },
+                },
+              ],
+              actorMoves: [],
+            }),
+          ),
+        ),
+    );
+
+    const response = await POST(turnRequest({ adventureId: "valid-adventure-id" }));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      narration:
+        "The heavy chapel doors splinter inward. Mira gasps, stumbling backward toward the shadows of the aisle, while Brother Alden freezes, the ledger slipping slightly from his grasp as he stares in paralyzed horror at the intruder.",
+      acceptedUpdates: [],
+      ignoredUpdates: [
+        {
+          actorKey: "mira",
+          field: "mood",
+          reason: "NPC mood update encodes physical incapacity instead of an affective state.",
+          valuePreview: "paralyzed",
+        },
+        {
+          actorKey: "mira",
+          field: "status",
+          reason: "NPC status update describes a momentary beat, not a durable condition.",
+          valuePreview: "frozen in horror, stumbling backward toward the shadows",
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.mutation).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.objectContaining({
+        status: "success",
+        acceptedUpdates: [],
+        ignoredUpdates: [
+          {
+            actorKey: "mira",
+            field: "mood",
+            reason: "NPC mood update encodes physical incapacity instead of an affective state.",
+            valuePreview: "paralyzed",
+          },
+          {
+            actorKey: "mira",
+            field: "status",
+            reason: "NPC status update describes a momentary beat, not a durable condition.",
+            valuePreview: "frozen in horror, stumbling backward toward the shadows",
+          },
+        ],
+      }),
+    );
+  });
 });
 
 function turnRequest({

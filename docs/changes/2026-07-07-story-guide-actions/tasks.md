@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: implementation complete; ready for `/sdd-review`
-- Last completed action: Story/Guide backend, UI, deterministic tests, E2E, Epic truth, changelog, and supporting docs were committed as `6384ce2`.
-- Next action: run `/sdd-review` as the local integration gate, then address findings or close/merge with user approval.
+- Current state: manual feedback remediation is implemented and required local gate passes; commits are pending.
+- Last completed action: tightened NPC state extraction after live-log feedback showed overreaching momentary/intensified updates.
+- Next action: commit the Pass-order UI tweak separately from the extraction remediation, then run `/sdd-review`.
 - Active branch/ref: `change/story-guide-actions`
-- Expected dirty files: Story/Guide implementation, focused tests, E2E, `docs/changes/2026-07-07-story-guide-actions/`, `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`, `README.md`, `CHANGELOG.md`, `docs/data-model.md`, `docs/persistence-system.md`, and `docs/testing.md`.
+- Expected dirty files: `src/features/play/turn-action-panel.tsx` for the Pass-order UI tweak; extraction prompt/validation/route tests; and related SDD/Epic/docs/changelog artifacts.
 - Known blockers: none
 
 ## Task Checklist
@@ -84,12 +84,15 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-07 | Proposed Story/Guide action scope | main, `/sdd-propose` | `proposal.md`, `design.md`, `tasks.md` | Planning artifacts drafted | `6384ce2` |
 | 2026-07-07 | Discovery and delegation | main, `sdd-apply`; backend/frontend subagents | change artifacts, Epic, Convex/route/prompt/UI surfaces | Branch created and implementation slices delegated | `6384ce2` |
 | 2026-07-07 | LC-001-S14/R1-R4 implementation | main orchestrator with backend/frontend subagents | Convex schema/functions, route parsing/orchestration, prompt categories, play UI, read model, E2E fixture path | Story inserts and Guide turns implemented with focused tests, E2E coverage, docs, changelog, and Epic truth reconciled | `6384ce2` |
+| 2026-07-07 | Manual UI feedback: Pass last | main | `src/features/play/turn-action-panel.tsx` | Pass moved after Act, Story, and Guide in the decision controls. | `539e229` |
+| 2026-07-07 | Manual feedback: tighter NPC extraction | main; `sdd-apply` specialist routing checked | extraction prompt, validation boundary, turn route, route/director tests, LC-001-S10, persistence docs, changelog | Added direct narration-support rules so momentary or intensified extractor proposals are ignored with debug-visible reasons. | commit pending |
 
 ## Specialist Checkpoint
 
 | Date | Slice | Touched Surface / Risk | Specialist Guidance Selected | Loaded / Delegated? | Consequence |
 |---|---|---|---|---|---|
 | 2026-07-07 | LC-001-S14/R1-R4 | Convex schema/functions, Next Route Handler, prompt contracts, browser-visible React UI, deterministic E2E | `convex/_generated/ai/guidelines.md`, `next-best-practices`, Next 16 local docs, shared visual style guide | loaded and delegated to backend/frontend subagents | Use existing Convex validators and thin route handlers; widen existing narration/turn contracts instead of adding a generalized timeline; keep UI client-only and story-first. |
+| 2026-07-07 | LC-001-S10/R2 manual remediation | Prompt/validation boundary, Next Route Handler persistence path, deterministic tests | `sdd-apply` specialist routing; no new stack-specific specialist beyond existing route/prompt/test patterns because this is a narrow validation refinement | loaded routing / main-thread slice | Keep the fix in the extractor validation boundary, preserve debug evidence, and avoid schema or provider-contract expansion. |
 
 ## Verification Ledger
 
@@ -107,6 +110,11 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-07 | `npm run ci:required` | broad supporting gate | Required local gate passes: lint, test, typecheck, build, including the 78-test Vitest suite. | Passed |
 | 2026-07-07 | `npm run e2e -- --grep "records Story setup"` | deterministic E2E | Disposable Adventure records Story setup, uses hidden Guide, verifies story/debug boundaries, reloads, and deletes the Adventure. | Passed |
 | 2026-07-07 | `npm run e2e` | deterministic E2E | Full browser fixture suite passes with Story/Guide path plus existing playtest regression path. | Passed: 2 tests |
+| 2026-07-07 | `npm run test -- src/lib/director/director.test.ts src/app/api/director/turn/route.test.ts` | focused automated test | Extraction prompt/validation and route persistence reject momentary or overreaching NPC fact proposals while preserving ignored-update debug evidence. | Passed: 2 files, 58 tests |
+| 2026-07-07 | `npm run lint` | broad supporting gate | ESLint passes after Pass-order and extraction-boundary changes. | Passed |
+| 2026-07-07 | `npm run typecheck` | broad supporting gate | TypeScript contracts remain valid after extractor boundary changes. | Passed |
+| 2026-07-07 | `npm run test` | broad supporting gate | Full Vitest suite remains green after manual-feedback remediation. | Passed: 7 files, 80 tests |
+| 2026-07-07 | `npm run ci:required` | broad supporting gate | Required local gate passes: lint, test, typecheck, and production build. | Passed |
 
 ## Manual Feedback
 
@@ -114,7 +122,8 @@ Record the user's manual testing feedback after implementation starts.
 
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
-| TBD | TBD | defect / verification gap / artifact drift / requirement refinement / scope expansion / product drift | TBD | open |
+| 2026-07-07 | Pass should be the last decision option. | requirement refinement | Updated the turn action panel ordering; no Epic change needed because this is visual ordering inside existing LC-001-S14 controls. | implemented, commit pending |
+| 2026-07-07 | Latest logs showed extractor accepted overreaching momentary/intensified NPC state such as a ledger slipping becoming a dropped ledger or paralysis/frozen status. | defect / requirement refinement | Tightened extraction prompt, added narration-support validation, updated LC-001-S10/docs/changelog, and added focused director/route tests. | implemented, verified, commit pending |
 
 ## Planning Updates
 
@@ -142,7 +151,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 ## Blockers / Open Questions
 
 - None blocking.
-- Non-blocking: Taylor manual confirmation is still useful for subjective Story/Guide play feel.
+- Non-blocking: Taylor manual confirmation is still useful for subjective Story/Guide play feel and live-provider extraction quality.
 
 ## Closeout
 
@@ -153,11 +162,11 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes
 - ADR status: not applicable
 - Changelog current: yes
-- `/sdd-review` verdict: pending
+- `/sdd-review` verdict: pending after broader verification and commits
 - Review record: pending
 - `review.md` findings resolved: pending
 - Planning updates resolved: not applicable
 - Manual UI confirmation status: pending Taylor
 - PR / merge state: not started
-- Deferred scope accepted: live-provider Guide quality and subjective play feel remain manual/empirical
+- Deferred scope accepted: live-provider Guide/extraction quality and subjective play feel remain manual/empirical
 - Change moved to `docs/changes/closed/`: no

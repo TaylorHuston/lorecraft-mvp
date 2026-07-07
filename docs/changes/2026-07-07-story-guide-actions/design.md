@@ -67,6 +67,12 @@ This change adds `Story` and `Guide` while preserving the core persistence rule:
 - Open questions that block implementation:
   - None. Exact UI feel can be resolved during `/sdd-apply` manual feedback.
 
+## Implementation Refinement
+
+Manual playtesting of Story/Guide turns exposed a related NPC extraction issue inside the existing resolving-turn path: the extractor could overread completed narration and persist stronger facts than the story established, such as upgrading an item slipping into a dropped item or a momentary freeze into durable status.
+
+This stays in scope because Guide turns intentionally use the same bounded extraction path as Act and Pass. The implementation therefore tightens `LC-001-S10` rather than adding a new Story: extraction instructions and backend validation now require direct completed-narration support for durable NPC `mood`, `status`, and `memory` updates, and ignored overreaching proposals remain debug-visible.
+
 ## Epic Changes
 
 ### Update Epic: LC-001 Provider-Agnostic Chat Experience

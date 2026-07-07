@@ -23,6 +23,7 @@ The format is based on Keep a Changelog 1.1.0.
 - Runtime story state, debug edits, Game Master turns, state diffs, and reset behavior now target the selected Adventure instead of using the authored World as mutable play state.
 - Game Master prompts now continue from canonical Adventure state plus recent successful narration, while prior player commands and world events remain visible/debuggable but are not treated as normal future story context.
 - Recent Game Master context now includes player-authored Story inserts while continuing to exclude slash utility output and raw Guide text.
+- NPC state extraction is more conservative about momentary reactions, so transient beats are less likely to become durable NPC facts.
 - The startup screen now supports multiple seeded World containers instead of assuming Stormbound Chapel is the only World.
 
 ## [0.2.0] - 2026-07-01

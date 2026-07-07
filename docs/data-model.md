@@ -199,6 +199,7 @@ Strategy:
 - Actor `description` is stable visible identity: physical presentation and immediately legible role. Put biography in `background`, behavior in `persona`, dialogue style in `voice`, current circumstance in `status`, and direct player history in `memory`.
 - `knowledge` can shape narration and dialogue, but it is not automatically player-visible.
 - Game Master-authored NPC mutation is allowed only through the post-narration extractor for `mood`, `status`, and `memory`.
+- Extracted NPC facts must be directly supported by the completed narration. The backend rejects momentary beats and intensified interpretations, such as treating a ledger slipping as proof that it was dropped.
 - Game Master-authored actor movement is allowed only through the post-narration extractor for current-scene actors moving to existing locations.
 - Debug NPC edits are canonical Convex demo-world actor rows and actor facts. They can change profile values in prompt context, and Reset Session restores seeded NPCs while removing debug-created NPCs.
 - Clearing an editable NPC fact in the debug UI removes that manual canonical fact instead of leaving the previous value in prompt context.

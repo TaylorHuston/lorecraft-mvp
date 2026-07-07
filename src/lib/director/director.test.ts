@@ -10,6 +10,7 @@ import {
 } from "./prompt";
 import { rawDirectorRequestForStorage, shouldStoreRawDirectorRequest } from "./raw-request";
 import {
+  applyNarrationSupportBoundary,
   applySceneBeatPersistenceBoundary,
   parseDirectorOutput,
   parseNpcStateExtractionOutput,
@@ -458,6 +459,13 @@ describe("Director request construction", () => {
     expect(userMessage?.content).toContain("Mira's hand tightens around the pew");
     expect(userMessage?.content).toContain('{"npcUpdates":[],"actorMoves":[]}');
     expect(userMessage?.content).toContain("Do not update description, background, persona");
+    expect(userMessage?.content).toContain(
+      "Only update a field when the completed Game Master Narration directly supports that exact durable condition.",
+    );
+    expect(userMessage?.content).toContain(
+      "ledger slipping slightly' does not support 'dropping his ledger",
+    );
+    expect(userMessage?.content).toContain("should still matter three turns from now");
   });
 
   it("builds a Pass request without turning Pass into player story prose", () => {
@@ -1240,6 +1248,60 @@ describe("NPC update validation", () => {
         field: "mood",
         reason: "Required scene beat does not allow durable NPC updates for this action.",
         valuePreview: "concerned",
+      },
+    ]);
+  });
+
+  it("rejects momentary or intensified NPC state updates not supported by narration", () => {
+    const validation = validateNpcUpdates(
+      [
+        {
+          actorKey: "brother-alden",
+          reason: "Brother Alden is paralyzed with horror by the ghoul's appearance.",
+          changes: {
+            mood: "paralyzed",
+            status: "frozen in horror, dropping his ledger",
+          },
+        },
+        {
+          actorKey: "mira",
+          reason: "Mira reacts durably to the ghoul threat.",
+          changes: {
+            mood: "terrified",
+            status: "guarding the aisle against the ghoul",
+          },
+        },
+      ],
+      [...context.actors, brotherAlden],
+    );
+    const bounded = applyNarrationSupportBoundary(
+      validation,
+      "Mira gasps, stumbling backward toward the shadows of the aisle, while Brother Alden freezes, the ledger slipping slightly from his grasp as he stares in paralyzed horror at the intruder.",
+    );
+
+    expect(bounded.acceptedUpdates).toEqual([
+      {
+        actorKey: "mira",
+        actorName: "Mira",
+        reason: "Mira reacts durably to the ghoul threat.",
+        changes: [
+          { key: "mood", value: "terrified" },
+          { key: "status", value: "guarding the aisle against the ghoul" },
+        ],
+      },
+    ]);
+    expect(bounded.ignoredUpdates).toMatchObject([
+      {
+        actorKey: "brother-alden",
+        field: "mood",
+        reason: "NPC mood update encodes physical incapacity instead of an affective state.",
+        valuePreview: "paralyzed",
+      },
+      {
+        actorKey: "brother-alden",
+        field: "status",
+        reason: "NPC status update describes a momentary beat, not a durable condition.",
+        valuePreview: "frozen in horror, dropping his ledger",
       },
     ]);
   });

@@ -1484,8 +1484,8 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a developer-playtester, I want meaningful NPC characteristics to mutate through a separate validated extraction pass, so that the world can remember story consequences without making the creative Game Master response carry persistence decisions.
 
@@ -1543,6 +1543,13 @@ The system SHALL accept only validated current-scene NPC updates for `mood`, `st
 - WHEN the narration contains only a short-term gesture, stumble, glance, flinch, hesitation, or other one-frame reaction
 - THEN the extractor may return no NPC update
 - AND existing NPC facts remain unchanged
+
+###### Scenario R2-S4a: Narration support boundary
+
+- WHEN the extractor proposes a stronger durable fact than the completed narration directly supports
+- THEN the backend ignores that proposed fact
+- AND the ignored update remains visible in extractor debug evidence
+- AND the system does not convert transient beats such as gasping, stumbling, freezing, or an item slipping into durable `mood` or `status` facts by default
 
 ###### Scenario R2-S5: Read-only NPC card fields are rejected
 
@@ -1606,7 +1613,7 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/lib/director/prompt.ts` | keeps persistent story generation plain-prose and adds `buildNpcStateExtractionRequest` for a second JSON-only extractor request using final narration, current input, current-scene NPC Cards, recent story, and the `mood` / `status` / `memory` allowlist. | Recheck when this Story changes or the listed path changes. |
-| `src/lib/director/output.ts` | adds `parseNpcStateExtractionOutput` while reusing existing NPC update validation, actor allowlisting, field allowlisting, memory caps, and scene-beat persistence boundaries. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/director/output.ts` | adds `parseNpcStateExtractionOutput` while reusing existing NPC update validation, actor allowlisting, field allowlisting, memory caps, scene-beat persistence boundaries, and narration-support boundaries that reject momentary or intensified facts. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | runs extraction only after successful persistent narration, records story and extraction calls with `requestSummary.callRole`, skips extraction in transcript mode, and treats extractor failure as a debug-visible persistence miss rather than a failed story turn. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts`, `src/lib/world/convex-turn-persistence.ts` | add `recordNpcStateExtraction` and shared accepted-update persistence for actor facts, turn-scoped state diffs, LLM events, and `directorCalls` debug records. | Recheck when this Story changes or the listed paths change. |
 | `scripts/director-playtest.mjs` | verifies persistent mode now records both story-generation and NPC-state-extraction calls for each tested turn. | Recheck when this Story changes or the listed path changes. |
@@ -1616,9 +1623,9 @@ The system SHALL use the existing provider-neutral backend boundary for NPC stat
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R1-S1 through R1-S3 | Focused director tests | prove persistent story generation remains plain prose, successful narration triggers a separate extraction request, and transcript mode skips NPC-state extraction. | Recorded |
-| R2-S1 through R2-S6 | Focused director tests | prove `mood`, `status`, and `memory` acceptance, 500-character memory cap, ephemeral no-update behavior, read-only field rejection, and unknown/offscreen actor rejection. | Recorded |
+| R2-S1 through R2-S6 | Focused director tests | prove `mood`, `status`, and `memory` acceptance, 500-character memory cap, ephemeral no-update behavior, narration-support rejection for momentary/intensified facts, read-only field rejection, and unknown/offscreen actor rejection. | Recorded |
 | R3-S1 and R3-S2 | Persistent playtest and Convex snapshot inspection | prove accepted extractor updates persist actor facts and turn-scoped state diff/event evidence without exposing hidden knowledge as player-facing metadata. | Recorded |
-| R3-S3 and R3-S4 | `src/app/api/director/turn/route.test.ts` | proves extractor provider failure, invalid extractor output, and no-update extraction remain debug-visible while preserving successful story narration and not faking state. | Recorded |
+| R3-S3 and R3-S4 | `src/app/api/director/turn/route.test.ts` | proves extractor provider failure, invalid extractor output, no-update extraction, and ignored overreaching extractor proposals remain debug-visible while preserving successful story narration and not faking state. | Recorded |
 | R4-S1 and R4-S2 | Focused route/provider tests | prove the extractor uses the existing OpenAI-compatible provider path and records compact extraction request metadata without secrets. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run typecheck`, and `npx convex codegen` passed after extractor implementation and documentation updates. | As described in the evidence cell. | Passing |
 

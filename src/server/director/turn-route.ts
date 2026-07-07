@@ -11,6 +11,7 @@ import {
   buildTranscriptDirectorRequest,
 } from "@/lib/director/prompt";
 import {
+  applyNarrationSupportBoundary,
   applySceneBeatPersistenceBoundary,
   parseStateExtractionOutput,
   parsePlainProseDirectorOutput,
@@ -530,9 +531,12 @@ export async function POST(request: Request) {
     });
   }
 
-  const extractionValidated = applySceneBeatPersistenceBoundary(
-    validateNpcUpdates(extractionParsed.npcUpdates, persistentContext.actors),
-    extractionRequest.requestSummary.requiredSceneBeat,
+  const extractionValidated = applyNarrationSupportBoundary(
+    applySceneBeatPersistenceBoundary(
+      validateNpcUpdates(extractionParsed.npcUpdates, persistentContext.actors),
+      extractionRequest.requestSummary.requiredSceneBeat,
+    ),
+    parsed.output.narration,
   );
   const movementValidated = validateActorMoves(
     extractionParsed.actorMoves,
