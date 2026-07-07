@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: manual feedback remediation is implemented and required local gate passes; commits are pending.
-- Last completed action: tightened NPC state extraction after live-log feedback showed overreaching momentary/intensified updates.
-- Next action: commit the Pass-order UI tweak separately from the extraction remediation, then run `/sdd-review`.
+- Current state: implementation complete after manual-feedback remediation; ready for `/sdd-review`.
+- Last completed action: tightened NPC state extraction after live-log feedback showed overreaching momentary/intensified updates and committed it as `917968a`.
+- Next action: run `/sdd-review` as the local integration gate, then address findings or close/merge with user approval.
 - Active branch/ref: `change/story-guide-actions`
-- Expected dirty files: `src/features/play/turn-action-panel.tsx` for the Pass-order UI tweak; extraction prompt/validation/route tests; and related SDD/Epic/docs/changelog artifacts.
+- Expected dirty files: none in the app repo after ledger hash update is committed.
 - Known blockers: none
 
 ## Task Checklist
@@ -85,7 +85,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-07 | Discovery and delegation | main, `sdd-apply`; backend/frontend subagents | change artifacts, Epic, Convex/route/prompt/UI surfaces | Branch created and implementation slices delegated | `6384ce2` |
 | 2026-07-07 | LC-001-S14/R1-R4 implementation | main orchestrator with backend/frontend subagents | Convex schema/functions, route parsing/orchestration, prompt categories, play UI, read model, E2E fixture path | Story inserts and Guide turns implemented with focused tests, E2E coverage, docs, changelog, and Epic truth reconciled | `6384ce2` |
 | 2026-07-07 | Manual UI feedback: Pass last | main | `src/features/play/turn-action-panel.tsx` | Pass moved after Act, Story, and Guide in the decision controls. | `539e229` |
-| 2026-07-07 | Manual feedback: tighter NPC extraction | main; `sdd-apply` specialist routing checked | extraction prompt, validation boundary, turn route, route/director tests, LC-001-S10, persistence docs, changelog | Added direct narration-support rules so momentary or intensified extractor proposals are ignored with debug-visible reasons. | commit pending |
+| 2026-07-07 | Manual feedback: tighter NPC extraction | main; `sdd-apply` specialist routing checked | extraction prompt, validation boundary, turn route, route/director tests, LC-001-S10, persistence docs, changelog | Added direct narration-support rules so momentary or intensified extractor proposals are ignored with debug-visible reasons. | `917968a` |
 
 ## Specialist Checkpoint
 
@@ -122,8 +122,8 @@ Record the user's manual testing feedback after implementation starts.
 
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
-| 2026-07-07 | Pass should be the last decision option. | requirement refinement | Updated the turn action panel ordering; no Epic change needed because this is visual ordering inside existing LC-001-S14 controls. | implemented, commit pending |
-| 2026-07-07 | Latest logs showed extractor accepted overreaching momentary/intensified NPC state such as a ledger slipping becoming a dropped ledger or paralysis/frozen status. | defect / requirement refinement | Tightened extraction prompt, added narration-support validation, updated LC-001-S10/docs/changelog, and added focused director/route tests. | implemented, verified, commit pending |
+| 2026-07-07 | Pass should be the last decision option. | requirement refinement | Updated the turn action panel ordering; no Epic change needed because this is visual ordering inside existing LC-001-S14 controls. | resolved in `539e229` |
+| 2026-07-07 | Latest logs showed extractor accepted overreaching momentary/intensified NPC state such as a ledger slipping becoming a dropped ledger or paralysis/frozen status. | defect / requirement refinement | Tightened extraction prompt, added narration-support validation, updated LC-001-S10/docs/changelog, and added focused director/route tests. | resolved in `917968a` |
 
 ## Planning Updates
 
@@ -162,7 +162,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes
 - ADR status: not applicable
 - Changelog current: yes
-- `/sdd-review` verdict: pending after broader verification and commits
+- `/sdd-review` verdict: pending
 - Review record: pending
 - `review.md` findings resolved: pending
 - Planning updates resolved: not applicable
