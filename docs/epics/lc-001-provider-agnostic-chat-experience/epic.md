@@ -2,8 +2,8 @@
 id: LC-001
 status: implemented
 created: 2026-07-01
-modified: 2026-07-06
-last_verified: 2026-07-06
+modified: 2026-07-07
+last_verified: 2026-07-07
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -18,6 +18,7 @@ stories:
   - LC-001-S10
   - LC-001-S11
   - LC-001-S13
+  - LC-001-S14
 ---
 
 # LC-001 Provider-Agnostic Chat Experience
@@ -50,14 +51,15 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 | LC-001-S3 | implemented | Persistent Current-Scene NPC State | 2026-07-05 | Revalidated by NPC context/edit/reset E2E coverage and CI gates. |
 | LC-001-S4 | implemented | Debuggable Game Master Calls And Reset | 2026-07-05 | Revalidated by debug/reset E2E coverage and review. |
 | LC-001-S5 | implemented | Story Stream Reading Experience | 2026-07-05 | Revalidated by story stream and turn-control E2E coverage. |
-| LC-001-S6 | implemented | Scoped Narrative Turns | 2026-07-05 | Revalidated by turn-scoped route tests and E2E coverage. |
-| LC-001-S7 | implemented | Active Game Master Guidance And Context Assembly | 2026-07-05 | Revalidated by extracted context helpers, CI, Convex compile, and E2E gates. |
+| LC-001-S6 | implemented | Scoped Narrative Turns | 2026-07-07 | Revalidated by Story/Guide route tests and E2E coverage. |
+| LC-001-S7 | implemented | Active Game Master Guidance And Context Assembly | 2026-07-07 | Revalidated by Story/Guide prompt-context tests and E2E gates. |
 | LC-001-S8 | implemented | Transcript Game Master Mode | 2026-07-05 | Revalidated by unchanged focused tests and CI gates. |
 | LC-001-S12 | implemented | Lightweight Location Cards And Movement | 2026-07-05 | Revalidated by extracted location helpers, CI, Convex compile, and E2E gates. |
 | LC-001-S9 | implemented | Read-Only NPC Context | 2026-07-05 | Revalidated by extracted NPC/debug helpers, CI, Convex compile, and E2E gates. |
 | LC-001-S10 | implemented | Extracted NPC State Mutation | 2026-07-05 | Revalidated by turn-persistence helper extraction, CI, Convex compile, and E2E gates. |
 | LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Deterministic browser E2E passed. |
-| LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-06 | Adds `/help` and `/look` as utility actions that do not create turns or enter future Game Master narration history. |
+| LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-07 | Revalidated against Story/Guide context boundaries. |
+| LC-001-S14 | implemented | Pre-Turn Story And Guide Actions | 2026-07-07 | Adds canonical player-authored Story inserts and hidden Guide turns. |
 
 ## Stories
 
@@ -122,14 +124,14 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 - THEN the system does not call the LLM
 - AND the player sees an actionable message to seed or reload the Adventure
 
-##### Requirement R4: Pass Control
+##### Requirement R4: Decision Controls
 
-The system SHALL provide dedicated Act and Pass controls at the decision point.
+The system SHALL provide dedicated decision controls at the decision point.
 
 ###### Scenario R4-S0: Player opens the action input
 
 - WHEN an Adventure is open
-- THEN the system shows `What do you do?` above the `Act` and `Pass` controls
+- THEN the system shows `What do you do?` above the current player decision controls
 - WHEN the player clicks `Act`
 - THEN the system replaces the controls with the narrative input
 - AND the player can submit a normal action
@@ -185,8 +187,8 @@ The system SHALL provide dedicated Act and Pass controls at the decision point.
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a developer, I want Lorecraft to call LLMs through backend application logic and a provider adapter, so that the UI can change later and local model playtesting does not lock the app to one provider.
 
@@ -651,7 +653,7 @@ As a developer-playtester, I want each resolved story beat to be stored as a sco
 
 ##### Requirement R1: Turn Lifecycle
 
-The system SHALL create a durable turn for each persisted narrative player intent.
+The system SHALL create a durable turn for each resolving story beat.
 
 ###### Scenario R1-S1: Successful narrative turn
 
@@ -742,6 +744,19 @@ The system SHALL distinguish how a turn was triggered.
 - AND related Game Master call/debug evidence remains linked to the Pass turn
 - AND no fake narration or unaccepted state change is stored
 
+###### Scenario R4-S4: Story insert is not a turn
+
+- WHEN the player records Story setup during the decision phase
+- THEN no turn is created
+- AND the next resolving turn keeps the sequence number it would have had without the Story insert
+
+###### Scenario R4-S5: Guide turn has no command
+
+- WHEN the player submits Guide text
+- THEN the system records a Guide turn
+- AND the turn does not create a command record or player-visible Guide prose
+- AND the turn can still link Game Master calls, narration, accepted state diffs, events, and failure state
+
 ##### Requirement R5: Retry Remains Deferred
 
 The system SHALL NOT implement Retry until the app has a safe snapshot, reversible-diff, or supersession mechanism.
@@ -775,6 +790,7 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 | R3-S1 through R3-S3 | `npm run e2e`, focused director tests, `docs/data-model.md`, and `docs/persistence-system.md` | prove rough reset clears turn history, accepted diffs remain turn-scoped audit records, and snapshot rollback remains deferred. | Recorded |
 | R4-S1 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove action turns still create commands and resolve current input. | Recorded |
 | R4-S2 and R4-S3 | `src/app/api/director/turn/route.test.ts` and `npm run e2e` | prove Pass turns complete or fail without command rows while remaining debug-visible. | Recorded |
+| R4-S4 and R4-S5 | `src/app/api/director/turn/route.test.ts`, `src/lib/world/convex-snapshot-read-model.test.ts`, and `npm run e2e` on 2026-07-07 | prove Story inserts do not create turns, Guide turns create commandless turn records, and Guide turn status remains debug-visible. | Passing |
 | R5-S1 | Source inspection of `src/features/play/world-client.tsx`, `docs/data-model.md`, and `docs/persistence-system.md` | proves Retry remains deferred and no Retry control is exposed. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, and the prior local PR gate passed for the broader app surface. | As described in the evidence cell. | Passing |
 
@@ -791,8 +807,8 @@ The system SHALL NOT implement Retry until the app has a safe snapshot, reversib
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want the Game Master to actively advance the current scene and let present NPCs respond meaningfully, so that Lorecraft feels like a story with persistent structure instead of a passive state logger.
 
@@ -964,10 +980,10 @@ The system SHALL build future Game Master story context from story-visible histo
 - THEN prior event records are not included in the recent story/history section
 - AND event records remain available to existing player/debug surfaces for now
 
-###### Scenario R10-S3: Prior successful narrations are included
+###### Scenario R10-S3: Prior successful narrations and Story inserts are included
 
 - WHEN the backend builds a Game Master story-generation request
-- THEN recent successful Game Master narrations are included as story-visible history
+- THEN recent successful Game Master narrations and player-authored Story inserts are included as story-visible history
 - AND canonical Location Cards, NPC Cards, facts, actor locations, objects, and known locations remain available as current truth
 
 ##### Requirement R11: Pass Prompt Context
@@ -1029,7 +1045,7 @@ The system SHALL use the same story-visible history policy for state extraction 
 | R7-S1 and R7-S2 | Focused director tests | prove prompt guidance sections affect the next turn and are summarized in debug metadata. | Recorded |
 | R8-S1 and R8-S2 | Focused raw-request tests | prove exact request persistence is gated and omitted by default. | Recorded |
 | R9-S1 and R9-S2 | Local debug-log tests | prove one turn-unit record per recorded turn attempt and gated raw request/response artifacts. | Recorded |
-| R10-S1 through R10-S3 | `src/lib/director/director.test.ts` | proves persistent story-generation prompts include successful narration history while excluding prior commands and events from Recent Story. | Recorded |
+| R10-S1 through R10-S3 | `src/lib/director/director.test.ts` and `src/lib/world/convex-snapshot-read-model.test.ts` | prove persistent story-generation prompts include successful narration history and player-authored Story inserts while excluding prior commands, utility output, raw Guide text, and events from Recent Story. | Passing |
 | R11-S1 and R11-S2 | `src/lib/director/director.test.ts`, `src/app/api/director/turn/route.test.ts`, and `npm run e2e` | prove Pass prompts include a continue directive, Pass turns resolve through the same route/extractor path, and no player Pass prose is stored. | Recorded |
 | R12-S1 and R12-S2 | `src/lib/director/director.test.ts` | proves extraction requests use the same filtered narration-history policy while retaining canonical cards/state and current narration. | Recorded |
 | Supporting gate | `npm run ci:required`, `npx convex codegen`, local Convex snapshot inspection, and local route playtests passed for the broader app surface. | As described in the evidence cell. | Passing |
@@ -1750,8 +1766,8 @@ The system SHALL expose clear scripts for cheap required checks, deterministic E
 
 Status: implemented
 Created: 2026-07-05
-Modified: 2026-07-06
-Last verified: 2026-07-06
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want lightweight slash commands during my decision phase, so that I can inspect the current fiction or get command help without ending my turn.
 
@@ -1812,7 +1828,7 @@ The system SHALL persist slash-command results as Adventure-scoped utility feed 
 ###### Scenario R3-S2: Utility result is not story-visible history
 
 - WHEN the player later performs an Act or Pass turn
-- THEN the Game Master prompt includes canonical state and recent successful narrations
+- THEN the Game Master prompt includes canonical state, recent successful narrations, and any player-authored Story inserts
 - AND it does not include previous `/look` or `/help` output as normal narrative history
 
 ###### Scenario R3-S3: Utility result does not affect turn lifecycle
@@ -1863,6 +1879,7 @@ The system SHALL offer lightweight autocomplete inside the Act-expanded input fo
 | R1-S1 and R1-S2 | `npm run test -- src/lib/director/slash-command.test.ts src/app/api/director/utility/route.test.ts` | Supported and unsupported slash command input routes to utility behavior without turn creation or LLM config for `/help`. | Passing |
 | R2-S1 through R2-S3 | `src/app/api/director/utility/route.test.ts` | `/look` calls the provider for visible targets, uses canonical Adventure context, and returns deterministic no-provider output for unknown targets. | Passing |
 | R3-S1 through R3-S3 | `npm run e2e` | Browser path proves `/help` and `/look` utility entries render in the feed, do not close the decision phase, and leave the first real Act as Turn #1. | Passing |
+| R3-S1 through R3-S3 | `src/lib/world/convex-snapshot-read-model.test.ts` and `npm run e2e` on 2026-07-07 | prove utility output remains outside story-visible Game Master history while Story inserts use a separate story-visible category. | Passing |
 | R4-S1 through R4-S3 | `npm run test -- src/lib/director/slash-command-autocomplete.test.ts` and `npm run e2e` | Autocomplete suggests `/help`, `/look`, and visible `/look` targets while preserving manual backend slash-command submission. | Passing |
 | Supporting gate | `npm run ci:required` | Lint, unit tests, typecheck, and production build pass with the utility route and feed changes. | Passing |
 
@@ -1874,9 +1891,148 @@ The system SHALL offer lightweight autocomplete inside the Act-expanded input fo
 
 - This Story reconciles the earlier MVP bias away from command parsing by limiting slash commands to pre-turn, read-only utility actions.
 
+### Story LC-001-S14: Pre-Turn Story And Guide Actions
+
+Status: implemented
+Created: 2026-07-07
+Modified: 2026-07-07
+Last verified: 2026-07-07
+
+As a playtester, I want Story and Guide actions during the decision phase, so that I can add canonical scene setup or privately steer the Game Master without forcing every interaction through Act or Pass.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Story Inserts
+
+The system SHALL let the player add canonical story-visible narration without ending the current turn.
+
+###### Scenario R1-S1: Player records Story setup
+
+- WHEN an Adventure is open
+- AND the player chooses Story and submits non-empty text
+- THEN the backend records a player-authored Story insert for that Adventure
+- AND no turn is created
+- AND the turn number does not increment
+
+###### Scenario R1-S2: Story insert is visible and resumable
+
+- WHEN a Story insert is recorded
+- AND the player reloads the Adventure
+- THEN the story stream shows the Story insert in chronological order
+- AND the Story insert is visually distinct from Game Master narration without reading like a utility/debug message
+
+###### Scenario R1-S3: Story insert is future story context
+
+- WHEN the player later uses Act, Pass, or Guide
+- THEN the Game Master prompt includes recent player-authored Story inserts in story-visible history
+- AND labels or prompt instructions make clear that those inserts are accepted canonical scene content
+
+##### Requirement R2: Story Inserts Do Not Mutate State Immediately
+
+The system SHALL treat Story inserts as canonical prose setup, not as immediate state mutations.
+
+###### Scenario R2-S1: Story insert does not run extraction
+
+- WHEN a Story insert is recorded
+- THEN the backend does not call the Game Master provider
+- AND it does not run post-narration extraction
+- AND it does not record state diffs, actor movement, NPC fact changes, or LLM-authored events from the Story insert alone
+
+###### Scenario R2-S2: Later resolving turns can react to Story setup
+
+- WHEN recent Story inserts set up a situation
+- AND the player later uses Act, Pass, or Guide
+- THEN the Game Master resolves the current turn in light of the Story setup
+- AND any durable state changes still require completed Game Master narration plus existing backend validation
+
+##### Requirement R3: Guide Turns
+
+The system SHALL let the player submit hidden current-turn guidance that produces Game Master narration.
+
+###### Scenario R3-S1: Guide creates a resolving turn
+
+- WHEN an Adventure is open
+- AND the player chooses Guide and submits non-empty guidance
+- THEN the backend creates a turn with a Guide trigger
+- AND the turn calls the Game Master
+- AND the turn can succeed or fail through the same terminal turn lifecycle as Act and Pass
+
+###### Scenario R3-S2: Guide text is hidden from the story stream
+
+- WHEN a Guide turn resolves
+- THEN the player-facing story stream shows the Game Master narration
+- AND it does not show the raw Guide text as a player story entry, utility entry, event, or command
+- AND debug surfaces can still inspect that the turn was Guide-triggered
+
+###### Scenario R3-S3: Guide text is current-turn context only
+
+- WHEN the backend builds the Game Master request for a Guide turn
+- THEN the request includes the Guide text as hidden current-turn direction
+- AND prompt instructions say to follow it as steering, not as already-canonical player action or dialogue
+- AND future Game Master story history excludes the raw Guide text after the turn completes
+
+###### Scenario R3-S4: Failed Guide remains debuggable
+
+- WHEN a Guide turn is created and the provider fails or returns invalid output
+- THEN the turn remains persisted with failed status
+- AND related Game Master call/debug evidence remains linked to the Guide turn
+- AND no fake narration or unaccepted state change is stored
+
+##### Requirement R4: Context Category Boundaries
+
+The system SHALL keep each player-facing activity in the correct persistence and prompt category.
+
+###### Scenario R4-S1: Future prompt context includes only story-visible history
+
+- WHEN a future Game Master story-generation request is built
+- THEN recent Game Master narration and player Story inserts may appear in story-visible history
+- AND prior Act commands, Pass triggers, Guide text, slash utility output, debug records, and event records are excluded from normal story-visible history
+
+###### Scenario R4-S2: Reset and delete clean up Story and Guide records
+
+- WHEN Reset Session or Delete Adventure is invoked
+- THEN Story inserts and Guide turns for that Adventure are removed or restored consistently with the rest of Adventure runtime history
+- AND source WorldVersions remain unchanged
+
+###### Scenario R4-S3: Transcript mode remains separate
+
+- WHEN transcript mode is enabled
+- THEN Story and Guide either remain unsupported with a clear error or receive explicit transcript-mode handling
+- AND the implementation does not accidentally mix persistent-mode canonical cards/state mutation into transcript-mode context
+
+#### Implemented By
+
+| Path | Role | Recheck Trigger |
+|---|---|---|
+| `convex/schema.ts` | widens `turns.trigger`, adds `turns.hiddenGuidance`, and allows player-source narration rows for Story inserts. | Recheck when Story/Guide persistence changes. |
+| `convex/world.ts` | validates and records Story inserts, records Guide turns as commandless resolving turns, exposes hidden guidance in debug turn summaries, and cleans Story/Guide runtime rows through existing Adventure reset/delete paths. | Recheck when Adventure runtime persistence changes. |
+| `src/lib/world/convex-snapshot-read-model.ts` | renders player-source narrations as visible `story` feed entries and includes Story inserts in story-visible history while leaving raw Guide text out. | Recheck when feed reconstruction or prompt history changes. |
+| `src/server/director/turn-request.ts`, `src/server/director/turn-route.ts`, `src/app/api/director/turn/route.ts` | validate Guide request bodies, reject Guide in transcript mode, create Guide turns, call the Game Master, persist success/failure, and omit raw Guide text from extraction as canonical player prose. | Recheck when turn route contracts change. |
+| `src/lib/director/prompt.ts`, `src/lib/director/types.ts`, `src/lib/director/debug-log.ts` | distinguish Story history and Guide current-turn steering in prompt construction, request summaries, and local debug log typing. | Recheck when prompt categories or debug records change. |
+| `src/features/play/turn-action-panel.tsx`, `src/features/play/world-client.tsx` | add Story and Guide decision controls, submit Story inserts and Guide turns, render Story entries distinctly, and keep Guide text out of the story stream. | Recheck when the play UI or story feed changes. |
+| `docs/data-model.md`, `docs/persistence-system.md`, `docs/testing.md`, `README.md`, `CHANGELOG.md` | document the new player action categories, persistence boundaries, and deterministic verification path. | Recheck when public or canonical docs change. |
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| R1-S1 through R1-S3 | `src/lib/world/convex-snapshot-read-model.test.ts`, `src/lib/director/director.test.ts`, and `npm run e2e` on 2026-07-07 | prove Story inserts are visible/reloadable, do not create turns, and enter future Game Master story context as canonical player-authored prose. | Passing |
+| R2-S1 and R2-S2 | `convex/world.ts` source inspection, `src/lib/world/convex-snapshot-read-model.test.ts`, and `npm run e2e` on 2026-07-07 | prove Story inserts do not call the provider/extractor or create state diffs, while later Guide/Act/Pass requests can read the Story setup. | Passing |
+| R3-S1 through R3-S4 | `src/app/api/director/turn/route.test.ts`, `src/lib/director/director.test.ts`, and `npm run e2e` on 2026-07-07 | prove Guide creates a resolving commandless turn, hides raw Guide text from the story stream, includes it only as current-turn steering for story generation, and keeps Guide evidence debuggable. | Passing |
+| R4-S1 | `src/lib/world/convex-snapshot-read-model.test.ts`, `src/lib/director/director.test.ts`, and `npm run e2e` on 2026-07-07 | prove future story context includes Game Master narration and Story inserts while excluding commands, raw Guide text, slash utility output, debug records, and events. | Passing |
+| R4-S2 | `npm run e2e` on 2026-07-07 and existing Adventure reset/delete coverage | prove disposable Story/Guide Adventures are deletable and Story/Guide runtime rows follow Adventure cleanup; Reset Session continues to clear runtime story history. | Passing |
+| R4-S3 | `src/app/api/director/turn/route.test.ts` and `src/lib/world/convex-snapshot-read-model.test.ts` | prove transcript mode rejects Guide before creating a turn or calling the provider, while Story inserts remain explicit transcript narration rather than persistent-mode canonical card/state mutation. | Passing |
+| Supporting gates | `npm run test`, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run convex:once`, `npm run ci:required`, and `npm run e2e` on 2026-07-07 | prove the broader app remains green with Story/Guide changes. | Passing |
+
+#### Verification Gaps
+
+- Live-provider Guide quality remains empirical; deterministic checks should prove category boundaries, not subjective prose quality.
+- Taylor manual browser confirmation remains pending for subjective Story/Guide play feel and whether the extra controls feel too dashboard-like.
+
 ## Cross-Story Concerns
 
 - Slash commands are allowed only as pre-turn utility actions unless a later Story explicitly expands that boundary. They must not become hidden turns, story narrations, state diffs, movement commands, inventory commands, combat commands, or a broad MUD command parser by accident.
+- Story inserts are the only player-authored pre-turn content that enters future story-visible history. Guide text and slash utility output must stay out of future normal story context unless a later Story explicitly changes that boundary.
 
 
 ## Open Decisions

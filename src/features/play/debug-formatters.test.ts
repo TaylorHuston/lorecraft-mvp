@@ -78,12 +78,23 @@ describe("play debug formatters", () => {
         eventCount: 0,
         stateDiffCount: 0,
       },
+      {
+        _id: "turn-3",
+        sequenceNumber: 3,
+        trigger: "guide",
+        status: "succeeded",
+        narrationCount: 1,
+        eventCount: 0,
+        stateDiffCount: 0,
+        directorCallStatus: "success",
+      },
     ];
 
     expect(buildTurnSequenceById(turns).get("turn-2")).toBe(2);
     expect(turnSummaryItems(turns)).toEqual([
       "Turn #1: Act succeeded - I greet Mira. (1 narration, 0 events, 1 diff; Game Master: success)",
       "Turn #2: Pass failed (0 narrations, 0 events, 0 diffs)",
+      "Turn #3: Guide succeeded (1 narration, 0 events, 0 diffs; Game Master: success)",
     ]);
   });
 });

@@ -1,6 +1,56 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verification", () => {
+  test("records Story setup and hidden Guide steering without leaking Guide text", async ({ page }) => {
+    const temporaryAdventureIds: string[] = [];
+
+    try {
+      await page.goto("/");
+      await ensureSeedWorlds(page);
+      await clickCreateAdventureForWorld(page, "Stormbound Chapel");
+      const adventureId = await readAdventureIdFromUrl(page);
+      temporaryAdventureIds.push(adventureId);
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
+
+      const storyText = "The altar candle burns blue before anyone touches it.";
+      await submitStory(page, storyText);
+      await expect(page.locator("#story-feed [data-story-kind='story']")).toContainText(storyText);
+      await expect(page.locator("#story-feed [data-story-kind='story']")).toContainText("Story");
+      await openDebugPanel(page);
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-turns-items")).toContainText("None yet.");
+      await page.locator("#debug-panel-toggle").click();
+
+      const guideText = "Privately steer Mira to mention the midnight bell.";
+      await submitGuide(page, guideText);
+      await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+      await expect(page.locator("#story-stream")).not.toContainText(guideText);
+      await openDebugPanel(page);
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: Guide succeeded");
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(storyText);
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "[Hidden Guide]",
+      );
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(guideText);
+      await page.locator("#debug-panel-toggle").click();
+
+      await page.reload();
+      await expect(page.locator("#story-feed [data-story-kind='story']")).toContainText(storyText);
+      await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+      await expect(page.locator("#story-stream")).not.toContainText(guideText);
+
+      await deleteTemporaryAdventure(page, adventureId);
+      temporaryAdventureIds.splice(temporaryAdventureIds.indexOf(adventureId), 1);
+    } finally {
+      for (const adventureId of temporaryAdventureIds) {
+        await deleteTemporaryAdventure(page, adventureId).catch(() => {});
+      }
+    }
+  });
+
   test("runs a deterministic seeded-Adventure browser playtest", async ({ page }) => {
     const temporaryAdventureIds: string[] = [];
 
@@ -296,6 +346,20 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
   });
 });
 
+async function ensureSeedWorlds(page: import("@playwright/test").Page) {
+  await page.locator("#adventure-landing, #seed-world-button").first().waitFor({ timeout: 30_000 });
+  if (await page.locator("#seed-world-button").isVisible()) {
+    await page.locator("#seed-world-button").click();
+    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+    await page.locator("#back-to-adventures-button").click();
+  }
+  await expect(page).toHaveURL("/");
+  await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+  await expect(page.locator("#adventure-list-loading-state")).toHaveCount(0, {
+    timeout: 30_000,
+  });
+}
+
 async function seedFreshWorld(page: import("@playwright/test").Page) {
   await page.waitForFunction(() =>
     Boolean(
@@ -408,6 +472,23 @@ async function submitSlashCommand(page: import("@playwright/test").Page, input: 
   await directorInput.press("Enter");
   await expect(directorInput).toBeVisible({ timeout: 60_000 });
   await expect(directorInput).toHaveValue("");
+}
+
+async function submitStory(page: import("@playwright/test").Page, input: string) {
+  await page.locator("#story-turn-button").click();
+  const storyInput = page.locator("#story-action-input");
+  await expect(storyInput).toBeVisible();
+  await storyInput.fill(input);
+  await storyInput.press("Enter");
+  await expect(storyInput).toHaveCount(0, { timeout: 30_000 });
+}
+
+async function submitGuide(page: import("@playwright/test").Page, input: string) {
+  await page.locator("#guide-turn-button").click();
+  const guideInput = page.locator("#guide-action-input");
+  await expect(guideInput).toBeVisible();
+  await guideInput.fill(input);
+  await guideInput.press("Enter");
 }
 
 async function openDebugPanel(page: import("@playwright/test").Page) {

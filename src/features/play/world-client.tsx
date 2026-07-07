@@ -45,6 +45,11 @@ type DirectorTurnResponse =
       error: string;
     };
 
+type DirectorTurnPayload =
+  | { trigger: "act"; input: string }
+  | { trigger: "pass" }
+  | { trigger: "guide"; guidance: string };
+
 type DirectorUtilityResponse =
   | {
       ok: true;
@@ -68,6 +73,18 @@ type SlashCommandSnapshot = {
   room: { name: string };
 };
 
+type StoryInsertResult =
+  | {
+      ok: true;
+      narrationId?: Id<"narrations">;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+type StoryFeedKind = "player" | "director" | "event" | "utility" | "story";
+
 const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
   style: "Grounded, concise prose with concrete sensory detail. Keep the scene moving.",
   npcBehavior:
@@ -87,6 +104,7 @@ export function WorldClient({
   const createAdventure = useMutation(api.world.createAdventure);
   const deleteAdventure = useMutation(api.world.deleteAdventure);
   const resetPlaytestWorld = useMutation(api.world.resetPlaytestWorld);
+  const recordStoryInsert = useMutation(api.world.recordStoryInsert);
   const [selectedAdventureId, setSelectedAdventureId] = useState<Id<"adventures"> | null>(
     initialAdventureId,
   );
@@ -270,6 +288,55 @@ export function WorldClient({
     return submitted ? "close" : false;
   }
 
+  async function handleStorySubmit(input: string): Promise<"close" | false> {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+      return false;
+    }
+
+    const submitted = await submitStoryInsert(input);
+    return submitted ? "close" : false;
+  }
+
+  async function handleGuideSubmit(input: string): Promise<"close" | false> {
+    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+      return false;
+    }
+
+    const submitted = await submitTurn({ trigger: "guide", guidance: input });
+    return submitted ? "close" : false;
+  }
+
+  async function submitStoryInsert(input: string) {
+    if (!adventureId) {
+      return false;
+    }
+
+    setError(null);
+    setNotice(null);
+    setIsSubmitting(true);
+    try {
+      const npcSavesFlushed = await npcDebug.flushQueuedSaves();
+      const locationSavesFlushed = await locationDebug.flushActiveSaves();
+      if (!npcSavesFlushed || !locationSavesFlushed) {
+        return false;
+      }
+
+      const result = (await recordStoryInsert({ adventureId, text: input })) as StoryInsertResult;
+      if (!result.ok) {
+        setError(result.error);
+        return false;
+      }
+
+      setNotice("Story added.");
+      return true;
+    } catch (submitError) {
+      setError(errorMessage(submitError));
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function submitUtilityCommand(input: string): Promise<"keep-open" | false> {
     if (!adventureId) {
       return false;
@@ -308,7 +375,7 @@ export function WorldClient({
     }
   }
 
-  async function submitTurn(turn: { trigger: "act"; input: string } | { trigger: "pass" }) {
+  async function submitTurn(turn: DirectorTurnPayload) {
     const submittedInput = turn.trigger === "act" ? turn.input : "";
     setError(null);
     setNotice(null);
@@ -327,6 +394,7 @@ export function WorldClient({
           adventureId,
           trigger: turn.trigger,
           ...(turn.trigger === "act" ? { input: submittedInput } : {}),
+          ...(turn.trigger === "guide" ? { guidance: turn.guidance } : {}),
           promptGuidance,
         }),
       });
@@ -443,15 +511,23 @@ export function WorldClient({
                   >
                     {snapshot.feed.length > 0 ? (
                       <div id="story-feed" className="space-y-8">
-                        {snapshot.feed.map((entry) => (
-                          <StoryEntry
-                            key={entry.id}
-                            id={entry.id}
-                            kind={entry.kind}
-                            text={entry.text}
-                            turnNumber={entry.kind !== "utility" && entry.turnId ? turnSequenceById.get(entry.turnId) : undefined}
-                          />
-                        ))}
+                        {snapshot.feed.map((entry) => {
+                          const kind = normalizeFeedKind(entry.kind, entry.source);
+                          const turnId = "turnId" in entry ? entry.turnId : undefined;
+                          return (
+                            <StoryEntry
+                              key={entry.id}
+                              id={entry.id}
+                              kind={kind}
+                              text={entry.text}
+                              turnNumber={
+                                shouldShowTurnNumber(kind) && turnId
+                                  ? turnSequenceById.get(turnId)
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
                       </div>
                     ) : (
                       <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
@@ -470,6 +546,8 @@ export function WorldClient({
                   error={error}
                   slashCommandTargets={slashCommandTargets}
                   onActSubmit={handleActSubmit}
+                  onStorySubmit={handleStorySubmit}
+                  onGuideSubmit={handleGuideSubmit}
                   onPass={handlePass}
                 />
               </>
@@ -601,6 +679,20 @@ function buildSlashCommandTargets(snapshot: SlashCommandSnapshot) {
   return targets;
 }
 
+function normalizeFeedKind(kind: string, source?: string): StoryFeedKind {
+  if (kind === "story" || (kind === "director" && source === "player")) {
+    return "story";
+  }
+  if (kind === "player" || kind === "director" || kind === "event" || kind === "utility") {
+    return kind;
+  }
+  return "event";
+}
+
+function shouldShowTurnNumber(kind: StoryFeedKind) {
+  return kind !== "utility" && kind !== "story";
+}
+
 function GearIcon() {
   return (
     <svg
@@ -626,7 +718,7 @@ function StoryEntry({
   turnNumber,
 }: {
   id: string;
-  kind: "player" | "director" | "event" | "utility";
+  kind: StoryFeedKind;
   text: string;
   turnNumber?: number;
 }) {
@@ -640,6 +732,24 @@ function StoryEntry({
             Player
           </p>
           <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-amber-50">{text}</p>
+        </article>
+      </StoryEntryShell>
+    );
+  }
+
+  if (kind === "story") {
+    return (
+      <StoryEntryShell id={entryDomId} kind={kind} turnNumber={undefined}>
+        <article
+          id={`${entryDomId}-story-insert`}
+          className="border-l-2 border-sky-300/45 pl-4 text-zinc-200"
+        >
+          <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-sky-200/70">
+            Story
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-[1.02rem] leading-7 text-zinc-200">
+            {text}
+          </p>
         </article>
       </StoryEntryShell>
     );
@@ -692,7 +802,7 @@ function StoryEntryShell({
   children,
 }: {
   id: string;
-  kind: "player" | "director" | "event" | "utility";
+  kind: StoryFeedKind;
   turnNumber?: number;
   children: React.ReactNode;
 }) {

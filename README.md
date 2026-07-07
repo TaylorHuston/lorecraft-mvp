@@ -10,6 +10,8 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 
 - Narrative-only story input and a resumable player-facing story stream.
 - `Pass` turns for letting the Game Master continue the scene without adding player prose.
+- `Story` inserts for adding canonical player-authored scene prose before the next resolving turn.
+- `Guide` turns for privately steering the next Game Master narration without showing the raw guidance in the story stream.
 - Provider-agnostic Game Master route for OpenAI-compatible chat completions endpoints.
 - Local Ollama, LM Studio, OpenRouter, Vercel AI Gateway, or direct-provider playtesting through the same backend adapter.
 - Stormbound Chapel demo World with a frozen WorldVersion and a default playable Adventure copy.
@@ -154,7 +156,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, add Story setup, use hidden Guide steering, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 

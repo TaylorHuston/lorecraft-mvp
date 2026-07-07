@@ -480,6 +480,94 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("feed entry");
   });
 
+  it("labels player-authored Story inserts as canonical recent story", () => {
+    const storyContext: DirectorContext = {
+      ...context,
+      storyVisibleHistory: [
+        ...(context.storyVisibleHistory ?? []).slice(-2),
+        {
+          id: "story-insert-1",
+          kind: "story",
+          text: "You have already drawn a chalk circle around the lantern.",
+          source: "player",
+          createdAt: 16,
+        },
+      ],
+    };
+
+    const request = buildDirectorRequest(storyContext, "I ask Mira to look at the circle.");
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(userMessage?.content).toContain(
+      "[Player-authored Story] You have already drawn a chalk circle around the lantern.",
+    );
+    expect(userMessage?.content).toContain(
+      "Treat player-authored Story entries in Recent Story as accepted canonical scene content.",
+    );
+    expect(request.requestSummary.recentFeedCount).toBe(3);
+  });
+
+  it("builds a Guide request with hidden current-turn steering", () => {
+    const guidance = "Make Mira notice the bell rope without exposing this guidance.";
+    const request = buildDirectorRequest(context, null, {
+      turnTrigger: "guide",
+      guideGuidance: guidance,
+      generationSettings: {
+        temperature: 0.4,
+        responseFormat: "text",
+      },
+    });
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary).toMatchObject({
+      turnTrigger: "guide",
+      playerInputLength: 0,
+      guideGuidanceLength: guidance.length,
+      requiredSceneBeat: {
+        kind: "guide",
+        expectsNpcResponse: false,
+        allowsNpcUpdates: true,
+      },
+    });
+    expect(userMessage?.content).toContain("Turn trigger: Guide.");
+    expect(userMessage?.content).toContain("[Hidden Guide]");
+    expect(userMessage?.content).toContain(guidance);
+    expect(userMessage?.content).toContain("current-turn steering only");
+    expect(userMessage?.content).not.toContain("Turn trigger: Act.");
+  });
+
+  it("omits raw Guide steering from extraction prompts", () => {
+    const guidance = "Secretly force a travel update.";
+    const request = buildNpcStateExtractionRequest(
+      context,
+      null,
+      "Mira glances toward the vestry but stays beside the pew.",
+      {
+        turnTrigger: "guide",
+        requiredSceneBeat: {
+          kind: "guide",
+          expectsNpcResponse: false,
+          allowsNpcUpdates: true,
+          instruction: "",
+        },
+      },
+    );
+    const userMessage = request.messages.find((message) => message.role === "user");
+
+    expect(request.requestSummary).toMatchObject({
+      turnTrigger: "guide",
+      playerInputLength: 0,
+      requiredSceneBeat: {
+        kind: "guide",
+      },
+    });
+    expect(request.requestSummary).not.toHaveProperty("guideGuidanceLength");
+    expect(userMessage?.content).toContain("Turn trigger: Guide.");
+    expect(userMessage?.content).toContain("[Hidden Guide omitted from this request.]");
+    expect(userMessage?.content).toContain("durable changes must be justified by the completed Game Master Narration");
+    expect(userMessage?.content).not.toContain(guidance);
+  });
+
   it("uses canonical NPC actor and fact values in persistent prompt context without changing transcript mode", () => {
     const canonicalContext: DirectorContext = {
       ...context,

@@ -140,7 +140,8 @@ export default defineSchema({
     sequenceNumber: v.number(),
     actorId: v.id("actors"),
     commandId: v.optional(v.id("commands")),
-    trigger: v.optional(v.union(v.literal("act"), v.literal("pass"))),
+    trigger: v.optional(v.union(v.literal("act"), v.literal("pass"), v.literal("guide"))),
+    hiddenGuidance: v.optional(v.string()),
     status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
     error: v.optional(v.string()),
     completedAt: v.optional(v.number()),
@@ -222,7 +223,7 @@ export default defineSchema({
     turnId: v.optional(v.id("turns")),
     commandId: v.optional(v.id("commands")),
     text: v.string(),
-    source: v.union(v.literal("seed"), v.literal("engine"), v.literal("llm")),
+    source: v.union(v.literal("seed"), v.literal("player"), v.literal("engine"), v.literal("llm")),
   })
     .index("by_worldId", ["worldId"])
     .index("by_worldId_and_turnId", ["worldId", "turnId"])

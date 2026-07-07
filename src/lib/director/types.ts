@@ -2,7 +2,7 @@ export const NPC_FACT_KEYS = ["mood", "status", "memory"] as const;
 
 export type NpcFactKey = (typeof NPC_FACT_KEYS)[number];
 
-export type FeedEntryKind = "player" | "director" | "event" | "utility";
+export type FeedEntryKind = "player" | "story" | "director" | "event" | "utility";
 
 export type DirectorFeedEntry = {
   id: string;
@@ -150,7 +150,7 @@ export type DirectorMessage = {
 };
 
 export type DirectorMode = "persistent" | "transcript";
-export type TurnTrigger = "act" | "pass";
+export type TurnTrigger = "act" | "pass" | "guide";
 export type DirectorOutputContract = "json_npc_updates" | "plain_prose";
 export type DirectorCallRole = "story_generation" | "npc_state_extraction" | "utility_look";
 export type SceneBeatSource = "engine" | "llm" | "fallback";
@@ -185,6 +185,7 @@ export type DirectorRequestSummary = {
   promptComponentKeys: string[];
   promptGuidanceKeys?: string[];
   generationSettings?: DirectorGenerationSettingsSummary;
+  guideGuidanceLength?: number;
 };
 
 export type DirectorRequest = {
@@ -194,6 +195,7 @@ export type DirectorRequest = {
 
 export type SceneBeatKind =
   | "pass"
+  | "guide"
   | "direct_npc_question"
   | "direct_npc_address"
   | "scene_question"
