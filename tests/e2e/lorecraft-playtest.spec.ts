@@ -2,64 +2,67 @@ import { expect, test } from "@playwright/test";
 
 test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verification", () => {
   test("runs a deterministic seeded-Adventure browser playtest", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.locator("#lorecraft-app")).toBeVisible();
+    const temporaryAdventureIds: string[] = [];
 
-    await seedFreshWorld(page);
+    try {
+      await page.goto("/");
+      await expect(page.locator("#lorecraft-app")).toBeVisible();
 
-    await page.locator("#act-turn-button").click();
-    const directorInput = page.locator("#director-input");
-    await expect(directorInput).toBeVisible();
-    await directorInput.fill("/");
-    await expect(page.locator("#slash-command-autocomplete")).toContainText("/help");
-    await expect(page.locator("#slash-command-autocomplete")).toContainText("/look");
-    await directorInput.press("ArrowDown");
-    await directorInput.press("ArrowUp");
-    await directorInput.fill("/l");
-    await directorInput.press("Enter");
-    await expect(directorInput).toHaveValue("/look ");
-    await directorInput.fill("/look Mi");
-    await expect(page.locator("#slash-command-autocomplete")).toContainText("Mira");
-    await directorInput.press("Tab");
-    await expect(directorInput).toHaveValue("/look Mira");
-    await directorInput.press("Enter");
-    await expect(page.locator("#story-feed [data-story-kind='utility']")).toContainText("Mira", {
-      timeout: 60_000,
-    });
-    await expect(directorInput).toBeVisible({ timeout: 60_000 });
-    await expect(directorInput).toHaveValue("");
+      await seedFreshWorld(page);
 
-    await submitSlashCommand(page, "/help");
-    await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
-      "Available commands:",
-    );
-    await submitSlashCommand(page, "/look moonblade");
-    await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
-      'You do not see "moonblade" here to inspect.',
-    );
-    await page.locator("#close-act-input-button").click();
-    await expect(page.locator("#act-turn-button")).toBeVisible();
+      await page.locator("#act-turn-button").click();
+      const directorInput = page.locator("#director-input");
+      await expect(directorInput).toBeVisible();
+      await directorInput.fill("/");
+      await expect(page.locator("#slash-command-autocomplete")).toContainText("/help");
+      await expect(page.locator("#slash-command-autocomplete")).toContainText("/look");
+      await directorInput.press("ArrowDown");
+      await directorInput.press("ArrowUp");
+      await directorInput.fill("/l");
+      await directorInput.press("Enter");
+      await expect(directorInput).toHaveValue("/look ");
+      await directorInput.fill("/look Mi");
+      await expect(page.locator("#slash-command-autocomplete")).toContainText("Mira");
+      await directorInput.press("Tab");
+      await expect(directorInput).toHaveValue("/look Mira");
+      await directorInput.press("Enter");
+      await expect(page.locator("#story-feed [data-story-kind='utility']")).toContainText("Mira", {
+        timeout: 60_000,
+      });
+      await expect(directorInput).toBeVisible({ timeout: 60_000 });
+      await expect(directorInput).toHaveValue("");
 
-    const playerText = "Mira, what do you know about the storm?";
-    await submitAct(page, playerText);
+      await submitSlashCommand(page, "/help");
+      await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
+        "Available commands:",
+      );
+      await submitSlashCommand(page, "/look moonblade");
+      await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
+        'You do not see "moonblade" here to inspect.',
+      );
+      await page.locator("#close-act-input-button").click();
+      await expect(page.locator("#act-turn-button")).toBeVisible();
 
-    await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
-    await expect(page.locator("#director-input")).toBeHidden();
-    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
-    await expect(page.locator("#story-stream")).toContainText(playerText);
-    await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
-    await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+      const playerText = "Mira, what do you know about the storm?";
+      await submitAct(page, playerText);
 
-    await page.reload();
-    const reloadedUtilityEntries = page.locator("#story-feed [data-story-kind='utility']");
-    await expect(reloadedUtilityEntries.filter({ hasText: "Mira" })).toBeVisible();
-    await expect(reloadedUtilityEntries.filter({ hasText: "Available commands:" })).toBeVisible();
-    await expect(
-      reloadedUtilityEntries.filter({ hasText: 'You do not see "moonblade" here to inspect.' }),
-    ).toBeVisible();
-    await expect(page.locator("#story-stream")).toContainText(playerText);
-    await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
-    await openDebugPanel(page);
+      await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
+      await expect(page.locator("#director-input")).toBeHidden();
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator("#story-stream")).toContainText(playerText);
+      await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+      await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
+
+      await page.reload();
+      const reloadedUtilityEntries = page.locator("#story-feed [data-story-kind='utility']");
+      await expect(reloadedUtilityEntries.filter({ hasText: "Mira" })).toBeVisible();
+      await expect(reloadedUtilityEntries.filter({ hasText: "Available commands:" })).toBeVisible();
+      await expect(
+        reloadedUtilityEntries.filter({ hasText: 'You do not see "moonblade" here to inspect.' }),
+      ).toBeVisible();
+      await expect(page.locator("#story-stream")).toContainText(playerText);
+      await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
+      await openDebugPanel(page);
 
     const debugPanel = page.locator("#debug-panel");
     const debugToggle = page.locator("#debug-panel-toggle");
@@ -267,32 +270,29 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page).toHaveURL("/");
     await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
     await expect(page.locator("#world-container-list")).toContainText("Tutorial");
-    await clickCreateAdventureForWorld(page, "Stormbound Chapel");
-    await page.waitForURL(/\/adventures\/[^/]+$/);
-    const temporaryAdventureId = page.url().split("/").pop();
-    if (!temporaryAdventureId) {
-      throw new Error("Expected created Adventure URL to include an Adventure id.");
-    }
-    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
-    await page.locator("#back-to-adventures-button").click();
-    await expect(page).toHaveURL("/");
-    await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
-    const temporaryAdventureCard = page.locator(`#adventure-card-${temporaryAdventureId}`);
-    await expect(temporaryAdventureCard).toBeVisible();
-    page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("Delete");
-      await dialog.accept();
-    });
-    await page.locator(`#delete-adventure-${temporaryAdventureId}`).click();
-    await expect(temporaryAdventureCard).toHaveCount(0);
-    await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
+      await clickCreateAdventureForWorld(page, "Stormbound Chapel");
+      const temporaryStormboundAdventureId = await readAdventureIdFromUrl(page);
+      temporaryAdventureIds.push(temporaryStormboundAdventureId);
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
+      await deleteTemporaryAdventure(page, temporaryStormboundAdventureId);
+      temporaryAdventureIds.splice(temporaryAdventureIds.indexOf(temporaryStormboundAdventureId), 1);
+      await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
 
-    await clickCreateAdventureForWorld(page, "Tutorial");
-    await page.waitForURL(/\/adventures\/[^/]+$/);
-    await expect(page.locator("#story-stream")).toContainText("Guide Serin", {
-      timeout: 30_000,
-    });
-    await expect(page.locator("#story-stream")).toContainText("look around");
+      await clickCreateAdventureForWorld(page, "Tutorial");
+      const temporaryTutorialAdventureId = await readAdventureIdFromUrl(page);
+      temporaryAdventureIds.push(temporaryTutorialAdventureId);
+      await expect(page.locator("#story-stream")).toContainText("Guide Serin", {
+        timeout: 30_000,
+      });
+      await expect(page.locator("#story-stream")).toContainText("look around");
+      await deleteTemporaryAdventure(page, temporaryTutorialAdventureId);
+      temporaryAdventureIds.splice(temporaryAdventureIds.indexOf(temporaryTutorialAdventureId), 1);
+      await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
+    } finally {
+      for (const adventureId of temporaryAdventureIds) {
+        await deleteTemporaryAdventure(page, adventureId).catch(() => {});
+      }
+    }
   });
 });
 
@@ -353,6 +353,41 @@ async function clickCreateAdventureForWorld(page: import("@playwright/test").Pag
     element.scrollIntoView({ block: "center", inline: "nearest" });
   });
   await createButton.click();
+}
+
+async function readAdventureIdFromUrl(page: import("@playwright/test").Page) {
+  await page.waitForURL(/\/adventures\/[^/]+$/);
+  const adventureId = new URL(page.url()).pathname.split("/").pop();
+  if (!adventureId) {
+    throw new Error("Expected created Adventure URL to include an Adventure id.");
+  }
+  return adventureId;
+}
+
+async function deleteTemporaryAdventure(page: import("@playwright/test").Page, adventureId: string) {
+  if (page.url() !== new URL("/", page.url()).href) {
+    const backToAdventuresButton = page.locator("#back-to-adventures-button");
+    if (await backToAdventuresButton.isVisible()) {
+      await backToAdventuresButton.click();
+    } else {
+      await page.goto("/");
+    }
+  }
+
+  await expect(page).toHaveURL("/");
+  await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
+
+  const temporaryAdventureCard = page.locator(`#adventure-card-${adventureId}`);
+  if (!(await temporaryAdventureCard.isVisible())) {
+    return;
+  }
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Delete");
+    await dialog.accept();
+  });
+  await page.locator(`#delete-adventure-${adventureId}`).click();
+  await expect(temporaryAdventureCard).toHaveCount(0);
 }
 
 async function submitAct(page: import("@playwright/test").Page, input: string) {

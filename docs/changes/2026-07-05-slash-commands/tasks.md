@@ -2,8 +2,8 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` changes requested; fifth safe review fix set applied.
-- Last completed action: fixed review findings for fixed-header inner-container interception during startup Adventure creation, landing scroll alignment for long Adventure lists, Act input focus visibility, post-`e34cf50` lifecycle state, stale review bundle facts, manual UI status checkbox state, fixed-header interception during startup Adventure creation, missing utility reload-persistence E2E coverage, post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, duplicate README wording, stale lifecycle state, Demo World Lifetime reseed wording, Epic verification metadata, `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
+- Current state: `/sdd-review` changes requested; sixth safe review fix set applied.
+- Last completed action: fixed review findings for E2E-created Tutorial Adventure cleanup, fixed-header inner-container interception during startup Adventure creation, landing scroll alignment for long Adventure lists, Act input focus visibility, post-`e34cf50` lifecycle state, stale review bundle facts, manual UI status checkbox state, fixed-header interception during startup Adventure creation, missing utility reload-persistence E2E coverage, post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, duplicate README wording, stale lifecycle state, Demo World Lifetime reseed wording, Epic verification metadata, `/look` privacy, ESLint generated-output ignores, offscreen `/look` locations, broad Tutorial deletion during reseed, empty first-run landing seed action, LC-002 top-level scope wording, and LC-001-S13 Story placement.
 - Next action: rerun `/sdd-review` for a fresh ready verdict.
 - Active branch/ref: `change/slash-commands-tutorial`
 - Expected dirty files after remediation commit: none
@@ -106,6 +106,7 @@
 | 2026-07-06 | Fresh `/sdd-review` artifact remediation | main + artifact/frontend/security reviewers | `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md`, `docs/persistence-system.md`, LC-001 Epic, LC-002 Epic | Reconciled post-`d425b76` lifecycle state, reseed lifetime wording, and Epic verification metadata. Security and frontend delegated passes were clean. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md`, `docs/data-model.md`, `docs/deployment.md`, `docs/architecture.md`, LC-001 Epic, `README.md` | Fixed fixed-header interception during startup Adventure creation, added utility reload-persistence E2E coverage, reconciled post-`388fbcb` lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, and duplicate README wording. | review remediation commit |
 | 2026-07-06 | Fresh `/sdd-review` remediation | main + artifact/frontend/security reviewers | `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx`, `src/features/play/turn-action-panel.tsx`, `src/app/globals.css`, `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md` | Fixed fixed-header inner-container click interception, global landing scroll alignment, long-list landing overflow, Act input focus visibility, deterministic E2E card clicking, and post-`e34cf50` lifecycle/review bundle/manual UI status artifacts. | review remediation commit |
+| 2026-07-06 | Fresh `/sdd-review` remediation | main + Taylor feedback | `tests/e2e/lorecraft-playtest.spec.ts`, `docs/changes/2026-07-05-slash-commands/review.md`, `docs/changes/2026-07-05-slash-commands/tasks.md` | Added cleanup for E2E-created Tutorial Adventures and a defensive finally block for temporary Adventure deletion. | review remediation commit |
 
 ## Verification Ledger
 
@@ -144,6 +145,10 @@
 | 2026-07-06 | `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | Parser, autocomplete, visible `/look` matching, offscreen location rejection, and provider prompt privacy remain green after UI review fixes. | Passed, 14 tests |
 | 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes after top-bar pointer-event, landing scroll alignment, long-list overflow, focus, and E2E helper fixes. | Passed, 1 browser test |
 | 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after the fifth safe review fix set. | Passed, 68 tests |
+| 2026-07-06 | `git diff --check` | whitespace check | E2E cleanup remediation diff has no whitespace errors. | Passed |
+| 2026-07-06 | `npx eslint tests/e2e/lorecraft-playtest.spec.ts` | focused lint | Edited E2E cleanup test file satisfies lint. | Passed |
+| 2026-07-06 | `npm run e2e` | deterministic E2E | Browser playtest passes while deleting both temporary Stormbound and Tutorial Adventures created by the test. | Passed, 1 browser test |
+| 2026-07-06 | `npm run ci:required` | broad supporting gate | Lint, unit tests, typecheck, and production build pass after the sixth safe review fix set. | Passed, 68 tests |
 
 ## Specialist Checkpoint
 
@@ -211,7 +216,7 @@
 - Superseded earlier Epic truth reconciled: complete
 - ADR status: not applicable
 - Changelog current: complete
-- `sdd-review` verdict: changes-requested, fifth safe review fix set applied; fresh rerun pending
+- `sdd-review` verdict: changes-requested, sixth safe review fix set applied; fresh rerun pending
 - Review record: `docs/changes/2026-07-05-slash-commands/review.md`
 - `review.md` findings resolved: fixed in safe review passes; fresh rerun pending
 - Planning updates resolved: not applicable

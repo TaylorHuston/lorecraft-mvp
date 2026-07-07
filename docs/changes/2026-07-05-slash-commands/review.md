@@ -4,7 +4,7 @@
 
 changes-requested
 
-This fresh review found additional UI verification, accessibility, and artifact drift after the prior remediation commit and applied safe in-scope fixes. Rerun `/sdd-review` for a fresh-context ready verdict before merge/closeout.
+This fresh review found additional UI verification, accessibility, E2E cleanup, and artifact drift after the prior remediation commit and applied safe in-scope fixes. Rerun `/sdd-review` for a fresh-context ready verdict before merge/closeout.
 
 ## Gate Scorecard
 
@@ -14,7 +14,7 @@ This fresh review found additional UI verification, accessibility, and artifact 
 | Epic truth | pass after fix | LC-001-S13 is under Stories; LC-002 describes seeded Worlds including Tutorial; verification metadata updated to 2026-07-06. |
 | Requirements and Scenarios | pass | LC-001-S13 and LC-002/S5 Requirements map to implementation and verification. |
 | Story reference traceability | pass | Story labels remain stable and indexed. |
-| Tests and verification | pass after fix | Focused route/parser/autocomplete tests, deterministic E2E, and required CI passed after adding utility reload-persistence coverage. |
+| Tests and verification | pass after fix | Focused route/parser/autocomplete tests, deterministic E2E, and required CI passed after adding utility reload-persistence coverage and temporary Adventure cleanup. |
 | Manual UI confirmation | pass with pending status | `tasks.md` records a current walkthrough and `pending Taylor` status. |
 | Code review | pass after fix | Empty first-run landing path restored; reseed destructive scope narrowed; generated output lint fragility fixed. |
 | Visual / UX consistency | pass after fix with suggestion | Fixed startup Adventure buttons, top-bar pointer-event behavior, landing scroll alignment for long Adventure lists, and Act input focus visibility; autocomplete works, but ARIA could be tightened later with a fuller combobox pattern. |
@@ -40,6 +40,7 @@ This fresh review found additional UI verification, accessibility, and artifact 
 - [x] `src/features/play/world-client.tsx` - Fresh deterministic E2E still reproduced fixed-header interception because `#app-top-bar-inner` kept pointer events enabled across the full browser width. Fixed by making the top-bar inner layout non-intercepting while keeping the actual top-bar action controls clickable.
 - [x] `docs/changes/2026-07-05-slash-commands/tasks.md` and `docs/changes/2026-07-05-slash-commands/review.md` - Lifecycle and bundle state still described the pre-`e34cf50` remediation state. Fixed by updating this review record, tasks resume state, manual UI status checkbox, source-only commit list, diff stat, and PR/merge readiness wording to the current safe-fix state.
 - [x] `src/features/play/adventure-landing.tsx`, `src/app/globals.css`, and `tests/e2e/lorecraft-playtest.spec.ts` - Fixed-header clickability remained sensitive to browser scroll placement on the Adventure landing page, and long Adventure lists could place the top World action under the fixed bar. Fixed with top-aligned landing content, global top scroll padding, World container scroll margins, and an E2E helper that centers the intended `New Adventure` action before clicking.
+- [x] `tests/e2e/lorecraft-playtest.spec.ts` - The deterministic E2E created a Tutorial Adventure to verify the Tutorial seed path but never deleted it, leaving repeated local test Adventures on the home screen. Fixed by tracking temporary Adventure ids, deleting the Tutorial Adventure after verification, and adding a defensive `finally` cleanup for any temporary Adventure created before a later assertion failure.
 
 ### REQUIRED
 
@@ -71,6 +72,10 @@ This fresh review found additional UI verification, accessibility, and artifact 
 | `npm run test -- src/app/api/director/utility/route.test.ts src/lib/director/slash-command.test.ts src/lib/director/slash-command-autocomplete.test.ts` | focused automated test | LC-001-S13/R1, R2, R4 | Passed, 14 tests | Parser, autocomplete, visible `/look` matching, offscreen location rejection, and provider prompt privacy remain green after UI review fixes. |
 | `npm run e2e` | deterministic E2E | LC-001-S13, LC-002/S5, first-run seed helper | Passed, 1 browser test | Browser path remains green after top-bar pointer-event, landing scroll, long-list overflow, focus, and E2E helper fixes. |
 | `npm run ci:required` | broad supporting gate | full local required gate | Passed, 68 tests | Lint, unit tests, typecheck, and production build pass after the fifth safe review fix set. |
+| `git diff --check` | whitespace check | safe review remediation | Passed | Confirms the E2E cleanup remediation diff has no whitespace errors. |
+| `npx eslint tests/e2e/lorecraft-playtest.spec.ts` | focused lint | E2E cleanup file | Passed | Edited E2E cleanup test file satisfies lint. |
+| `npm run e2e` | deterministic E2E | LC-001-S13, LC-002/S5, first-run seed helper | Passed, 1 browser test | Browser path remains green while deleting both temporary Stormbound and Tutorial Adventures created by the test. |
+| `npm run ci:required` | broad supporting gate | full local required gate | Passed, 68 tests | Lint, unit tests, typecheck, and production build pass after the sixth safe review fix set. |
 
 ## Review Bundle
 
@@ -109,3 +114,4 @@ This fresh review found additional UI verification, accessibility, and artifact 
 - 2026-07-06: Fresh review rerun found and fixed artifact/doc drift after `d425b76`: lifecycle state, reseed lifetime docs, and Epic verification metadata. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Fresh review rerun found and fixed UI verification, artifact, and doc drift after `388fbcb`: fixed-header click interception, missing utility reload-persistence E2E coverage, lifecycle state, LC-001-S13 embedded Story metadata, data-model reseed wording, route-hardening docs, and duplicate README wording. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Fresh review rerun found and fixed UI verification, accessibility, and artifact drift after `e34cf50`: fixed-header inner-container click interception, landing scroll alignment for long Adventure lists, Act input focus visibility, lifecycle state, review bundle facts, and manual UI status checkbox state. Rerun `/sdd-review` for a clean ready verdict.
+- 2026-07-06: Taylor feedback identified that E2E-created Tutorial Adventures were accumulating locally. Fixed the browser test to delete temporary Tutorial Adventures and defensively clean up tracked temporary Adventure ids on failure. Rerun `/sdd-review` for a clean ready verdict.
