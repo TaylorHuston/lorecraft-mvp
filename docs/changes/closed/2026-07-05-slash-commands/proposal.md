@@ -70,7 +70,7 @@ This is also the right moment to add a second seeded World named `Tutorial`. Sto
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-07-05-slash-commands/`
+- Active location: not applicable; change is closed.
 - Closed location: `docs/changes/closed/2026-07-05-slash-commands/`
 
 ## Impact

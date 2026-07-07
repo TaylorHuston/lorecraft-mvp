@@ -4,7 +4,7 @@
 
 ready
 
-This fresh review rerun found no unresolved blocking or required findings. The source branch is ready for local integration into `develop` once Taylor authorizes merge-and-close.
+This fresh review rerun found no unresolved blocking or required findings. Taylor authorized merge-and-close on 2026-07-07, and the source branch was merged locally into `develop`.
 
 ## Gate Scorecard
 
@@ -21,7 +21,7 @@ This fresh review rerun found no unresolved blocking or required findings. The s
 | Security review | pass | Offscreen `/look` location leak fixed; `/look` prompt input now excludes non-observable NPC facts; global reseed no longer deletes Tutorial. |
 | Documentation | pass | README, data/persistence/architecture/deployment docs, change artifacts, and affected Epics are current for this change. |
 | Changelog | pass | Public `Unreleased` entries cover slash utilities, autocomplete, Tutorial, and multi-World startup. |
-| Branch and merge readiness | pass | Source `change/slash-commands-tutorial` targets `develop`, merge-tree is clean, and app repo was clean before this review-record update. |
+| Branch and merge readiness | pass | Source `change/slash-commands-tutorial` targeted `develop`, merge-tree was clean, and the branch was merged locally with merge commit `6016059`. |
 | PRD alignment | not applicable | No separate PRD update required for this scoped prototype change. |
 
 ## Findings
@@ -104,14 +104,21 @@ This fresh review rerun found no unresolved blocking or required findings. The s
 | Frontend / UI | `019f36a5-7902-7fa0-b7fa-3b64c369947d` | changes-requested | Reproduced fixed-header click interception and flagged missing visible focus indication on the Act textarea. |
 | Fresh ready rerun | main thread | pass | Subagent spawning was skipped because the available subagent tool only permits spawning when the user explicitly asks for delegation; the main thread reran source/diff review and all relevant verification gates. |
 
+## Suggested Manual UI Testing
+
+- Route/setup: `http://localhost:3000`; seeded Stormbound Chapel and Tutorial Worlds with at least one playable Adventure.
+- Actions: create or open a Tutorial Adventure; open Act input; try `/`, `/look Mi`, Tab or Enter autocomplete, `/help`, `/look`, `/look Mira`, and a normal Act; reload the Adventure.
+- Expected result: utility entries feel visually distinct from story narration, slash commands do not increment the turn or end the decision phase, autocomplete helps without feeling intrusive, normal Act still ends the turn, utility outputs survive reload, and Tutorial feels like onboarding rather than documentation.
+- Status: pending Taylor; non-blocking for local integration.
+
 ## PR / Merge Readiness
 
 - Source branch: `change/slash-commands-tutorial`
 - Target branch: `develop`
 - Conflict check: clean before this ready-record update
-- Commit state: implementation and safe fixes are committed; this ready review record is an artifact-only update
+- Commit state: implementation and safe fixes were committed before merge
 - PR status: not requested
-- Merge status: ready for local merge-and-close after Taylor authorization
+- Merge status: merged locally into `develop` with merge commit `6016059`; closeout folder move recorded in a separate closeout commit
 
 ## Review Log
 
@@ -122,3 +129,4 @@ This fresh review rerun found no unresolved blocking or required findings. The s
 - 2026-07-06: Fresh review rerun found and fixed UI verification, accessibility, and artifact drift after `e34cf50`: fixed-header inner-container click interception, landing scroll alignment for long Adventure lists, Act input focus visibility, lifecycle state, review bundle facts, and manual UI status checkbox state. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Taylor feedback identified that E2E-created Tutorial Adventures were accumulating locally. Fixed the browser test to delete temporary Tutorial Adventures and defensively clean up tracked temporary Adventure ids on failure. Rerun `/sdd-review` for a clean ready verdict.
 - 2026-07-06: Fresh review rerun after `bd85349` found no unresolved blocking or required findings. Focused utility tests, Convex compile, deterministic E2E, required CI, whitespace check, and merge-tree all passed. Ready for local merge-and-close after Taylor authorization.
+- 2026-07-07: Taylor authorized merge-and-close. Final pre-merge checks passed, source branch merged into `develop` with merge commit `6016059`, and this change folder moved to `docs/changes/closed/2026-07-05-slash-commands/`.
