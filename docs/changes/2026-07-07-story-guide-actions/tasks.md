@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: implementation complete after manual-feedback remediation; ready for `/sdd-review`.
-- Last completed action: tightened NPC state extraction after live-log feedback showed overreaching momentary/intensified updates and committed it as `917968a`.
-- Next action: run `/sdd-review` as the local integration gate, then address findings or close/merge with user approval.
+- Current state: `/sdd-review` passed locally; ready to merge into `develop` and close.
+- Last completed action: local review found no blocking or required findings; `npm run ci:required` passed.
+- Next action: merge `change/story-guide-actions` into `develop`, move this change folder to `docs/changes/closed/`, and commit closeout.
 - Active branch/ref: `change/story-guide-actions`
-- Expected dirty files: none in the app repo after ledger hash update is committed.
+- Expected dirty files: review ledger update pending commit before merge.
 - Known blockers: none
 
 ## Task Checklist
@@ -66,12 +66,12 @@
 ### 6. Review And Closeout
 
 - [x] 6.1 Update root `CHANGELOG.md` under `Unreleased` because changelog impact is required.
-- [ ] 6.2 Run `/sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
-- [ ] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
-- [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 6.2 Run `/sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
+- [x] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
+- [x] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [x] 6.5 Record manual UI confirmation status as `not applicable`, `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
-- [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
+- [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -115,6 +115,9 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-07 | `npm run typecheck` | broad supporting gate | TypeScript contracts remain valid after extractor boundary changes. | Passed |
 | 2026-07-07 | `npm run test` | broad supporting gate | Full Vitest suite remains green after manual-feedback remediation. | Passed: 7 files, 80 tests |
 | 2026-07-07 | `npm run ci:required` | broad supporting gate | Required local gate passes: lint, test, typecheck, and production build. | Passed |
+| 2026-07-07 | `/sdd-review` local source-vs-`develop` review | local PR review | Change artifacts, Epic truth, Requirement/Scenario coverage, code diff, security posture, docs, changelog, and merge readiness were checked against `develop`. | Passed; no `review.md` needed |
+| 2026-07-07 | `npm run ci:required` | broad supporting gate | Required pre-merge local gate passes: lint, test, typecheck, and production build. | Passed |
+| 2026-07-07 | `npm run convex:once` | Convex validation | Attempted fresh Convex validation during review. | Skipped: existing local Convex backend is running on port 3210 through the dev server, which is intentionally kept running |
 
 ## Manual Feedback
 
@@ -136,7 +139,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending Taylor
+- Status: accepted gap
 - App URL / route: `http://localhost:3000/adventures/<id>`
 - Required setup or test data: seeded Stormbound Chapel or Tutorial Adventure
 - Steps for the user:
@@ -151,7 +154,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 ## Blockers / Open Questions
 
 - None blocking.
-- Non-blocking: Taylor manual confirmation is still useful for subjective Story/Guide play feel and live-provider extraction quality.
+- Accepted gap: subjective Story/Guide play feel and live-provider extraction quality remain empirical after deterministic coverage.
 
 ## Closeout
 
@@ -162,11 +165,11 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes
 - ADR status: not applicable
 - Changelog current: yes
-- `/sdd-review` verdict: pending
-- Review record: pending
-- `review.md` findings resolved: pending
+- `/sdd-review` verdict: ready
+- Review record: clean review recorded in this ledger; no `review.md` needed
+- `review.md` findings resolved: not applicable
 - Planning updates resolved: not applicable
-- Manual UI confirmation status: pending Taylor
-- PR / merge state: not started
+- Manual UI confirmation status: accepted gap
+- PR / merge state: authorized by `/close and merge`; pending local merge to `develop`
 - Deferred scope accepted: live-provider Guide/extraction quality and subjective play feel remain manual/empirical
 - Change moved to `docs/changes/closed/`: no
