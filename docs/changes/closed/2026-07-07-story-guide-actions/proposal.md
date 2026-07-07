@@ -71,7 +71,7 @@ This keeps the app closer to AI Dungeon's useful action modes while preserving L
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-07-07-story-guide-actions/`
+- Original active location: `docs/changes/2026-07-07-story-guide-actions/`
 - Closed location: `docs/changes/closed/2026-07-07-story-guide-actions/`
 
 ## Impact
