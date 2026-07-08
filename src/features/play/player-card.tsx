@@ -99,7 +99,7 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
   return (
     <aside
       id="player-card"
-      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 px-4 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-0 lg:ml-5 lg:mr-2 lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:self-start lg:overflow-y-auto ${
+      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 px-4 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-auto lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:w-[calc(100%-2rem)] lg:max-w-72 lg:overflow-y-auto ${
         isCollapsed ? "lg:w-16 lg:px-3" : ""
       }`}
     >

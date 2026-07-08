@@ -500,14 +500,17 @@ export function WorldClient({
                 </button>
               </div>
             ) : (
-              <div id="play-layout" className="flex min-h-0 flex-1 flex-col lg:flex-row">
+              <div
+                id="play-layout"
+                className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[20%_60%_20%]"
+              >
                 <PlayerCard
                   key={snapshot.player._id}
                   adventureId={adventureId}
                   player={snapshot.player}
                   onError={setError}
                 />
-                <div id="story-workspace" className="flex min-h-0 flex-1 flex-col">
+                <div id="story-workspace" className="flex min-h-0 min-w-0 flex-1 flex-col">
                   <section
                     id="story-stream"
                     ref={storyScrollerRef}
@@ -559,6 +562,7 @@ export function WorldClient({
                     onPass={handlePass}
                   />
                 </div>
+                <div id="story-balance-rail" className="hidden lg:block" aria-hidden="true" />
               </div>
             )}
           </div>
