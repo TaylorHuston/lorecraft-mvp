@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` ready; awaiting Taylor authorization for merge-and-close
-- Last completed action: completed fresh `/sdd-review` on 2026-07-08 with no blocking or required findings
-- Next action: merge into `develop` and close the change if Taylor authorizes it
-- Active branch/ref: `fix/lc-002-multi-world-debug-reset`
+- Current state: closed and merged into `develop`
+- Last completed action: merged `fix/lc-002-multi-world-debug-reset` into `develop` with merge commit `2babe39`
+- Next action: none
+- Active branch/ref: `develop`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
 
@@ -103,6 +103,8 @@
 | 2026-07-08 | `npx convex codegen` during final review | passed | Convex compile/codegen | Convex functions and generated bindings compile after all review remediation. |
 | 2026-07-08 | `git merge-tree --write-tree develop HEAD` during final review | clean, tree `71984a42c97c87fbb47bc5c437705a757552789a` | branch/merge readiness | Source branch can merge into `develop` without conflicts. |
 | 2026-07-08 | runtime HTTP smoke during final review | passed, `http://localhost:3000` returned 200 OK | local runtime smoke | Dev server was left running. |
+| 2026-07-08 | `npm run ci:required` before merge-and-close | passed, 8 files / 84 tests | required integration gate | Rechecked lint, full unit suite, typecheck, and production build immediately before merge. |
+| 2026-07-08 | `git merge --no-ff fix/lc-002-multi-world-debug-reset` into `develop` | passed, merge commit `2babe39` | local integration | Change merged into the integration branch before closeout. |
 
 ## Manual UI Confirmation
 
@@ -122,5 +124,5 @@
 - Review record: final `/sdd-review` returned ready on 2026-07-08 after clean delegated artifact, backend/code, and security passes. No `review.md` created because no blocking or required findings remain.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first, second, and third review-fixes committed; final ready review recorded; not merged.
-- Folder location: active under `docs/changes/`.
+- PR / merge state: merged locally into `develop` with merge commit `2babe39`; no remote PR created; not pushed.
+- Folder location: closed under `docs/changes/closed/2026-07-07-lc-002-multi-world-debug-reset/`.
