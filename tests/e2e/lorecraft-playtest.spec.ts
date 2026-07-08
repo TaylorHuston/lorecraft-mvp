@@ -329,8 +329,10 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       temporaryAdventureIds.push(temporaryStormboundAdventureId);
       await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator("#player-card-name")).toContainText("Edda");
-      await expect(page.locator("#player-card-empty-profile")).toBeVisible();
-      await page.locator("#player-card-edit-button").click();
+      await expect(page.locator("#player-card-edit-physical-description")).toBeVisible();
+      await expect(page.locator("#player-card-edit-physical-description")).toHaveValue("");
+      await expect(page.locator("#player-card-edit-backstory")).toHaveValue("");
+      await expect(page.locator("#player-card-edit-status")).toHaveValue("");
       await page.locator("#player-card-edit-physical-description").fill(
         "A short traveler with a weathered green cloak.",
       );
@@ -341,9 +343,8 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#player-card-save-status")).toContainText("Saved", {
         timeout: 10_000,
       });
-      await page.locator("#player-card-done-button").click();
-      await expect(page.locator("#player-card-physical-description")).toContainText(
-        "weathered green cloak",
+      await expect(page.locator("#player-card-edit-physical-description")).toHaveValue(
+        /weathered green cloak/,
       );
       await page.locator("#player-card-collapse-toggle").click();
       await expect(page.locator("#player-card-collapse-toggle")).toHaveAttribute(
@@ -357,8 +358,8 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       );
       await page.reload();
       await expect(page.locator("#player-card-name")).toContainText("Edda");
-      await expect(page.locator("#player-card-backstory")).toContainText("hearing the bell");
-      await expect(page.locator("#player-card-status")).toContainText("trying to stay calm");
+      await expect(page.locator("#player-card-edit-backstory")).toHaveValue(/hearing the bell/);
+      await expect(page.locator("#player-card-edit-status")).toHaveValue(/trying to stay calm/);
       await deleteTemporaryAdventure(page, temporaryStormboundAdventureId);
       temporaryAdventureIds.splice(temporaryAdventureIds.indexOf(temporaryStormboundAdventureId), 1);
       await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");

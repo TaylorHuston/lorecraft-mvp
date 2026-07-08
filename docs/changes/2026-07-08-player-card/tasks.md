@@ -119,6 +119,7 @@ Record the user's manual testing feedback after implementation starts.
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
 | 2026-07-08 | Player Card should feel more like a floating video-game panel instead of a fixed sidebar. | requirement refinement | Updated Player Card surface styling with inset spacing, rounded elevated panel, softer ring, shadow, and contained controls. | addressed |
+| 2026-07-08 | Player fields should always be visible and editable like NPC fields. | requirement refinement | Removed Player Card read/edit mode switch; expanded card now shows all profile text areas directly with autosave status. | addressed |
 
 ## Planning Updates
 

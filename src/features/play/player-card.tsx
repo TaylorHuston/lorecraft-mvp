@@ -39,7 +39,6 @@ type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
 export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
   const updatePlayerProfile = useMutation(api.world.updatePlayerProfile);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<PlayerCardDraft>(() => draftFromPlayer(player));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,10 +89,6 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
     }
   }
 
-  const hasFilledProfile =
-    Boolean(player.profile.physicalDescription.trim()) ||
-    Boolean(player.profile.backstory.trim()) ||
-    Boolean(player.profile.status.trim());
   const fieldsId = "player-card-fields";
 
   return (
@@ -135,112 +130,38 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
 
       {!isCollapsed ? (
         <div id={fieldsId} className="mt-5 space-y-4">
-          {!isEditing ? (
-            <>
-              {hasFilledProfile ? (
-                <div id="player-card-profile-summary" className="space-y-4">
-                  <PlayerCardReadField
-                    id="player-card-physical-description"
-                    label="Physical description"
-                    value={player.profile.physicalDescription}
-                  />
-                  <PlayerCardReadField
-                    id="player-card-backstory"
-                    label="Backstory"
-                    value={player.profile.backstory}
-                  />
-                  <PlayerCardReadField
-                    id="player-card-status"
-                    label="Status"
-                    value={player.profile.status}
-                  />
-                </div>
-              ) : (
-                <p id="player-card-empty-profile" className="text-sm leading-6 text-zinc-500">
-                  No character details added yet.
-                </p>
-              )}
-              <button
-                id="player-card-edit-button"
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="h-10 rounded-full bg-zinc-950/80 px-4 text-sm font-medium text-zinc-200 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:ring-zinc-600"
-              >
-                Edit
-              </button>
-            </>
-          ) : (
-            <div id="player-card-edit-fields" className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Edit character</p>
-                <span
-                  id="player-card-save-status"
-                  role="status"
-                  aria-live="polite"
-                  className="text-xs uppercase text-emerald-300/70"
-                >
-                  {saveStatusLabel(saveStatus)}
-                </span>
-              </div>
-              <PlayerCardTextarea
-                id="player-card-edit-physical-description"
-                label="Physical description"
-                value={draft.physicalDescription}
-                onChange={(physicalDescription) => updateDraft({ ...draft, physicalDescription })}
-              />
-              <PlayerCardTextarea
-                id="player-card-edit-backstory"
-                label="Backstory"
-                value={draft.backstory}
-                onChange={(backstory) => updateDraft({ ...draft, backstory })}
-              />
-              <PlayerCardTextarea
-                id="player-card-edit-status"
-                label="Status"
-                value={draft.status}
-                onChange={(status) => updateDraft({ ...draft, status })}
-              />
-              <button
-                id="player-card-done-button"
-                type="button"
-                onClick={() => {
-                  if (saveTimer.current) {
-                    clearTimeout(saveTimer.current);
-                    saveTimer.current = null;
-                    void save(draft);
-                  }
-                  setIsEditing(false);
-                }}
-                className="h-10 rounded-full bg-zinc-950/80 px-4 text-sm font-medium text-zinc-200 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:ring-zinc-600"
-              >
-                Done
-              </button>
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Character</p>
+            <span
+              id="player-card-save-status"
+              role="status"
+              aria-live="polite"
+              className="text-xs uppercase text-emerald-300/70"
+            >
+              {saveStatusLabel(saveStatus)}
+            </span>
+          </div>
+          <PlayerCardTextarea
+            id="player-card-edit-physical-description"
+            label="Physical description"
+            value={draft.physicalDescription}
+            onChange={(physicalDescription) => updateDraft({ ...draft, physicalDescription })}
+          />
+          <PlayerCardTextarea
+            id="player-card-edit-backstory"
+            label="Backstory"
+            value={draft.backstory}
+            onChange={(backstory) => updateDraft({ ...draft, backstory })}
+          />
+          <PlayerCardTextarea
+            id="player-card-edit-status"
+            label="Status"
+            value={draft.status}
+            onChange={(status) => updateDraft({ ...draft, status })}
+          />
         </div>
       ) : null}
     </aside>
-  );
-}
-
-function PlayerCardReadField({
-  id,
-  label,
-  value,
-}: {
-  id: string;
-  label: string;
-  value: string;
-}) {
-  if (!value.trim()) {
-    return null;
-  }
-
-  return (
-    <section id={id}>
-      <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">{label}</h3>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-300">{value}</p>
-    </section>
   );
 }
 
