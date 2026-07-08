@@ -502,7 +502,7 @@ export function WorldClient({
             ) : (
               <div
                 id="play-layout"
-                className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[20%_60%_20%]"
+                className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[23fr_56fr_23fr]"
               >
                 <PlayerCard
                   key={snapshot.player._id}
