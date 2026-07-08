@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete; verification/docs in progress
-- Last completed action: implemented player name creation, Player Card UI/profile persistence, prompt context, docs, and Epic traceability
-- Next action: run remaining feasible verification, commit, then run `/sdd-review`
+- Current state: implementation committed; ready for `/sdd-review`
+- Last completed action: committed player name creation, Player Card UI/profile persistence, prompt context, docs, and Epic traceability
+- Next action: run `/sdd-review`
 - Active branch/ref: `change/player-card`
 - Expected dirty files: implementation, docs, tests, and `docs/changes/2026-07-08-player-card/`
 - Known blockers: full E2E and `convex:once` conflict with the intentionally running local dev Convex backend on port `3210`
@@ -94,9 +94,9 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-08 | Planning | main; `sdd-propose`; project AGENTS; shared visual style guide; UI/UX guidance | `proposal.md`, `design.md`, `tasks.md` | Proposed Player Card scope and Epic updates. | uncommitted |
-| 2026-07-08 | Player Card implementation | main; Convex/Next/UI guidance; delegated discovery | `convex/world.ts`, `src/features/play/*`, `src/lib/world/*`, `src/lib/director/*`, E2E spec | Implemented named Adventure creation, Player Card profile editing, prompt context, reset preservation, and deterministic tests. | uncommitted |
-| 2026-07-08 | Documentation and Epic traceability | main | README, CHANGELOG, data model, persistence doc, LC-001, LC-002 | Updated user-facing docs and scenario-mapped Epic evidence for Player Card behavior. | uncommitted |
+| 2026-07-08 | Planning | main; `sdd-propose`; project AGENTS; shared visual style guide; UI/UX guidance | `proposal.md`, `design.md`, `tasks.md` | Proposed Player Card scope and Epic updates. | `5e9074a` |
+| 2026-07-08 | Player Card implementation | main; Convex/Next/UI guidance; delegated discovery | `convex/world.ts`, `src/features/play/*`, `src/lib/world/*`, `src/lib/director/*`, E2E spec | Implemented named Adventure creation, Player Card profile editing, prompt context, reset preservation, and deterministic tests. | `5e9074a` |
+| 2026-07-08 | Documentation and Epic traceability | main | README, CHANGELOG, data model, persistence doc, LC-001, LC-002 | Updated user-facing docs and scenario-mapped Epic evidence for Player Card behavior. | `5e9074a` |
 
 ## Verification Ledger
 
