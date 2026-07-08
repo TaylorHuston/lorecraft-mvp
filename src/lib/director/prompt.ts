@@ -23,6 +23,7 @@ const DIRECTOR_INSTRUCTIONS = [
   "You are Lorecraft's Game Master for a narrative-first persistent-world MVP.",
   "Continue the scene in present tense, second person, with concrete story prose.",
   "Resolve the current player input first. Treat it as intent for you to adjudicate, not canonical prose to copy.",
+  "The Player Card is canonical protagonist context, but it is not permission to invent new player intent.",
   "NPC cards are canonical. Recent story is continuity, but cards win when they conflict.",
   "When the player directly engages a present NPC, include that NPC's answer, refusal, action, lie, warning, counter-question, or meaningful silence.",
   "Use private NPC knowledge only when the scene gives that NPC a reason to reveal, hide, imply, or refuse it.",
@@ -449,6 +450,7 @@ function buildPromptComponents(
     },
     locationCard,
     knownLocations,
+    playerCard: context.player,
     npcCards,
     conversationFocus,
     recentFeed: storyVisibleHistory.map((entry) => ({
@@ -559,6 +561,8 @@ function buildPersistentAiInstructions({
       : "Resolve Current Input before advancing; do not merely restate it.",
     "Stop after resolving the current input; do not continue into the player's next action.",
     "Treat player-authored Story entries in Recent Story as accepted canonical scene content.",
+    "Treat the Player Card as canonical protagonist context for appearance, backstory, current status, and location.",
+    "Use the Player Card to ground perception and consequences, not to choose new player intent.",
     "Treat Location Cards as canonical scene truth. Known Locations are the only valid movement destinations; do not invent new locations.",
     "Treat NPC Cards as canonical story memory, including descriptions, personality, voice, current status, memory, and private knowledge.",
     "Keep fleeting gestures and reactions in narration. Durable NPC state is evaluated separately after this prose.",
@@ -595,6 +599,7 @@ function buildPersistentUserPrompt(components: {
   scene: PersistentPromptScene;
   locationCard: NonNullable<DirectorContext["locationCard"]>;
   knownLocations: NonNullable<DirectorContext["knownLocations"]>;
+  playerCard: DirectorContext["player"];
   npcCards: PromptNpcCard[];
   recentFeed: PromptFeedEntry[];
   lastAction: { trigger: TurnTrigger; rawInput: string; directive: string };
@@ -602,6 +607,7 @@ function buildPersistentUserPrompt(components: {
   return buildSectionedPrompt([
     ["AI Instructions", bulletList(components.aiInstructions)],
     ["World", formatPersistentScene(components.scene)],
+    ["Player Card", formatPlayerCard(components.playerCard)],
     ["Location Card", formatLocationCard(components.locationCard)],
     ["Known Locations", formatKnownLocations(components.knownLocations)],
     ["NPC Cards", formatNpcCards(components.npcCards)],
@@ -673,6 +679,7 @@ function persistentPromptSectionKeys() {
   return [
     "aiInstructions",
     "world",
+    "playerCard",
     "locationCard",
     "knownLocations",
     "npcCards",
@@ -761,6 +768,22 @@ function formatPersistentScene(scene: PersistentPromptScene) {
         .join("; ")}`,
     );
   }
+
+  return lines.join("\n");
+}
+
+function formatPlayerCard(player: DirectorContext["player"]) {
+  const lines = [
+    `PLAYER CARD: ${player.name} (${player.key})`,
+    `Current location: ${player.locationName} (${player.locationKey})`,
+  ];
+
+  appendCardLine(lines, "Physical description", player.profile.physicalDescription);
+  appendCardLine(lines, "Backstory", player.profile.backstory);
+  appendCardLine(lines, "Current status", player.profile.status);
+  lines.push(
+    "Agency boundary: use this card for continuity, perception, and consequences; do not invent new player actions, thoughts, feelings, speech, goals, or intent.",
+  );
 
   return lines.join("\n");
 }
@@ -958,7 +981,7 @@ function buildPersistentSceneDirective(
     targetActorName: sceneBeat.targetActorName,
     mustUse,
     conflictPolicy:
-      "currentTurn and sceneDirective override Recent Story. npcCards, npcProfiles, and visibleFacts are canonical current scene truth; when they conflict with Recent Story, use the canonical card/profile/fact context.",
+      "currentTurn and sceneDirective override Recent Story. playerCard, npcCards, npcProfiles, and visibleFacts are canonical current scene truth; when they conflict with Recent Story, use the canonical card/profile/fact context without overriding player agency.",
     responseRequirement: sceneBeat.expectsNpcResponse
       ? "The target NPC must answer, refuse, deflect, warn, lie, ask back, act, or intentionally stay silent in this response. Do not stop after setup or repeat the player's question without resolution."
       : inferredMode === "pass"

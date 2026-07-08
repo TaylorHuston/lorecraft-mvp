@@ -18,6 +18,7 @@ import {
 } from "./debug-formatters";
 import { AdventureLanding, type AdventureListItem } from "./adventure-landing";
 import { DebugActionButton, DebugPanelShell } from "./debug-panel-shell";
+import { PlayerCard } from "./player-card";
 import { TurnActionPanel } from "./turn-action-panel";
 import {
   NPC_PROFILE_FACT_KEYS,
@@ -175,12 +176,12 @@ export function WorldClient({
     }
   }
 
-  async function handleCreateAdventure(worldId: Id<"worlds">) {
+  async function handleCreateAdventure(worldId: Id<"worlds">, playerName: string) {
     setError(null);
     setNotice(null);
     setCreatingWorldId(worldId);
     try {
-      const result = await createAdventure({ worldId });
+      const result = await createAdventure({ worldId, playerName });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -478,7 +479,7 @@ export function WorldClient({
                 error={error}
                 notice={notice}
                 onSeedWorld={() => void handleSeed()}
-                onCreateAdventure={(worldId) => void handleCreateAdventure(worldId)}
+                onCreateAdventure={(worldId, playerName) => void handleCreateAdventure(worldId, playerName)}
                 onSelectAdventure={handleSelectAdventure}
                 onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}
               />
@@ -499,58 +500,66 @@ export function WorldClient({
                 </button>
               </div>
             ) : (
-              <>
-                <section
-                  id="story-stream"
-                  ref={storyScrollerRef}
-                  className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10"
-                >
-                  <div
-                    id="story-stream-inner"
-                    className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end pr-0 sm:pr-12"
-                  >
-                    {snapshot.feed.length > 0 ? (
-                      <div id="story-feed" className="space-y-8">
-                        {snapshot.feed.map((entry) => {
-                          const kind = normalizeFeedKind(entry.kind, entry.source);
-                          const turnId = "turnId" in entry ? entry.turnId : undefined;
-                          return (
-                            <StoryEntry
-                              key={entry.id}
-                              id={entry.id}
-                              kind={kind}
-                              text={entry.text}
-                              turnNumber={
-                                shouldShowTurnNumber(kind) && turnId
-                                  ? turnSequenceById.get(turnId)
-                                  : undefined
-                              }
-                            />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
-                        <p className="max-w-md text-base leading-7 text-zinc-400">
-                          The chapel waits in rain and lantern light.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <TurnActionPanel
-                  disabled={isSeeding || isResetting || creatingWorldId !== null}
-                  isSubmitting={isSubmitting}
-                  notice={notice}
-                  error={error}
-                  slashCommandTargets={slashCommandTargets}
-                  onActSubmit={handleActSubmit}
-                  onStorySubmit={handleStorySubmit}
-                  onGuideSubmit={handleGuideSubmit}
-                  onPass={handlePass}
+              <div id="play-layout" className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                <PlayerCard
+                  key={snapshot.player._id}
+                  adventureId={adventureId}
+                  player={snapshot.player}
+                  onError={setError}
                 />
-              </>
+                <div id="story-workspace" className="flex min-h-0 flex-1 flex-col">
+                  <section
+                    id="story-stream"
+                    ref={storyScrollerRef}
+                    className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10"
+                  >
+                    <div
+                      id="story-stream-inner"
+                      className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end pr-0 sm:pr-12"
+                    >
+                      {snapshot.feed.length > 0 ? (
+                        <div id="story-feed" className="space-y-8">
+                          {snapshot.feed.map((entry) => {
+                            const kind = normalizeFeedKind(entry.kind, entry.source);
+                            const turnId = "turnId" in entry ? entry.turnId : undefined;
+                            return (
+                              <StoryEntry
+                                key={entry.id}
+                                id={entry.id}
+                                kind={kind}
+                                text={entry.text}
+                                turnNumber={
+                                  shouldShowTurnNumber(kind) && turnId
+                                    ? turnSequenceById.get(turnId)
+                                    : undefined
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
+                          <p className="max-w-md text-base leading-7 text-zinc-400">
+                            The chapel waits in rain and lantern light.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  <TurnActionPanel
+                    disabled={isSeeding || isResetting || creatingWorldId !== null}
+                    isSubmitting={isSubmitting}
+                    notice={notice}
+                    error={error}
+                    slashCommandTargets={slashCommandTargets}
+                    onActSubmit={handleActSubmit}
+                    onStorySubmit={handleStorySubmit}
+                    onGuideSubmit={handleGuideSubmit}
+                    onPass={handlePass}
+                  />
+                </div>
+              </div>
             )}
           </div>
         </section>

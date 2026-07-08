@@ -92,11 +92,14 @@ export async function loadSnapshotReadModel(
       versionNumber: worldVersion.versionNumber,
       name: worldVersion.name,
     },
-    player: {
+      player: {
       _id: player._id,
       key: stableActorKey(player),
       name: player.name,
+      description: player.description,
       roomId: player.roomId,
+      locationName: room.name,
+      profile: playerProfileFromFacts(player, facts),
     },
     room: {
       _id: room._id,
@@ -174,6 +177,24 @@ export async function loadSnapshotReadModel(
         }))
       : [],
   };
+}
+
+function playerProfileFromFacts(
+  player: Doc<"actors">,
+  facts: Array<Doc<"facts">>,
+) {
+  const actorKey = stableActorKey(player);
+  const actorFacts = facts.filter((fact) => fact.subjectId === actorSubjectId(actorKey));
+  return {
+    physicalDescription: player.description,
+    backstory: stringFactValue(actorFacts, "backstory"),
+    status: stringFactValue(actorFacts, "status"),
+  };
+}
+
+function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
+  const fact = facts.find((candidate) => candidate.key === key);
+  return typeof fact?.value === "string" ? fact.value : "";
 }
 
 export async function loadVisibleExits(
@@ -452,4 +473,8 @@ async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, l
 
 function stableActorKey(actor: { key?: string; name: string }) {
   return actor.key ?? actor.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function actorSubjectId(actorKey: string) {
+  return `actor:${actorKey}`;
 }

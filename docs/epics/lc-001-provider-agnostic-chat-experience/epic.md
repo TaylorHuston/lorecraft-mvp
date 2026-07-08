@@ -2,8 +2,8 @@
 id: LC-001
 status: implemented
 created: 2026-07-01
-modified: 2026-07-07
-last_verified: 2026-07-07
+modified: 2026-07-08
+last_verified: 2026-07-08
 stories:
   - LC-001-S1
   - LC-001-S2
@@ -19,13 +19,14 @@ stories:
   - LC-001-S11
   - LC-001-S13
   - LC-001-S14
+  - LC-001-S15
 ---
 
 # LC-001 Core Game Master Play Loop
 
 ## Product Context
 
-Lorecraft's first product bet is that an AI Game Master can feel better than a generic chat window when it is grounded in typed canonical state, a readable story stream, and clear player action categories. This Epic owns that playable loop: the player-facing story feed, Game Master request boundary, prompt context categories, NPC/Location Card context, bounded state extraction, pre-turn utilities, Story/Guide actions, local debugging, and deterministic verification for those behaviors.
+Lorecraft's first product bet is that an AI Game Master can feel better than a generic chat window when it is grounded in typed canonical state, a readable story stream, and clear player action categories. This Epic owns that playable loop: the player-facing story feed, Game Master request boundary, prompt context categories, Player/NPC/Location Card context, bounded state extraction, pre-turn utilities, Story/Guide actions, local debugging, and deterministic verification for those behaviors.
 
 LC-002 owns the World/Adventure container model. LC-001 should treat the selected Adventure as the active runtime context and should not redefine WorldVersion copy, reset, or isolation semantics except where the play loop consumes them.
 
@@ -37,7 +38,7 @@ Lorecraft needs a first playable AI Game Master loop where the player can intera
 
 - Player-facing Act, Pass, Story, Guide, `/help`, and `/look` interactions for a local Adventure.
 - Provider-agnostic Game Master request handling through the current OpenAI-compatible adapter boundary.
-- Prompt context assembly from story-visible history plus canonical NPC/Location Card state.
+- Prompt context assembly from story-visible history plus canonical Player/NPC/Location Card state.
 - Plain-prose Game Master narration followed by separate bounded extraction for durable NPC facts and actor movement.
 - Local debug surfaces, local structured logs, raw prompt/output inspection, reset controls, and deterministic E2E coverage needed to keep the loop inspectable.
 
@@ -68,6 +69,7 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 | LC-001-S11 | implemented | End To End Playtest Verification | 2026-07-05 | Supporting verification story for the play loop; move to broader verification ownership if E2E becomes app-wide infrastructure. |
 | LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-07 | Revalidated against Story/Guide context boundaries. |
 | LC-001-S14 | implemented | Pre-Turn Story And Guide Actions | 2026-07-07 | Adds canonical player-authored Story inserts and hidden Guide turns. |
+| LC-001-S15 | implemented | Player Card | 2026-07-08 | Adds persistent player-facing protagonist context and prompt grounding. |
 
 ## Stories
 
@@ -195,8 +197,8 @@ The system SHALL provide dedicated decision controls at the decision point.
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-07
-Last verified: 2026-07-07
+Modified: 2026-07-08
+Last verified: 2026-07-08
 
 As a developer, I want Lorecraft to call LLMs through backend application logic and a provider adapter, so that the UI can change later and local model playtesting does not lock the app to one provider.
 
@@ -829,14 +831,14 @@ The system SHALL assemble Game Master prompts from explicit components with clea
 ###### Scenario R1-S1: Prompt separates instructions from state and history
 
 - WHEN the backend builds a Game Master request
-- THEN the request distinguishes Game Master instructions, scene state, visible facts, hidden NPC knowledge, Recent Story, current input or Pass directive, and required scene beat
+- THEN the request distinguishes Game Master instructions, Player Card context, scene state, visible facts, hidden NPC knowledge, Recent Story, current input or Pass directive, and required scene beat
 - AND Recent Story remains bounded and does not include prior player commands, events, internal turn IDs, or command IDs in normal persistent-mode story context
 
 ###### Scenario R1-S2: Editable and derived components have clear ownership
 
 - WHEN prompt components are documented or inspected in tests
 - THEN Game Master instructions, author/tone guidance, and model settings are treated as editable configuration
-- AND scene state, visible facts, hidden NPC knowledge, Recent Story, current input, and required scene beat are derived from Convex state, player input, and engine logic
+- AND Player Card context, scene state, visible facts, hidden NPC knowledge, Recent Story, current input, and required scene beat are derived from Convex state, player input, and engine logic
 
 ##### Requirement R2: Read-Only Knowledge Context
 
@@ -1030,12 +1032,13 @@ The system SHALL use the same story-visible history policy for state extraction 
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/lib/director/prompt.ts` | builds explicit Game Master prompt components, derives required scene beats including `trivial_player_action` and `pass`, separates mutable NPC facts from read-only hidden NPC knowledge, uses story-visible narration history for story/extraction prompts, and records compact request-summary metadata. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/director/prompt.ts` | builds explicit Game Master prompt components, includes Player Card protagonist context, derives required scene beats including `trivial_player_action` and `pass`, separates mutable NPC facts from read-only hidden NPC knowledge, uses story-visible narration history for story/extraction prompts, and records compact request-summary metadata. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/provider.ts` | parses `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, and `LLM_TOP_P`, applies safe defaults, and sends supported OpenAI-compatible generation settings. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | passes effective generation settings, trigger metadata, and validated debug prompt guidance into Game Master request construction so persisted `directorCalls.requestSummary` and local turn-unit debug logs can inspect them, and persists exact request messages only when raw request debug storage is enabled. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | emits one local `director.turn.unit` record per recorded turn attempt and gates full raw request/response text behind explicit local debug flags. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | continues to validate `npcUpdates` through the bounded `mood`, `status`, and `memory` allowlist, ignores read-only knowledge facts as attempted mutations, and suppresses accepted NPC updates when the required scene beat disallows durable changes. | Recheck when this Story changes or the listed path changes. |
 | `src/features/play/world-client.tsx` | renders debug prompt guidance text sections and includes them with the next narrative turn. | Recheck when this Story changes or the listed path changes. |
+| `src/lib/world/convex-director-context.ts` | exposes the Adventure player actor, Player Card profile facts, and current player location to Game Master context assembly. | Recheck when Player Card or Director context shape changes. |
 | `src/lib/director/raw-request.ts` | gates raw provider request persistence behind `LORECRAFT_DEBUG_STORE_RAW_REQUEST=1`. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/director.test.ts` | covers prompt component structure, prompt guidance inclusion, hidden knowledge inclusion, scene-beat derivation, read-only fact rejection, provider generation settings, raw request storage gating, and local turn-unit debug log shape. | Recheck when this Story changes or the listed path changes. |
 | `scripts/director-playtest.mjs` | runs the repeatable local Game Master playtest against a running dev server. | Recheck when this Story changes or the listed path changes. |
@@ -1045,6 +1048,7 @@ The system SHALL use the same story-visible history policy for state extraction 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R1-S1 and R1-S2 | Focused director tests | prove prompt component separation, editable prompt guidance inclusion, derived scene state/story-history ownership, and no prior command/event rows in the persistent Recent Story prompt surface. | Recorded |
+| R1-S1 and R1-S2 | `src/lib/director/director.test.ts`, `src/lib/world/convex-snapshot-read-model.test.ts`, `npm run test`, and `npm run typecheck` on 2026-07-08 | prove Player Card context is a distinct prompt component derived from canonical Adventure player state while preserving the existing prompt contract. | Passing |
 | R2-S1 and R2-S2 | Focused director tests | prove hidden read-only NPC knowledge reaches the prompt and read-only fields are rejected if proposed as mutations by the extractor. | Recorded |
 | R3-S1 and R3-S2 | Focused director tests | prove direct-question and trivial-action scene-beat derivation. | Recorded |
 | R4-S1 and R4-S2 | Local route playtest with Ollama `llama3.1:8b` produced Mira dialogue for a direct storm question, and focused prompt tests permit attributed dialogue in player-facing narration. | As described in the evidence cell. | Recorded |
@@ -2049,6 +2053,94 @@ The system SHALL keep each player-facing activity in the correct persistence and
 - Story inserts are currently local-prototype client-callable Convex mutations. Before shared or hosted use, this path needs the same ownership, auth, and permission hardening as other debug-oriented mutations.
 - Guide text is not player-authored canon. It is hidden current-turn steering for the Game Master request and must stay out of future story-visible history unless a later Story explicitly changes that boundary.
 - Actor movement from Guide or Pass should remain conservative. Movement acceptance belongs to location/movement validation in LC-001-S12, not to prompt guidance alone.
+
+### Story LC-001-S15: Player Card
+
+Status: implemented
+Created: 2026-07-08
+Modified: 2026-07-08
+Last verified: 2026-07-08
+
+As a playtester, I want a persistent Player Card visible during play, so that the Game Master has stable protagonist context without hiding my character details in debug state.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Persistent Player Card Surface
+
+The system SHALL show a persistent player-facing Player Card while an Adventure is open.
+
+###### Scenario R1-S1: Expanded Player Card shows filled profile fields
+
+- WHEN an Adventure is open and the Player Card is expanded
+- THEN it shows the player name, current location, and filled optional fields
+- AND blank optional fields are omitted from normal display
+
+###### Scenario R1-S2: Player Card collapses
+
+- WHEN the player collapses the Player Card
+- THEN the story stream remains readable
+- AND a clear control remains available to expand the Player Card again
+
+##### Requirement R2: Editable Adventure Profile
+
+The system SHALL let the player fill in optional Player Card fields for the current Adventure.
+
+###### Scenario R2-S1: Player edits profile fields
+
+- WHEN the player edits physical description, backstory, or status in the Player Card
+- THEN the values are saved to the selected Adventure
+- AND reloading the Adventure shows the saved values
+
+###### Scenario R2-S2: Player clears optional fields
+
+- WHEN the player clears an optional Player Card field
+- THEN the field is removed from normal display
+- AND future prompt context omits that blank field
+
+##### Requirement R3: Game Master Uses Player Card Without Owning Agency
+
+The system SHALL include filled Player Card context in Game Master requests while preserving player agency.
+
+###### Scenario R3-S1: Filled Player Card enters prompt context
+
+- WHEN the player submits Act, Pass, or Guide after filling Player Card fields
+- THEN the request includes the player name, current location, physical description, backstory, and status as Player Card context
+- AND blank optional fields are omitted
+
+###### Scenario R3-S2: Player agency remains explicit
+
+- WHEN the Game Master uses Player Card context
+- THEN the prompt continues to prohibit inventing new player intent, actions, speech, thoughts, feelings, or goals
+
+#### Implemented By
+
+| Path | Role | Recheck Trigger |
+|---|---|---|
+| `convex/world.ts` | Accepts player name during Adventure creation, exposes Player Card fields in snapshots and Director context, saves/clears Player Card optional fields, and preserves Player Card identity across Reset Session. | Recheck when Adventure creation, reset, snapshot, or player profile storage changes. |
+| `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts` | Derive player-facing and Game Master-facing Player Card read models from the Adventure player actor and actor facts. | Recheck when read-model or prompt-context shape changes. |
+| `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx` | Prompt for player name, render the persistent collapsible Player Card, save optional profile fields, and keep the card outside the debug panel. | Recheck when the Adventure landing or play layout changes. |
+| `src/lib/director/prompt.ts`, `src/lib/director/types.ts` | Add Player Card context to prompt components and preserve explicit player-agency guidance. | Recheck when prompt assembly or Director context changes. |
+| `tests/e2e/lorecraft-playtest.spec.ts` | Covers name prompt, cancel path, Player Card display, edit persistence, collapse/expand, and reload. | Recheck when browser user paths change. |
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| R1-S1 through R2-S2 | `tests/e2e/lorecraft-playtest.spec.ts` updated on 2026-07-08 | Browser coverage exists for name prompt, cancel, card display, editing, collapse/expand, and reload persistence. | Added |
+| R1-S1 through R3-S1 | `src/lib/world/convex-snapshot-read-model.test.ts` | proves snapshot Player Card fields are available even when debug facts are hidden. | Passing |
+| R3-S1 and R3-S2 | `src/lib/director/director.test.ts` | proves Player Card enters prompt context and agency guidance remains present. | Passing |
+| Supporting gate | `npm run lint`, `npm run test`, and `npm run typecheck` on 2026-07-08 | prove the implemented UI, route fixtures, prompt tests, and read-model tests compile and pass. | Passing |
+
+#### Verification Gaps
+
+- `npm run e2e` was not executed during the 2026-07-08 apply run because the local dev Convex backend was already running on port `3210` and Playwright is configured with `reuseExistingServer: false`.
+- Manual visual review is still useful for story width and Player Card collapse feel on narrow screens.
+
+#### Story Notes
+
+- The Player Card is Adventure-owned runtime context, not source World data.
+- The Player Card is not a rules/stat sheet yet. Inventory, equipment, HP, stats, and TTRPG character mechanics remain deferred.
+- Reset Session preserves the Player Card identity/profile while resetting the rest of the Adventure runtime copy to its source WorldVersion.
 
 ## Cross-Story Concerns
 

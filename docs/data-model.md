@@ -1,11 +1,11 @@
 ---
-modified: 2026-06-30
+modified: 2026-07-08
 ---
 # Data Model
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, and a tiny readable NPC state surface.
+The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, a player-facing Player Card, and a tiny readable NPC state surface.
 
 ## World
 
@@ -68,6 +68,7 @@ Strategy:
 - Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
 - Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
 - Delete Adventure removes that Adventure and its Adventure-owned runtime rows. It does not delete the source World or WorldVersion.
+- New Adventure creation asks for the player name. That name is copied into the Adventure-owned player actor without changing the source WorldVersion.
 
 ## Room / Location
 
@@ -135,6 +136,26 @@ Strategy:
 - Put mutable state in actor-scoped facts.
 - Actor location is canonical state, not transcript inference. The Game Master can propose actor moves only through the extractor, and Convex validates current-scene actor presence plus destination existence before patching `roomId`.
 - Do not add an `npcs` table until NPC-specific behavior outgrows generic actors plus facts.
+
+### Current Player Card Fields
+
+The Player Card is the player-facing version of the Adventure-owned player actor. It is visible outside the debug panel and is included in Game Master context as protagonist grounding, not as permission for the model to choose the player's next intent.
+
+| Field | Backing storage | Meaning |
+|---|---|---|
+| Player name | Player actor `name` | The name entered when the Adventure is created. Future versions may use account username, character name, or both. |
+| Current location | Player actor `roomId` joined to Location name | Canonical current player location. This updates only through accepted movement or reset/debug tooling. |
+| Physical description | Player actor `description` | Optional visible character appearance. Blank on new Adventures until the player fills it in. |
+| Backstory | Actor fact `backstory` with `source = "player"` | Optional short history before this Adventure's current story. |
+| Status | Actor fact `status` with `source = "player"` | Optional current player condition or circumstance that should ground narration. |
+
+Strategy:
+
+- The Player Card belongs to the Adventure, not the source WorldVersion. Editing it does not mutate seeded World data.
+- Blank optional fields are omitted from normal Player Card display and from prompt text.
+- Reset Session preserves the current player name and Player Card optional fields while recopying the source WorldVersion runtime rows.
+- The Game Master sees the Player Card as canonical context for appearance, backstory, status, and current location. It may use that context for continuity and perception, but it must not invent player thoughts, goals, speech, feelings, or actions from it.
+- Future inventory, equipment, stats, health, or TTRPG character data can extend this Player Card only after playtesting proves the need.
 
 ## World Object
 

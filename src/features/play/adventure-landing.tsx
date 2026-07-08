@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { formatAdventureTimestamp } from "./debug-formatters";
 
@@ -31,7 +32,7 @@ type AdventureLandingProps = {
   error: string | null;
   notice: string | null;
   onSeedWorld: () => void;
-  onCreateAdventure: (worldId: Id<"worlds">) => void;
+  onCreateAdventure: (worldId: Id<"worlds">, playerName: string) => void;
   onSelectAdventure: (adventureId: Id<"adventures">) => void;
   onDeleteAdventure: (adventure: AdventureListItem) => void;
 };
@@ -49,6 +50,14 @@ export function AdventureLanding({
   onSelectAdventure,
   onDeleteAdventure,
 }: AdventureLandingProps) {
+  const [pendingWorldId, setPendingWorldId] = useState<Id<"worlds"> | null>(null);
+  const [playerName, setPlayerName] = useState("");
+
+  function cancelCreateAdventure() {
+    setPendingWorldId(null);
+    setPlayerName("");
+  }
+
   return (
     <section
       id="adventure-landing"
@@ -98,13 +107,67 @@ export function AdventureLanding({
                 <button
                   id={`create-adventure-${world._id}`}
                   type="button"
-                  onClick={() => onCreateAdventure(world._id)}
+                  onClick={() => {
+                    setPendingWorldId(world._id);
+                    setPlayerName("");
+                  }}
                   disabled={creatingWorldId !== null || deletingAdventureId !== null}
                   className="w-fit scroll-mt-16 rounded-md bg-amber-300 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creatingWorldId === world._id ? "Creating" : "New Adventure"}
                 </button>
               </div>
+              {pendingWorldId === world._id ? (
+                <form
+                  id={`create-adventure-form-${world._id}`}
+                  className="border-b border-zinc-800 px-4 py-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const trimmedName = playerName.trim();
+                    if (!trimmedName) {
+                      return;
+                    }
+                    onCreateAdventure(world._id, trimmedName);
+                  }}
+                >
+                  <label
+                    htmlFor={`create-adventure-player-name-${world._id}`}
+                    className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500"
+                  >
+                    Player name
+                  </label>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                    <input
+                      id={`create-adventure-player-name-${world._id}`}
+                      value={playerName}
+                      maxLength={80}
+                      autoFocus
+                      onChange={(event) => setPlayerName(event.target.value)}
+                      className="min-h-11 flex-1 rounded-md bg-zinc-950 px-3 text-sm text-zinc-100 outline-none ring-1 ring-zinc-800 transition placeholder:text-zinc-700 focus:ring-amber-300/70"
+                      placeholder="Character name"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        id={`confirm-create-adventure-${world._id}`}
+                        type="submit"
+                        disabled={!playerName.trim() || creatingWorldId !== null || deletingAdventureId !== null}
+                        className="min-h-11 rounded-md bg-amber-300 px-4 text-sm font-medium text-zinc-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Create
+                      </button>
+                      <button
+                        id={`cancel-create-adventure-${world._id}`}
+                        type="button"
+                        onClick={cancelCreateAdventure}
+                        disabled={creatingWorldId !== null}
+                        className="min-h-11 rounded-md bg-zinc-800 px-4 text-sm font-medium text-zinc-200 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : null}
               {world.adventures.length > 0 ? (
                 <div id={`adventure-list-${world._id}`} className="divide-y divide-zinc-800">
                   {world.adventures.map((adventure) => (

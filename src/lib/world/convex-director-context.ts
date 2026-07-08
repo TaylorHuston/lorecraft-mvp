@@ -83,6 +83,10 @@ export async function loadDirectorContextReadModel(
       id: player._id,
       key: stableActorKey(player),
       name: player.name,
+      description: player.description,
+      locationKey: room.key,
+      locationName: room.name,
+      profile: playerProfileFromFacts(player, facts),
     },
     room: {
       id: room._id,
@@ -139,6 +143,24 @@ export async function loadDirectorContextReadModel(
     recentFeed,
     storyVisibleHistory,
   };
+}
+
+function playerProfileFromFacts(
+  player: Doc<"actors">,
+  facts: Array<Doc<"facts">>,
+) {
+  const actorKey = stableActorKey(player);
+  const actorFacts = facts.filter((fact) => fact.subjectId === actorSubjectId(actorKey));
+  return {
+    physicalDescription: player.description,
+    backstory: stringFactValue(actorFacts, "backstory"),
+    status: stringFactValue(actorFacts, "status"),
+  };
+}
+
+function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
+  const fact = facts.find((candidate) => candidate.key === key);
+  return typeof fact?.value === "string" ? fact.value : "";
 }
 
 export async function loadTranscriptDirectorContextReadModel(

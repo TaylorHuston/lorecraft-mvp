@@ -129,6 +129,14 @@ const context: DirectorContext = {
     id: "player-id",
     key: "taylor",
     name: "Taylor",
+    description: "A rain-soaked traveler in a dark coat.",
+    locationKey: "chapel",
+    locationName: "Chapel",
+    profile: {
+      physicalDescription: "A rain-soaked traveler in a dark coat.",
+      backstory: "Taylor came to Stormbound Chapel to investigate the midnight bell.",
+      status: "standing near the chapel aisle",
+    },
   },
   room: {
     id: "room-id",
@@ -331,6 +339,7 @@ describe("Director request construction", () => {
     expect(request.requestSummary.promptComponentKeys).toEqual([
       "aiInstructions",
       "world",
+      "playerCard",
       "locationCard",
       "knownLocations",
       "npcCards",
@@ -340,6 +349,17 @@ describe("Director request construction", () => {
     ]);
     expect(userMessage?.content).toContain("AI Instructions:");
     expect(userMessage?.content).toContain("World:");
+    expect(userMessage?.content).toContain("Player Card:");
+    expect(userMessage?.content).toContain("PLAYER CARD: Taylor (taylor)");
+    expect(userMessage?.content).toContain("Current location: Chapel (chapel)");
+    expect(userMessage?.content).toContain("Physical description: A rain-soaked traveler in a dark coat.");
+    expect(userMessage?.content).toContain(
+      "Backstory: Taylor came to Stormbound Chapel to investigate the midnight bell.",
+    );
+    expect(userMessage?.content).toContain("Current status: standing near the chapel aisle");
+    expect(userMessage?.content).toContain(
+      "Agency boundary: use this card for continuity, perception, and consequences",
+    );
     expect(userMessage?.content).toContain("Location Card:");
     expect(userMessage?.content).toContain("LOCATION CARD: Chapel (chapel)");
     expect(userMessage?.content).toContain("Facts: sanctity=fading (seed)");
@@ -380,8 +400,9 @@ describe("Director request construction", () => {
     expect(userMessage?.content).not.toContain("npcUpdates");
     expect(userMessage?.content).not.toContain("Return JSON");
     expect(userMessage?.content).not.toContain("read-only for this turn");
-    expect(userMessage?.content.length).toBeLessThan(5000);
+    expect(userMessage?.content.length).toBeLessThan(5500);
     expect(systemMessage?.content).toContain("Continue the scene in present tense");
+    expect(systemMessage?.content).toContain("The Player Card is canonical protagonist context");
     expect(systemMessage?.content).toContain("NPC cards are canonical");
     expect(systemMessage?.content).toContain("Return only player-facing story prose");
     expect(systemMessage?.content).not.toContain("strict JSON");

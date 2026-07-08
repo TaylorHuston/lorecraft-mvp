@@ -17,6 +17,7 @@ In the MVP, that state is intentionally small:
 - WorldVersions describe the authored baseline.
 - Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
+- The Player Card represents Adventure-owned protagonist context.
 - Commands, narrations, Story inserts, events, and utility messages reconstruct the visible play feed.
 - Turns group each resolved story beat with the Game Master work it caused.
 - State diffs record accepted mutations.
@@ -33,6 +34,8 @@ Convex stores the current Adventure runtime. If the selected Adventure says the 
 Game Master output is untrusted model output. The story-generation step returns player-facing prose, and the backend wraps that prose into the existing turn result shape with no state updates from the prose itself.
 
 Persistent mode gives the Game Master current Location Cards, known locations, and current-scene NPC Cards as canonical read context. The model can write story prose from that context, but prose is not accepted as state by itself.
+
+The Player Card is also canonical read context. It carries the Adventure player's name, current location, optional physical description, optional backstory, and optional current status. The Game Master can use those details to ground perception and continuity, but it must not use them to decide new player intent, speech, thoughts, feelings, or goals.
 
 Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the current action or Pass trigger, completed narration, current Location Card, Known Locations, NPC Cards, and the same story-visible narration history as story generation, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 
@@ -98,7 +101,7 @@ Current synchronous flow:
 3. The route loads bounded Game Master context from Convex.
 4. Convex creates a pending turn with the next Adventure-scoped sequence number and a trigger of `act`, `pass`, or `guide`.
 5. For action turns, Convex records the player input command and links it to the turn. Pass and Guide turns do not create command rows or fake player prose.
-6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, current Location Card, Known Locations, NPC Cards, bounded story-visible narration history, current input, Pass directive, or hidden Guide directive, and output guidance.
+6. The backend builds a stateless provider request from compact prompt sections: AI instructions, world, Player Card, current Location Card, Known Locations, NPC Cards, bounded story-visible narration history, current input, Pass directive, or hidden Guide directive, and output guidance.
 7. The provider returns player-facing story prose.
 8. The backend parses the prose into a normalized turn result with `narration` and an empty `npcUpdates` array.
 9. Convex records the Game Master call for debugging and links it to the turn. By default this stores a compact request summary and raw provider response; exact provider request messages are stored only when local raw request debug storage is explicitly enabled.
@@ -154,6 +157,8 @@ This keeps story writing and persistence decisions separate. A future smaller ex
 For this MVP experiment, the seeded demo Worlds are not durable product data. The seed mutation creates a fresh deterministic Stormbound Chapel World with an immutable WorldVersion and a default Stormbound Chapel Adventure, deletes the prior deterministic Stormbound Chapel World and its Adventures, WorldVersions, and runtime rows, and ensures the Tutorial World exists without deleting existing Tutorial Adventures. Use Reset World when a Stormbound Chapel playtest needs to return to the initial authored setup.
 
 Reset Session is narrower: it deletes the selected Adventure's mutable runtime rows and recopies that Adventure's original source WorldVersion. If the World has a newer current WorldVersion, Reset Session does not upgrade the Adventure to it.
+
+Reset Session preserves the current Adventure's player name and Player Card optional profile fields while resetting the rest of the runtime copy back to the source WorldVersion. This keeps the player-created character identity from disappearing during ordinary playtest resets.
 
 Delete Adventure is narrower than Reset World and broader than Reset Session: it removes one local Adventure and its mutable runtime rows, while leaving the source WorldVersion available for future Adventures.
 
