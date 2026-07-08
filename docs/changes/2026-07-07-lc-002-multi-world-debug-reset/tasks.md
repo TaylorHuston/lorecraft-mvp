@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: third `/sdd-review` safe-fix remediation pending verification and commit
-- Last completed action: updated `docs/data-model.md` Adventure-scoped debug cap wording and stale reset evidence wording
-- Next action: rerun lightweight checks, commit safe remediation, then rerun `/sdd-review`
+- Current state: third `/sdd-review` safe-fix remediation committed
+- Last completed action: committed third review remediation slice `bd6a758`
+- Next action: rerun `/sdd-review`
 - Active branch/ref: `fix/lc-002-multi-world-debug-reset`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
@@ -60,7 +60,7 @@
 | 2026-07-07 | Remediated `/sdd-review` findings by passing legacy cleanup keys through seeded NPC reset and adding a fallback for older stored Stormbound baselines. | `712844b` |
 | 2026-07-08 | Remediated second `/sdd-review` artifact finding by aligning LC-002 S2/S4/S5 Story Index and story-local verification dates with the new 2026-07-07 evidence rows. | `5fbf43e` |
 | 2026-07-08 | Remediated second `/sdd-review` code finding by clearing all seeded NPC actor facts before restoring source baseline facts, so debug-added profile facts absent from the baseline do not survive reset. | `5fbf43e` |
-| 2026-07-08 | Remediated third `/sdd-review` doc finding by updating `docs/data-model.md` to describe debug-created caps and NPC edits as Adventure-scoped. | pending docs review-fix commit |
+| 2026-07-08 | Remediated third `/sdd-review` doc finding by updating `docs/data-model.md` to describe debug-created caps and NPC edits as Adventure-scoped. | `bd6a758` |
 
 ## Verification Ledger
 
@@ -95,6 +95,9 @@
 | 2026-07-08 | `npm run ci:required` after second safe-fix remediation | passed, 8 files / 84 tests | broad supporting gate | Lint, full unit suite, typecheck, and production build passed after the second review fix. |
 | 2026-07-08 | third delegated artifact review | required finding remediated | artifact/docs review | Found `docs/data-model.md` still described debug-created caps as per demo world instead of per Adventure. |
 | 2026-07-08 | third delegated code review | suggestion remediated | source-vs-target code review | Found stale evidence wording that still referenced legacy cleanup keys after reset cleanup was simplified. |
+| 2026-07-08 | third delegated security review | passed with suggestion | security review | No blocking or required diff security findings; noted pre-existing shared-deployment auth/ownership hardening before any production/shared deployment. |
+| 2026-07-08 | `rg -n "per demo world\|demo-world actor" docs/data-model.md docs/persistence-system.md docs/changes/2026-07-07-lc-002-multi-world-debug-reset/tasks.md docs/epics/lc-002-world-adventure-model/epic.md` | passed | docs verification | No stale per-demo-world wording remains in the affected docs. |
+| 2026-07-08 | `git diff --check` after third safe-fix remediation | passed | diff hygiene | Confirms the documentation safe fix has no whitespace errors. |
 
 ## Manual UI Confirmation
 
@@ -111,8 +114,8 @@
 
 ## Closeout
 
-- Review record: third `/sdd-review` found safe docs/evidence wording findings; remediation pending verification and commit. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
+- Review record: third `/sdd-review` found safe docs/evidence wording findings; remediation verified and committed. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first and second review-fixes committed; third safe-fix pending; not merged.
+- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first, second, and third review-fixes committed; not merged.
 - Folder location: active under `docs/changes/`.
