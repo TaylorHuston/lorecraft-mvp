@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete and verified; commit pending
-- Last completed action: apply self-check findings were remediated, then `npm run ci:required` and `npx convex codegen` passed again
-- Next action: commit the verified slice
+- Current state: implementation complete and committed
+- Last completed action: committed implementation slice `2742b0b`
+- Next action: run `/sdd-review`
 - Active branch/ref: `fix/lc-002-multi-world-debug-reset`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
@@ -40,7 +40,7 @@
 ### 5. Apply Self-Check
 
 - [x] 5.1 Run implementation self-check for scope, Epic truth, tests, docs, changelog, and dirty state.
-- [ ] 5.2 Commit verified changes if the slice is complete and commit-shaped.
+- [x] 5.2 Commit verified changes if the slice is complete and commit-shaped.
 
 ## Specialist Checkpoint
 
@@ -52,11 +52,11 @@
 
 | Date | Entry | Commit |
 |---|---|---|
-| 2026-07-07 | Created tracked change artifacts for LC-002 multi-world debug reset/accounting follow-up. | commit pending |
-| 2026-07-07 | Added `src/lib/world/adventure-baseline.ts` helpers and focused tests for selected-baseline seeded/debug-created classification across Stormbound and Tutorial. | commit pending |
-| 2026-07-07 | Updated Convex debug-created NPC/Location counting and per-NPC reset to use the Adventure source WorldVersion baseline. | commit pending |
-| 2026-07-07 | Updated LC-002 Epic evidence and `CHANGELOG.md` for the debug reset/accounting fix. | commit pending |
-| 2026-07-07 | Remediated apply self-check findings by preserving Mira legacy fact cleanup in the Stormbound baseline and removing contradictory changelog status. | commit pending |
+| 2026-07-07 | Created tracked change artifacts for LC-002 multi-world debug reset/accounting follow-up. | `2742b0b` |
+| 2026-07-07 | Added `src/lib/world/adventure-baseline.ts` helpers and focused tests for selected-baseline seeded/debug-created classification across Stormbound and Tutorial. | `2742b0b` |
+| 2026-07-07 | Updated Convex debug-created NPC/Location counting and per-NPC reset to use the Adventure source WorldVersion baseline. | `2742b0b` |
+| 2026-07-07 | Updated LC-002 Epic evidence and `CHANGELOG.md` for the debug reset/accounting fix. | `2742b0b` |
+| 2026-07-07 | Remediated apply self-check findings by preserving Mira legacy fact cleanup in the Stormbound baseline and removing contradictory changelog status. | `2742b0b` |
 
 ## Verification Ledger
 
@@ -93,5 +93,5 @@
 - Review record: pending `/sdd-review`.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: branch in progress; not merged.
+- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; not reviewed or merged.
 - Folder location: active under `docs/changes/`.
