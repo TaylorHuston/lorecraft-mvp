@@ -2,10 +2,10 @@
 
 ## Resume Here
 
-- Current state: Closing after user authorization
+- Current state: Closed and merged
 - Last completed action: user authorized close and merge
-- Next action: move this change folder under `docs/changes/closed/`, commit, and merge to `develop`
-- Active branch/ref: `change/world-adventure-model`
+- Next action: none; follow-up work should use a new SDD change
+- Active branch/ref: `develop`
 - Expected dirty files: none in app repo
 - Known blockers: none identified
 
@@ -156,7 +156,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending Taylor
+- Status: accepted gap
 - App URL / route: `http://localhost:3000`
 - Required setup or test data: seeded Stormbound Chapel WorldVersion and default Adventure
 - Steps for the user: open the app, confirm it lands on the Stormbound Chapel World container with Adventure rows, continue an existing Adventure or create a new one, confirm the browser URL is `/adventures/<id>`, reload that URL, submit at least one turn, inspect debug Adventure/source version identity, reset from the open Adventure debug panel, return home and delete a disposable Adventure
@@ -180,7 +180,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Review record: clean review recorded in this ledger; no `review.md` created.
 - `review.md` findings resolved: not applicable; no unresolved findings.
 - Planning updates resolved: none.
-- Manual UI confirmation status: pending Taylor.
+- Manual UI confirmation status: accepted gap.
 - PR / merge state: user authorized local merge from `change/world-adventure-model` to `develop`.
 - Deferred scope accepted: polished World Builder, World patching, snapshots, rollback, branching, auth/ownership, multiplayer, and rules-heavy RPG systems.
 - Change moved to `docs/changes/closed/`: yes.

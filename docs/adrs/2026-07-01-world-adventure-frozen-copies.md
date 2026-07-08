@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-07-01
-- Related change: none yet
-- Related Epics / Stories: `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
+- Related change: `docs/changes/closed/2026-07-01-world-adventure-model/`
+- Related Epics / Stories: `docs/epics/lc-002-world-adventure-model/epic.md`; `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`
 - Supersedes: none
 - Superseded by: none
 
@@ -76,7 +76,7 @@ Current runtime tables that store mutable play state should eventually be keyed 
 - Negative: The database will duplicate baseline locations, actors, objects, exits, and facts per Adventure.
 - Negative: Schema and code will need a careful migration away from using `worldId` as the runtime identity.
 - Negative: Patching existing Adventures from newer World versions becomes a separate future feature.
-- Follow-up: A future SDD change should introduce the `Adventure` concept, decide whether to add `WorldVersion` immediately, and define the migration path from the current single-world demo model.
+- Follow-up: LC-002 introduced `World`, `WorldVersion`, and `Adventure` as the MVP model. Future SDD changes should focus on World Builder workflows, explicit Adventure migration/upgrade behavior, rollback/snapshot semantics, and multi-world debug reset/accounting.
 
 ## Validation
 

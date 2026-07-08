@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This repository is the implementation workspace for the Lorecraft MVP prototype: a Next.js + Convex persistent-world memory spike. The current product goal is one editable, resettable playtest world with durable narrative state, Game Master narrations, debug records, and readable NPC profile/fact context.
+This repository is the implementation workspace for the Lorecraft MVP prototype: a Next.js + Convex persistent-world memory spike. The current product goal is a local Game Master play loop where seeded Worlds create frozen Adventure copies, Adventures own mutable narrative state, and NPC/Location cards provide structured context for narration and bounded extraction.
 
-Keep the repo disposable until the core loop proves itself. Do not turn Lorecraft into a command parser, MUD, combat simulator, inventory system, quest engine, marketplace, or polished builder UI before playtesting shows a concrete need.
+Keep the repo disposable until the core loop proves itself. Slash commands currently exist only as pre-turn utility actions such as `/help` and `/look`; do not turn Lorecraft into a broad command parser, MUD, combat simulator, inventory system, quest engine, marketplace, or polished builder UI before playtesting shows a concrete need.
 
 ## Read First
 
@@ -92,7 +92,7 @@ For the foreseeable future, use `npm run dev:debug` instead of `npm run dev` for
 ## UI / Visual Guidance
 
 - Follow `../../shared/visual-style-guide.md`: utilitarian workbench UI, dark-mode-native surfaces, compact density, clear state, restrained motion, and no generic AI-dashboard decoration.
-- The player-facing surface is intentionally narrative-only for now. Avoid slash commands, MUD-style command lists, room-movement controls, combat UI, HP, inventory, quests, campaign-copy management, marketplace logic, and broad simulation controls until playtesting proves the need.
+- The player-facing surface is intentionally narrative-first. Slash commands are allowed only as narrow pre-turn utilities until an Epic explicitly expands them. Avoid MUD-style command lists, room-movement controls, combat UI, HP, inventory, quests, marketplace logic, and broad simulation controls until playtesting proves the need.
 - Debug surfaces may be dense and technical, but they must remain readable, local-first, and visually distinct from player-facing story state.
 - Prefer product-state visibility over decorative presentation: story feed, canonical world context, NPC profile/fact state, prompt/debug evidence, and reset/playtest controls should be inspectable when relevant.
 
@@ -101,7 +101,7 @@ For the foreseeable future, use `npm run dev:debug` instead of `npm run dev` for
 - Convex is the canonical world state. Game Master output is untrusted prose unless the backend validates and stores a state change.
 - Persistent mode treats Game Master story generation as plain prose. Structured mutation happens only through the separate post-narration extractor, not as creative JSON embedded in narration.
 - Do not let the Game Master directly mutate rooms, exits, inventory, combat state, HP, object state, or arbitrary world facts. NPC facts and actor locations may change only through bounded extractor output plus backend validation.
-- The Stormbound Chapel demo world is resettable seed data. Seeding deletes the current deterministic demo world and dependent rows; use reset only when destructive local playtest behavior is intended.
+- Stormbound Chapel and Tutorial are resettable seed Worlds. Reset Session affects the selected Adventure copy; Reset World reseeds local authored demo source data and dependent local rows, so use it only when destructive local playtest behavior is intended.
 - Local debug logs and raw request storage can include prompt guidance, player text, model output, hidden NPC knowledge, and other sensitive playtest context. Keep them local/debug-only and out of commits, durable vault docs, and public artifacts.
-- Debug NPC and Location editing writes canonical demo-world Convex state. Keep it resettable and local/dev-oriented; do not treat it as a polished public World Builder contract yet.
+- Debug NPC and Location editing writes canonical Adventure Convex state. Keep it resettable and local/dev-oriented; do not treat it as a polished public World Builder contract yet.
 - Keep provider secrets in ignored `.env*` files, process environment, or platform secret stores. Never print API keys, generated tokens, database URLs, full environment dumps, or provider credentials.

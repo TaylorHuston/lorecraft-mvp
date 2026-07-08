@@ -1,9 +1,9 @@
 ---
 id: LC-002
-status: draft
+status: implemented
 created: 2026-07-01
-modified: 2026-07-06
-last_verified: 2026-07-06
+modified: 2026-07-07
+last_verified: 2026-07-07
 stories:
   - S1
   - S2
@@ -29,7 +29,9 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 
 - Seed Stormbound Chapel and Tutorial Worlds with immutable WorldVersions.
 - Create, resume, or delete local Adventures from the startup World container screen, then play each Adventure at `/adventures/<id>`.
+- Treat missing, deleted, or malformed Adventure URLs as part of the Adventure routing/load contract.
 - Scope mutable runtime rows, debug state, Game Master turns, feed reconstruction, NPC edits, location edits, actor movement, state diffs, and reset to the Adventure.
+- Distinguish Reset Session, which restores the selected Adventure from its source WorldVersion, from Reset World, which reseeds local authored demo source data.
 - Keep source World and WorldVersion visible as debug/source context.
 
 ## Deferred Scope
@@ -119,6 +121,11 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 
 - Optional live-provider smoke remains deferred; deterministic route, reset, and runtime coverage is passing.
 
+#### Story Notes
+
+- Direct `/adventures/<id>` routing is part of this Story's ownership because Adventure URLs are the durable resume surface.
+- Delete must remain Adventure-scoped. Deleting an Adventure must not delete the source WorldVersion or other Adventures under the same World container.
+
 ### Story S2: Adventure-Scoped Runtime State
 
 Status: implemented
@@ -178,6 +185,11 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 
 - Optional live-provider smoke remains deferred; deterministic browser E2E and required CI are passing.
 
+#### Story Notes
+
+- Runtime identity is `adventureId`. `worldId` and `worldVersionId` are source metadata for context, reset, and traceability, not mutable runtime ownership.
+- Debug panels are allowed to expose source WorldVersion identity, but edits and saved state should apply to the selected Adventure copy.
+
 ### Story S3: World Version Edits Do Not Mutate Existing Adventures
 
 Status: implemented
@@ -232,6 +244,11 @@ The system SHALL NOT apply WorldVersion changes to existing Adventures unless a 
 
 - Deterministic automated coverage for source-version isolation should be added before this model grows beyond the local MVP smoke path.
 
+#### Story Notes
+
+- Frozen-copy behavior is the main product guarantee of this Epic. Existing Adventures must not receive implicit WorldVersion patches, even when a source World is repaired or improved.
+- Future World patching or migration into an existing Adventure needs its own explicit user path and reviewable semantics.
+
 ### Story S4: Reset Adventure To Source Version
 
 Status: implemented
@@ -277,6 +294,11 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 #### Verification Gaps
 
 - Optional live-provider smoke remains deferred; deterministic browser E2E and required CI are passing.
+
+#### Story Notes
+
+- Reset Session means "restore this Adventure from the WorldVersion it was created from." It must not silently upgrade the Adventure to a newer WorldVersion.
+- Reset World is separate local seed maintenance and should remain visibly destructive in debug/admin surfaces.
 
 ### Story S5: Tutorial World Seed
 
@@ -346,7 +368,7 @@ The system SHALL author Tutorial content around the existing app mechanics witho
 
 #### Verification Gaps
 
-- Taylor manual browser confirmation remains pending for whether Tutorial feels useful as onboarding rather than in-app documentation.
+- Taylor manual browser confirmation is an accepted nonblocking gap for whether Tutorial feels useful as onboarding rather than in-app documentation.
 
 #### Story Notes
 
@@ -372,3 +394,9 @@ This Epic is healthy when:
 - `Verified By` maps concrete evidence to Requirements/Scenarios.
 - `Verification Gaps` are real, current, and explicit.
 - Related changes, docs, indexes, reviews, and changelog entries do not contradict this Epic.
+
+## Notes
+
+- LC-002 remains separate from LC-001. LC-001 owns the playable Game Master loop; LC-002 owns the World/WorldVersion/Adventure container and isolation model.
+- Keep Tutorial inside this Epic while it is only a seeded World used to exercise Adventure creation and scoped runtime state. Split Tutorial into a separate Epic only if it becomes onboarding curriculum, scenario authoring, or public content design.
+- Follow-up implementation work is still needed for fully source-version-aware debug reset/accounting across multiple seeded Worlds.
