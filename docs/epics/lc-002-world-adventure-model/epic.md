@@ -51,10 +51,10 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
 | S1 | implemented | Start Adventure From World Version | 2026-07-02 | Startup screen can continue existing Adventures or create a new copy from the selected seeded WorldVersion. |
-| S2 | implemented | Adventure-Scoped Runtime State | 2026-07-01 | Runtime reads/writes and debug state use `adventureId`. |
+| S2 | implemented | Adventure-Scoped Runtime State | 2026-07-07 | Runtime reads/writes and debug state use `adventureId`. |
 | S3 | implemented | World Version Edits Do Not Mutate Existing Adventures | 2026-07-01 | Live Convex isolation smoke proved v1 Adventure stayed unchanged after v2 source creation. |
-| S4 | implemented | Reset Adventure To Source Version | 2026-07-01 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
-| S5 | implemented | Tutorial World Seed | 2026-07-06 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
+| S4 | implemented | Reset Adventure To Source Version | 2026-07-07 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
+| S5 | implemented | Tutorial World Seed | 2026-07-07 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
 
 ## Stories
 
@@ -130,8 +130,8 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified: 2026-07-02
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want story turns and state changes to belong to my Adventure, so that play can resume from the story I actually changed.
 
@@ -167,7 +167,7 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-turn-persistence.ts` | Read/write commands, turns, narrations, events, facts, state diffs, Game Master calls, actor moves, NPC edits, location edits, feed reconstruction, Game Master context, debug snapshot context, and accepted turn state changes by Adventure. | Recheck when persistence, debug editing, movement, reset, context, or feed behavior changes. |
+| `convex/world.ts`, `src/lib/world/adventure-baseline.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-turn-persistence.ts` | Read/write commands, turns, narrations, events, facts, state diffs, Game Master calls, actor moves, NPC edits, location edits, feed reconstruction, Game Master context, debug snapshot context, accepted turn state changes, and debug-created entity accounting by Adventure source baseline. | Recheck when persistence, debug editing, movement, reset, context, source-baseline accounting, or feed behavior changes. |
 | `src/app/api/director/turn/route.ts` | Accepts `adventureId`, loads Adventure context, records turn artifacts against the Adventure, and passes Adventure/source-version metadata into logs. | Recheck when Game Master route input or turn orchestration changes. |
 | `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts`, `src/features/play/use-location-debug-saves.ts` | Send `adventureId` for turns and debug mutations, show Adventure/source WorldVersion in debug state, flush debug saves before turns/navigation, and reload snapshot/feed from selected Adventure state. | Recheck when UI state identity changes. |
 | `src/lib/director/types.ts`, `src/lib/director/prompt.ts`, `src/lib/director/debug-log.ts`, `src/lib/director/turn-errors.ts` | Carry Adventure/source-version identity through prompts, summaries, logs, and user-facing load errors. | Recheck when prompt/log/error contracts change. |
@@ -180,6 +180,7 @@ The system SHALL present debug state for the selected Adventure, not for the aut
 | R1-S1, R1-S2, R2-S1 | `npm run typecheck`; `npm run convex:once` | TypeScript and Convex generated schema/functions accept Adventure-scoped runtime contracts. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run e2e`; `npm run ci:required` | Browser playtest and required CI pass with Adventure-scoped story turns, debug state, reload behavior, and reset/delete flows. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after architecture extraction | Browser playtest, Convex compile, and required CI pass with extracted Adventure landing, debug save hooks, snapshot read model, Game Master context model, and turn persistence helpers. | Passing |
+| R2-S1 | `npm run test -- src/lib/world/adventure-baseline.test.ts` on 2026-07-07 | Source-baseline helpers classify seeded versus debug-created Tutorial and Stormbound NPCs/Locations from the selected Adventure baseline instead of hard-coded Stormbound constants. | Passing |
 
 #### Verification Gaps
 
@@ -253,8 +254,8 @@ The system SHALL NOT apply WorldVersion changes to existing Adventures unless a 
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified: 2026-07-01
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want to reset the current Adventure to its starting WorldVersion, so that I can replay from a known baseline without changing the authored World.
 
@@ -282,6 +283,7 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `convex/world.ts` | Deletes selected Adventure runtime rows and recopies the Adventure's original source WorldVersion baseline. | Recheck when reset semantics, seeded baseline shape, or Adventure ownership changes. |
+| `src/lib/world/adventure-baseline.ts` | Provides source-baseline NPC and Location classification used by debug reset/accounting paths. | Recheck when seeded baseline classification changes. |
 | `src/features/play/world-client.tsx` | Wires Reset Session to the selected Adventure. | Recheck when reset UI wording or selected identity changes. |
 
 #### Verified By
@@ -290,6 +292,7 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 |---|---|---|---|
 | R1-S1, R1-S2 | Live Convex smoke: reset the v2 isolation-check Adventure with `world:resetPlaytestWorld`, then reloaded its snapshot. It stayed tied to WorldVersion v2 and restored v2 baseline rows without affecting the original v1 Adventure. | Reset restores the selected Adventure from its original source WorldVersion and does not upgrade from or mutate other Adventures. | Passing |
 | R1-S1, R1-S2 | `npm run e2e`; `npm run ci:required` | Browser playtest and required CI pass with selected-Adventure reset restoring source-version baseline state. | Passing |
+| R1-S1, R1-S2 | `npm run test -- src/lib/world/adventure-baseline.test.ts` on 2026-07-07 | Per-entity debug reset/accounting can identify seeded Tutorial and Stormbound entities from the Adventure source baseline before deciding whether reset should restore or delete. | Passing |
 
 #### Verification Gaps
 
@@ -304,8 +307,8 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 
 Status: implemented
 Created: 2026-07-05
-Modified: 2026-07-06
-Last verified: 2026-07-06
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a new playtester, I want a Tutorial World that teaches the basic interaction loop, so that I can learn Act, Pass, `/help`, `/look`, and NPC presence before entering a normal story world.
 
@@ -354,7 +357,7 @@ The system SHALL author Tutorial content around the existing app mechanics witho
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/lib/world/stormbound-baseline.ts` | Defines the Tutorial World baseline alongside Stormbound Chapel, including starter and multi-NPC tutorial locations. | Recheck when seeded World content changes. |
-| `convex/world.ts` | Ensures Stormbound Chapel and Tutorial WorldVersions, lists seeded World containers, creates Adventures from the selected WorldVersion, and deletes/resets Adventure-owned rows. | Recheck when seeded World listing, Adventure creation, or reset/delete semantics change. |
+| `convex/world.ts`, `src/lib/world/adventure-baseline.ts` | Ensures Stormbound Chapel and Tutorial WorldVersions, lists seeded World containers, creates Adventures from the selected WorldVersion, deletes/resets Adventure-owned rows, and uses the selected Adventure's source baseline for debug-created entity accounting and seeded NPC reset. | Recheck when seeded World listing, Adventure creation, debug accounting, or reset/delete semantics change. |
 | `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx` | Renders multiple seeded World containers and creates Adventures from the selected container. | Recheck when home/startup behavior changes. |
 | `tests/e2e/lorecraft-playtest.spec.ts` | Exercises Tutorial listing and Tutorial Adventure creation in the deterministic browser flow. | Recheck when onboarding or startup behavior changes. |
 
@@ -364,6 +367,7 @@ The system SHALL author Tutorial content around the existing app mechanics witho
 |---|---|---|---|
 | R1-S1 and R1-S2 | `npm run e2e` | Home screen lists Tutorial as a separate World container and creates a Tutorial Adventure from Tutorial source content without modifying Stormbound Chapel. | Passing |
 | R2-S1 through R2-S3 | `npm run e2e`; source inspection of `buildTutorialBaseline` | Tutorial opens with Guide Serin in a one-NPC starter room, defines a second multi-NPC room, and uses only existing location, NPC, object, exit, opening narration, Act, Pass, `/help`, and `/look` mechanics. | Passing |
+| R1-S2 and R2-S1 | `npm run test -- src/lib/world/adventure-baseline.test.ts` on 2026-07-07 | Tutorial baseline NPCs and Locations, including Guide Serin, Mara, Orin, Threshold Room, and Common Room, are classified as seeded Tutorial entities rather than Stormbound debug-created rows. | Passing |
 | Supporting gate | `npm run ci:required`; `npm run convex:once` | Required app checks and Convex function compile pass with multiple seeded Worlds. | Passing |
 
 #### Verification Gaps
@@ -399,4 +403,4 @@ This Epic is healthy when:
 
 - LC-002 remains separate from LC-001. LC-001 owns the playable Game Master loop; LC-002 owns the World/WorldVersion/Adventure container and isolation model.
 - Keep Tutorial inside this Epic while it is only a seeded World used to exercise Adventure creation and scoped runtime state. Split Tutorial into a separate Epic only if it becomes onboarding curriculum, scenario authoring, or public content design.
-- Follow-up implementation work is still needed for fully source-version-aware debug reset/accounting across multiple seeded Worlds.
+- Per-entity debug reset/accounting is source-version-aware for seeded Tutorial and Stormbound entities as of the LC-002 multi-world debug reset fix. Future seeded Worlds should continue to use WorldVersion baseline classification rather than app-wide seed constants.

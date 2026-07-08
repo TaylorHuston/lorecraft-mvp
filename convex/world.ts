@@ -12,14 +12,17 @@ import { internal } from "./_generated/api";
 import {
   DEFAULT_ADVENTURE_SLUG,
   NPC_PROFILE_FACT_KEYS_FOR_WRITE,
-  SEEDED_NPCS,
-  SEEDED_ROOMS,
   TUTORIAL_WORLD_SLUG,
   WORLD_SLUG,
   buildStormboundBaseline,
   buildTutorialBaseline,
   type AdventureBaseline,
 } from "../src/lib/world/stormbound-baseline";
+import {
+  countDebugCreatedLocationKeys,
+  countDebugCreatedNpcKeys,
+  findBaselineNpc,
+} from "../src/lib/world/adventure-baseline";
 import {
   loadSnapshotReadModel,
 } from "../src/lib/world/convex-snapshot-read-model";
@@ -566,7 +569,6 @@ async function restoreSeededNpc(
     name: string;
     description: string;
     facts: readonly { key: string; value: FactValue }[];
-    legacyFactKeys?: readonly string[];
   },
 ) {
   const actor = await findActorByKeyOrName(ctx, args.adventureId, args.key, args.name);
@@ -580,9 +582,7 @@ async function restoreSeededNpc(
     description: args.description,
   });
 
-  for (const key of args.legacyFactKeys ?? []) {
-    await deleteActorFactByKey(ctx, args.adventureId, args.key, key);
-  }
+  await deleteActorFacts(ctx, args.adventureId, args.key);
 
   for (const fact of args.facts) {
     await setFact(ctx, {
@@ -1916,11 +1916,16 @@ export const createLocationInternal = internalMutation({
       return { ok: false, error: "A location with that key already exists." };
     }
 
-    const debugLocationCount = await countDebugCreatedLocations(ctx, args.adventureId);
+    const baseline = await loadAdventureBaseline(ctx, adventure);
+    if (!baseline) {
+      return { ok: false, error: "Adventure source WorldVersion could not be loaded." };
+    }
+
+    const debugLocationCount = await countDebugCreatedLocations(ctx, args.adventureId, baseline);
     if (debugLocationCount >= DEBUG_CREATED_LOCATION_LIMIT) {
       return {
         ok: false,
-        error: `Debug-created locations are capped at ${DEBUG_CREATED_LOCATION_LIMIT}. Reset the demo world before adding more.`,
+        error: `Debug-created locations are capped at ${DEBUG_CREATED_LOCATION_LIMIT}. Reset Session before adding more.`,
       };
     }
 
@@ -1997,11 +2002,16 @@ export const createNpcInternal = internalMutation({
       return { ok: false, error: "An actor with that key or name already exists." };
     }
 
-    const debugNpcCount = await countDebugCreatedNpcs(ctx, args.adventureId);
+    const baseline = await loadAdventureBaseline(ctx, adventure);
+    if (!baseline) {
+      return { ok: false, error: "Adventure source WorldVersion could not be loaded." };
+    }
+
+    const debugNpcCount = await countDebugCreatedNpcs(ctx, args.adventureId, baseline);
     if (debugNpcCount >= DEBUG_CREATED_NPC_LIMIT) {
       return {
         ok: false,
-        error: `Debug-created NPCs are capped at ${DEBUG_CREATED_NPC_LIMIT}. Reset the demo world before adding more.`,
+        error: `Debug-created NPCs are capped at ${DEBUG_CREATED_NPC_LIMIT}. Reset Session before adding more.`,
       };
     }
 
@@ -2039,8 +2049,17 @@ export const resetNpcInternal = internalMutation({
       return { ok: false, error: "NPC could not be found in this Adventure." };
     }
 
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure) {
+      return { ok: false, error: "Adventure could not be found." };
+    }
+    const baseline = await loadAdventureBaseline(ctx, adventure);
+    if (!baseline) {
+      return { ok: false, error: "Adventure source WorldVersion could not be loaded." };
+    }
+
     const actorKey = stableActorKey(actor);
-    const seededNpc = SEEDED_NPCS.find((npc) => npc.key === actorKey);
+    const seededNpc = findBaselineNpc(baseline, actorKey);
     if (!seededNpc) {
       await deleteActorFacts(ctx, args.adventureId, actorKey);
       await ctx.db.delete(actor._id);
@@ -2054,7 +2073,6 @@ export const resetNpcInternal = internalMutation({
       name: seededNpc.name,
       description: seededNpc.description,
       facts: seededNpc.facts,
-      legacyFactKeys: "legacyFactKeys" in seededNpc ? seededNpc.legacyFactKeys : undefined,
     });
     const room = await findRoomByKey(ctx, args.adventureId, seededNpc.roomKey);
     if (room && actor.roomId !== room._id) {
@@ -2131,18 +2149,27 @@ function requireServerWrite(token: string | undefined) {
   }
 }
 
-async function countDebugCreatedLocations(ctx: DatabaseCtx, adventureId: Id<"adventures">) {
-  const seededLocationKeys = new Set<string>(SEEDED_ROOMS.map((room) => room.key));
+async function countDebugCreatedLocations(
+  ctx: DatabaseCtx,
+  adventureId: Id<"adventures">,
+  baseline: AdventureBaseline,
+) {
   const locations = await ctx.db
     .query("rooms")
     .withIndex("by_adventureId", (q) => q.eq("adventureId", adventureId))
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("rooms", locations.length);
-  return locations.filter((location) => !seededLocationKeys.has(location.key)).length;
+  return countDebugCreatedLocationKeys(
+    baseline,
+    locations.map((location) => location.key),
+  );
 }
 
-async function countDebugCreatedNpcs(ctx: DatabaseCtx, adventureId: Id<"adventures">) {
-  const seededNpcKeys = new Set<string>(SEEDED_NPCS.map((npc) => npc.key));
+async function countDebugCreatedNpcs(
+  ctx: DatabaseCtx,
+  adventureId: Id<"adventures">,
+  baseline: AdventureBaseline,
+) {
   const actors = await ctx.db
     .query("actors")
     .withIndex("by_adventureId_and_role", (q) =>
@@ -2150,7 +2177,18 @@ async function countDebugCreatedNpcs(ctx: DatabaseCtx, adventureId: Id<"adventur
     )
     .take(DEMO_RESET_ROW_LIMIT + 1);
   assertDemoResetTableWithinLimit("actors", actors.length);
-  return actors.filter((actor) => !seededNpcKeys.has(stableActorKey(actor))).length;
+  return countDebugCreatedNpcKeys(
+    baseline,
+    actors.map((actor) => stableActorKey(actor)),
+  );
+}
+
+async function loadAdventureBaseline(
+  ctx: DatabaseCtx,
+  adventure: Pick<Doc<"adventures">, "worldVersionId">,
+) {
+  const worldVersion = await ctx.db.get(adventure.worldVersionId);
+  return (worldVersion?.baseline as AdventureBaseline | undefined) ?? null;
 }
 
 async function loadCurrentAdventure(ctx: QueryCtx, adventureId: Id<"adventures">) {
