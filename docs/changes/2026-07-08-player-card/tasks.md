@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `LC-001-S16` Room Info Panel implemented and apply-side self-check passed after remediation
-- Last completed action: committed Room Info implementation as `7918983`
-- Next action: run `/sdd-review`
+- Current state: `/sdd-review` found safe artifact, Player Card fact loading, autosave race, and narrow-layout findings; remediation has been applied
+- Last completed action: reran affected verification after safe review fixes
+- Next action: rerun `/sdd-review` for a fresh clean verdict
 - Active branch/ref: `change/player-card`
-- Expected dirty files: Room Info UI/test/docs plus `docs/changes/2026-07-08-player-card/`
+- Expected dirty files: review remediation in code, tests, and documentation artifacts until committed
 - Known blockers: `npm run e2e` cannot run without stopping the intentionally running local Convex dev server on port `3210`.
 
 ## Specialist Checkpoint
@@ -120,6 +120,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | pending |
 | 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | `7918983` |
 | 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | `7918983` |
+| 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, planning/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | pending |
 
 ## Verification Ledger
 
@@ -139,6 +140,9 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-08 | `lsof -nP -iTCP:3210 -sTCP:LISTEN`; `lsof -nP -iTCP:3000 -sTCP:LISTEN`; `curl http://localhost:3000/` | runtime / blocked E2E evidence | Confirms the standing dev loop is still running on Next `3000` and Convex `3210`, the app returns HTTP 200, and deterministic E2E would conflict with the active Convex port. | E2E blocked; dev server healthy |
 | 2026-07-08 | delegated apply-side self-check | fresh-context review | Found visible room key in the player-facing panel and stale Epic gap wording; both were remediated before commit. | Addressed |
 | 2026-07-08 | `npm run ci:required` | required local CI gate | Re-ran after self-check fixes; lint, 89 Vitest tests, typecheck, and production build pass. | Passed |
+| 2026-07-08 | `/sdd-review` live browser check at 1440x900 and 390x844 | deterministic local browser inspection | Found no horizontal overflow; found narrow viewport story-stream squeeze caused by stacked side rails. Remediated by giving the story workspace its own viewport-height block on sub-`lg` layouts. | Finding addressed |
+| 2026-07-08 | `/sdd-review` delegated artifact/code/UI reviews | fresh-context review | Found stale blank-field artifact wording, missing LC-002 blank-field scenario, bounded Player Card fact loading, Player Card autosave/turn race, collapsed rail width behavior, and blocked E2E evidence. | Findings addressed or recorded as accepted gap |
+| 2026-07-08 | `npm run e2e` | deterministic browser gate | Still not run during review because the user requested the dev server remain running and Playwright would need port `3210`. | Accepted operational gap for this local review |
 
 ## Manual Feedback
 

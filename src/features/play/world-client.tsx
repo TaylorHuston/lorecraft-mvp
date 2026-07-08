@@ -118,6 +118,8 @@ export function WorldClient({
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
+  const [isPlayerCardCollapsed, setIsPlayerCardCollapsed] = useState(false);
+  const [isPlayerCardSavePending, setIsPlayerCardSavePending] = useState(false);
   const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
     DEFAULT_PROMPT_GUIDANCE,
   );
@@ -270,7 +272,14 @@ export function WorldClient({
   }
 
   async function handlePass() {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -278,7 +287,14 @@ export function WorldClient({
   }
 
   async function handleActSubmit(input: string): Promise<"close" | "keep-open" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -291,7 +307,14 @@ export function WorldClient({
   }
 
   async function handleStorySubmit(input: string): Promise<"close" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -300,7 +323,14 @@ export function WorldClient({
   }
 
   async function handleGuideSubmit(input: string): Promise<"close" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -503,15 +533,25 @@ export function WorldClient({
             ) : (
               <div
                 id="play-layout"
-                className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[23fr_56fr_23fr]"
+                className={`flex min-h-0 flex-1 flex-col lg:grid ${
+                  isPlayerCardCollapsed
+                    ? "lg:grid-cols-[6rem_56fr_23fr]"
+                    : "lg:grid-cols-[23fr_56fr_23fr]"
+                }`}
               >
                 <PlayerCard
                   key={snapshot.player._id}
                   adventureId={adventureId}
                   player={snapshot.player}
+                  isCollapsed={isPlayerCardCollapsed}
                   onError={setError}
+                  onCollapseChange={setIsPlayerCardCollapsed}
+                  onSavePendingChange={setIsPlayerCardSavePending}
                 />
-                <div id="story-workspace" className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <div
+                  id="story-workspace"
+                  className="flex min-h-[calc(100vh-3rem)] min-w-0 flex-col lg:min-h-0"
+                >
                   <section
                     id="story-stream"
                     ref={storyScrollerRef}
@@ -552,7 +592,12 @@ export function WorldClient({
                   </section>
 
                   <TurnActionPanel
-                    disabled={isSeeding || isResetting || creatingWorldId !== null}
+                    disabled={
+                      isSeeding ||
+                      isResetting ||
+                      creatingWorldId !== null ||
+                      isPlayerCardSavePending
+                    }
                     isSubmitting={isSubmitting}
                     notice={notice}
                     error={error}

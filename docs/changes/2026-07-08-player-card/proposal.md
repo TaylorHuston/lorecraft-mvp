@@ -49,7 +49,7 @@ The next slice should make the player a first-class Adventure-owned character ca
   - Production auth, ownership, multi-user character profiles, and cross-Adventure player identity.
 - Assumptions:
   - Optional player fields can be edited from the Player Card itself for this MVP slice.
-  - Blank optional fields should not be shown as empty RPG chrome in the collapsed or normal reading state.
+  - Blank optional fields should remain editable in the expanded Player Card but should not be sent as filled prompt context.
   - Existing debug panels can continue to expose raw player facts indirectly through hidden state until a dedicated debug view is needed.
   - The Room Info panel should not add movement controls, location editing, object inspection, or debug-only metadata in this slice.
 - User decisions that shaped the Story/Requirement split:

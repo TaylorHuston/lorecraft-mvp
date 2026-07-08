@@ -31,25 +31,39 @@ type PlayerCardDraft = {
 type PlayerCardProps = {
   adventureId: Id<"adventures">;
   player: PlayerCardPlayer;
+  isCollapsed: boolean;
   onError: (message: string | null) => void;
+  onCollapseChange: (isCollapsed: boolean) => void;
+  onSavePendingChange: (isPending: boolean) => void;
 };
 
 type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
 
-export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
+export function PlayerCard({
+  adventureId,
+  player,
+  isCollapsed,
+  onError,
+  onCollapseChange,
+  onSavePendingChange,
+}: PlayerCardProps) {
   const updatePlayerProfile = useMutation(api.world.updatePlayerProfile);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [draft, setDraft] = useState<PlayerCardDraft>(() => draftFromPlayer(player));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    onSavePendingChange(saveStatus === "unsaved" || saveStatus === "saving");
+  }, [onSavePendingChange, saveStatus]);
 
   useEffect(() => {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
       }
+      onSavePendingChange(false);
     };
-  }, []);
+  }, [onSavePendingChange]);
 
   function updateDraft(next: PlayerCardDraft) {
     setDraft(next);
@@ -94,8 +108,8 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
   return (
     <aside
       id="player-card"
-      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 px-4 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-auto lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:w-[calc(100%-2rem)] lg:max-w-72 lg:overflow-y-auto ${
-        isCollapsed ? "lg:w-16 lg:px-3" : ""
+      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-auto lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto ${
+        isCollapsed ? "px-3 lg:w-16" : "px-4 lg:w-[calc(100%-2rem)] lg:max-w-72"
       }`}
     >
       <div
@@ -119,8 +133,8 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
           type="button"
           aria-expanded={!isCollapsed}
           aria-controls={fieldsId}
-          onClick={() => setIsCollapsed((current) => !current)}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-950/80 text-zinc-400 shadow-inner shadow-black/40 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:text-zinc-100 hover:ring-zinc-600"
+          onClick={() => onCollapseChange(!isCollapsed)}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-950/80 text-zinc-400 shadow-inner shadow-black/40 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:text-zinc-100 hover:ring-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80"
           title={isCollapsed ? "Expand Player Card" : "Collapse Player Card"}
         >
           <span aria-hidden="true">{isCollapsed ? ">" : "<"}</span>

@@ -49,7 +49,7 @@ This change makes the player character a first-class readable card while preserv
   - This should not become a debug panel story; the card is a player-facing identity surface.
 - Requirements refined:
   - Keep player name required for new Adventure creation.
-  - Keep optional fields blank and absent from normal display until filled.
+  - Keep optional fields blank by default, visible and editable in the expanded Player Card, and omitted from prompt context until filled.
   - Keep player agency language explicit in the prompt contract.
 - Scenario gaps considered:
   - Canceling the name prompt should not create an Adventure.
@@ -103,15 +103,15 @@ The system SHALL collect a player name before creating a new Adventure and store
 
 - WHEN an Adventure is created
 - THEN the copied player profile has blank physical description, backstory, and status fields
-- AND blank fields do not appear as misleading filled content in the story surface
+- AND blank fields remain editable in the expanded Player Card without being treated as filled prompt context
 
 ##### Implemented By
 
-Not implemented yet.
+Implemented in `convex/world.ts`, `src/features/play/adventure-landing.tsx`, and `src/features/play/player-card.tsx`.
 
 ##### Verified By
 
-Not verified yet.
+Verified by focused unit coverage and browser spec coverage recorded in `tasks.md` and `docs/epics/lc-002-world-adventure-model/epic.md`.
 
 Planned evidence:
 
@@ -120,7 +120,7 @@ Planned evidence:
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- `npm run e2e` was not executed in the apply pass because the standing local Convex dev server was intentionally left running on port `3210`.
 
 #### Supersedes / Reconciles
 
@@ -177,7 +177,7 @@ The system SHALL let the player fill in blank optional Player Card fields for th
 ###### Scenario R2-S2: Optional field is cleared
 
 - WHEN the player clears an optional profile field
-- THEN the Player Card omits that empty field from normal display
+- THEN the Player Card shows the empty editable field in expanded mode
 - AND future Game Master context does not include stale cleared text
 
 ##### Requirement R3: Game Master Uses Player Card Without Owning Agency
@@ -198,11 +198,11 @@ The system SHALL include Player Card context in Game Master requests while prese
 
 ##### Implemented By
 
-Not implemented yet.
+Implemented in `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/director/prompt.ts`, `src/features/play/adventure-landing.tsx`, `src/features/play/world-client.tsx`, and `src/features/play/player-card.tsx`.
 
 ##### Verified By
 
-Not verified yet.
+Verified by focused unit coverage and browser spec coverage recorded in `tasks.md` and `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`.
 
 Planned evidence:
 
@@ -213,7 +213,7 @@ Planned evidence:
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- `npm run e2e` was not executed in the apply pass because the standing local Convex dev server was intentionally left running on port `3210`.
 
 #### Supersedes / Reconciles
 
@@ -287,11 +287,11 @@ The system SHALL keep the Room Info panel as a readable scene-context surface ra
 
 ##### Implemented By
 
-Not implemented yet.
+Implemented in `src/features/play/room-info-card.tsx` and `src/features/play/world-client.tsx`.
 
 ##### Verified By
 
-Not verified yet.
+Verified by focused component coverage, updated browser spec coverage, and required CI recorded in `tasks.md` and `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md`.
 
 Planned evidence:
 
@@ -301,7 +301,7 @@ Planned evidence:
 
 ##### Verification Gaps
 
-- Implementation and verification are pending.
+- `npm run e2e` was not executed in the apply pass because the standing local Convex dev server was intentionally left running on port `3210`.
 
 ## Epic File Rules
 
@@ -419,7 +419,7 @@ It extends the current Actor/Facts model symmetrically without inventing a chara
 
 ## Implementation Constraints
 
-- Do not expose optional blank fields as empty player-facing clutter.
+- Keep optional blank fields editable in the expanded Player Card while omitting them from filled prompt context.
 - Do not move the Player Card into the debug panel.
 - Do not move the Room Info panel into the debug panel.
 - Do not let the Game Master mutate player profile facts in this slice.
@@ -453,7 +453,7 @@ It extends the current Actor/Facts model symmetrically without inventing a chara
   - Taylor confirms the right rail feels like scene context, not debug UI or a movement map.
   - Taylor confirms story width remains readable with the Player Card and Room Info panel visible.
 - Debug/log inspection:
-  - Inspect a raw request or persisted Game Master call in debug mode to confirm Player Card context appears only when relevant and blank fields are omitted.
+  - Inspect a raw request or persisted Game Master call in debug mode to confirm Player Card context appears only when relevant and blank optional fields are omitted.
 
 ## Decisions
 

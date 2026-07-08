@@ -2074,8 +2074,8 @@ The system SHALL show a persistent player-facing Player Card while an Adventure 
 ###### Scenario R1-S1: Expanded Player Card shows filled profile fields
 
 - WHEN an Adventure is open and the Player Card is expanded
-- THEN it shows the player name, current location, and filled optional fields
-- AND blank optional fields are omitted from normal display
+- THEN it shows the player name, current location, and editable optional fields
+- AND blank optional fields are visually editable without being treated as filled prompt context
 
 ###### Scenario R1-S2: Player Card collapses
 
@@ -2096,7 +2096,7 @@ The system SHALL let the player fill in optional Player Card fields for the curr
 ###### Scenario R2-S2: Player clears optional fields
 
 - WHEN the player clears an optional Player Card field
-- THEN the field is removed from normal display
+- THEN the expanded Player Card shows the field as empty and editable
 - AND future prompt context omits that blank field
 
 ##### Requirement R3: Game Master Uses Player Card Without Owning Agency

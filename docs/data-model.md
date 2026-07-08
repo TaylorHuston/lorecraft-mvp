@@ -170,7 +170,7 @@ The Player Card is the player-facing version of the Adventure-owned player actor
 Strategy:
 
 - The Player Card belongs to the Adventure, not the source WorldVersion. Editing it does not mutate seeded World data.
-- Blank optional fields are omitted from normal Player Card display and from prompt text.
+- Blank optional fields remain visible and editable in the expanded Player Card, but are omitted from prompt text until filled.
 - Reset Session preserves the current player name and Player Card optional fields while recopying the source WorldVersion runtime rows.
 - The Game Master sees the Player Card as canonical context for appearance, backstory, status, and current location. It may use that context for continuity and perception, but it must not invent player thoughts, goals, speech, feelings, or actions from it.
 - Future inventory, equipment, stats, health, or TTRPG character data can extend this Player Card only after playtesting proves the need.

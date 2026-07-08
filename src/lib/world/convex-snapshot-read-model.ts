@@ -23,6 +23,7 @@ export async function loadSnapshotReadModel(
     actors,
     objects,
     facts,
+    playerFacts,
     events,
     narrations,
     diffs,
@@ -50,6 +51,7 @@ export async function loadSnapshotReadModel(
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .order("desc")
         .take(80),
+      loadPlayerProfileFacts(ctx, args.adventureId, player),
       ctx.db
         .query("events")
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
@@ -99,7 +101,7 @@ export async function loadSnapshotReadModel(
       description: player.description,
       roomId: player.roomId,
       locationName: room.name,
-      profile: playerProfileFromFacts(player, facts),
+      profile: playerProfileFromFacts(player, playerFacts),
     },
     room: {
       _id: room._id,
@@ -190,6 +192,19 @@ function playerProfileFromFacts(
     backstory: stringFactValue(actorFacts, "backstory"),
     status: stringFactValue(actorFacts, "status"),
   };
+}
+
+async function loadPlayerProfileFacts(
+  ctx: QueryCtx,
+  adventureId: Id<"adventures">,
+  player: Doc<"actors">,
+) {
+  return await ctx.db
+    .query("facts")
+    .withIndex("by_adventureId_and_subjectId", (q) =>
+      q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(stableActorKey(player))),
+    )
+    .take(20);
 }
 
 function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
