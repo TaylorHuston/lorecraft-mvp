@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: implementation complete and committed
-- Last completed action: committed implementation slice `2742b0b`
-- Next action: run `/sdd-review`
+- Current state: `/sdd-review` safe-fix remediation verified; review-fix commit pending
+- Last completed action: remediated delegated review findings for Mira legacy cleanup fallback and reran `npm run ci:required` / `npx convex codegen`
+- Next action: commit review remediation, then rerun `/sdd-review`
 - Active branch/ref: `fix/lc-002-multi-world-debug-reset`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
@@ -57,6 +57,7 @@
 | 2026-07-07 | Updated Convex debug-created NPC/Location counting and per-NPC reset to use the Adventure source WorldVersion baseline. | `2742b0b` |
 | 2026-07-07 | Updated LC-002 Epic evidence and `CHANGELOG.md` for the debug reset/accounting fix. | `2742b0b` |
 | 2026-07-07 | Remediated apply self-check findings by preserving Mira legacy fact cleanup in the Stormbound baseline and removing contradictory changelog status. | `2742b0b` |
+| 2026-07-07 | Remediated `/sdd-review` findings by passing legacy cleanup keys through seeded NPC reset and adding a fallback for older stored Stormbound baselines. | pending review-fix commit |
 
 ## Verification Ledger
 
@@ -74,6 +75,13 @@
 | 2026-07-07 | `npm run test -- src/lib/world/adventure-baseline.test.ts` after self-check fix | passed, 1 file / 3 tests | focused automated test | Confirms Stormbound baseline still carries Mira legacy fact cleanup metadata. |
 | 2026-07-07 | `npx convex codegen` after self-check fix | passed | Convex compile/codegen | Confirms Convex functions still compile after remediation. |
 | 2026-07-07 | `npm run ci:required` after self-check fix | passed | broad supporting gate | Final required gate before commit. |
+| 2026-07-07 | delegated code review | required finding remediated | source-vs-target code review | Found that seeded NPC reset did not pass legacy cleanup keys into `restoreSeededNpc`. |
+| 2026-07-07 | delegated security review | required finding remediated | security review | Confirmed no debug write gate bypass, but flagged stale hidden fact retention until legacy cleanup keys were passed through. |
+| 2026-07-07 | delegated artifact review | blocking finding remediated | artifact/lifecycle review | Found task ledger claimed self-check remediation before the reset implementation actually used the legacy cleanup metadata. |
+| 2026-07-07 | `npm run test -- src/lib/world/adventure-baseline.test.ts` after review remediation | passed, 1 file / 4 tests | focused automated test | Confirms older stored Stormbound baselines still resolve Mira legacy fact cleanup keys. |
+| 2026-07-07 | `npm run typecheck` after review remediation | passed | broad supporting gate | Confirms helper and Convex integration types compile after review remediation. |
+| 2026-07-07 | `npx convex codegen` after review remediation | passed | Convex compile/codegen | Confirms Convex functions still compile after review remediation. |
+| 2026-07-07 | `npm run ci:required` after review remediation | passed | broad supporting gate | Lint, full unit suite, typecheck, and production build passed after the review fix. |
 
 ## Manual UI Confirmation
 
@@ -90,8 +98,8 @@
 
 ## Closeout
 
-- Review record: pending `/sdd-review`.
+- Review record: `/sdd-review` found safe-fix findings; remediation verified and review-fix commit pending. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; not reviewed or merged.
+- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; review-fix commit pending; not merged.
 - Folder location: active under `docs/changes/`.
