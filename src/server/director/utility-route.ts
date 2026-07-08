@@ -23,6 +23,18 @@ type UtilityResponse =
       ok: false;
       error: string;
     };
+type UtilityRecordArgs = {
+  adventureId: Id<"adventures">;
+  serverWriteToken?: string;
+  input: string;
+  command: string;
+  target?: string;
+  text: string;
+  source: "engine" | "llm";
+  status: "success" | "error";
+  provider?: string;
+  model?: string;
+};
 
 export async function POST(request: Request) {
   const startedAt = performance.now();
@@ -61,7 +73,7 @@ export async function POST(request: Request) {
 
   if (!parsedCommand.ok) {
     const message = parsedCommand.error;
-    await recordUtility(convexResult.client, {
+    const recorded = await recordUtility(convexResult.client, {
       adventureId: bodyResult.body.adventureId,
       ...serverWriteArgs,
       input: bodyResult.body.input,
@@ -70,12 +82,15 @@ export async function POST(request: Request) {
       source: "engine",
       status: "error",
     });
+    if (!recorded.ok) {
+      return utilityRecordFailureResponse(recorded);
+    }
     return json<UtilityResponse>({ ok: false, error: message }, 200);
   }
 
   if (parsedCommand.command === "help") {
     const message = helpText();
-    await recordUtility(convexResult.client, {
+    const recorded = await recordUtility(convexResult.client, {
       adventureId: bodyResult.body.adventureId,
       ...serverWriteArgs,
       input: parsedCommand.rawInput,
@@ -84,6 +99,9 @@ export async function POST(request: Request) {
       source: "engine",
       status: "success",
     });
+    if (!recorded.ok) {
+      return utilityRecordFailureResponse(recorded);
+    }
     return json<UtilityResponse>({ ok: true, command: "help", message });
   }
 
@@ -110,7 +128,7 @@ export async function POST(request: Request) {
 
   const targetResult = resolveLookTarget(context, parsedCommand.target);
   if (!targetResult.ok) {
-    await recordUtility(convexResult.client, {
+    const recorded = await recordUtility(convexResult.client, {
       adventureId: bodyResult.body.adventureId,
       ...serverWriteArgs,
       input: parsedCommand.rawInput,
@@ -120,6 +138,9 @@ export async function POST(request: Request) {
       source: "engine",
       status: "error",
     });
+    if (!recorded.ok) {
+      return utilityRecordFailureResponse(recorded);
+    }
     return json<UtilityResponse>({ ok: true, command: "look", message: targetResult.text });
   }
 
@@ -146,7 +167,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const providerError = normalizeProviderError(error);
-    await recordUtility(convexResult.client, {
+    const recorded = await recordUtility(convexResult.client, {
       adventureId: bodyResult.body.adventureId,
       ...serverWriteArgs,
       input: parsedCommand.rawInput,
@@ -158,6 +179,9 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
     });
+    if (!recorded.ok) {
+      return utilityRecordFailureResponse(recorded);
+    }
     await logUtility({
       event: "director.utility.look",
       stage: "provider_request",
@@ -177,7 +201,7 @@ export async function POST(request: Request) {
 
   const parsedOutput = parsePlainProseDirectorOutput(rawOutput);
   if (!parsedOutput.ok) {
-    await recordUtility(convexResult.client, {
+    const recorded = await recordUtility(convexResult.client, {
       adventureId: bodyResult.body.adventureId,
       ...serverWriteArgs,
       input: parsedCommand.rawInput,
@@ -189,6 +213,9 @@ export async function POST(request: Request) {
       provider,
       model: configResult.config.model,
     });
+    if (!recorded.ok) {
+      return utilityRecordFailureResponse(recorded);
+    }
     await logUtility({
       event: "director.utility.look",
       stage: "parse_utility_output",
@@ -206,7 +233,7 @@ export async function POST(request: Request) {
     return json<UtilityResponse>({ ok: false, error: parsedOutput.error }, 422);
   }
 
-  await recordUtility(convexResult.client, {
+  const recorded = await recordUtility(convexResult.client, {
     adventureId: bodyResult.body.adventureId,
     ...serverWriteArgs,
     input: parsedCommand.rawInput,
@@ -218,6 +245,9 @@ export async function POST(request: Request) {
     provider,
     model: configResult.config.model,
   });
+  if (!recorded.ok) {
+    return utilityRecordFailureResponse(recorded);
+  }
   await logUtility({
     event: "director.utility.look",
     stage: "complete_utility_look",
@@ -261,24 +291,53 @@ function createConvexClient() {
 
 async function recordUtility(
   convex: ConvexHttpClient,
-  args: {
-    adventureId: Id<"adventures">;
-    serverWriteToken?: string;
-    input: string;
-    command: string;
-    target?: string;
-    text: string;
-    source: "engine" | "llm";
-    status: "success" | "error";
-    provider?: string;
-    model?: string;
-  },
+  args: UtilityRecordArgs,
 ) {
-  const result = await convex.mutation(api.world.recordUtilityMessage, args);
-  if (!result.ok) {
-    throw new Error(result.error);
+  let result: Awaited<ReturnType<typeof convex.mutation<typeof api.world.recordUtilityMessage>>>;
+  try {
+    result = await convex.mutation(api.world.recordUtilityMessage, args);
+  } catch (error) {
+    const worldLoadError = normalizeWorldLoadError(error);
+    return {
+      ok: false as const,
+      error: worldLoadError.clientMessage,
+      httpStatus: worldLoadError.httpStatus,
+    };
   }
-  return result;
+
+  if (!result.ok) {
+    return {
+      ok: false as const,
+      error: utilityRecordFailureMessage(result.error),
+      httpStatus: utilityRecordFailureStatus(result.error),
+    };
+  }
+  return { ok: true as const, utilityMessageId: result.utilityMessageId };
+}
+
+function utilityRecordFailureResponse(recorded: {
+  ok: false;
+  error: string;
+  httpStatus: 400 | 404 | 500 | 503;
+}) {
+  return json<UtilityResponse>({ ok: false, error: recorded.error }, recorded.httpStatus);
+}
+
+function utilityRecordFailureMessage(error: string) {
+  if (error === "Adventure could not be found.") {
+    return "The selected Adventure is missing required state. Seed or reload the Adventure and try again.";
+  }
+  return error;
+}
+
+function utilityRecordFailureStatus(error: string): 404 | 500 | 503 {
+  if (error === "Adventure could not be found.") {
+    return 404;
+  }
+  if (error === "Server write access is not configured.") {
+    return 503;
+  }
+  return 500;
 }
 
 function normalizeProviderError(error: unknown) {

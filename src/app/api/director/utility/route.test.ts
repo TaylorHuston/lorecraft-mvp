@@ -69,6 +69,37 @@ describe("Director utility route", () => {
     );
   });
 
+  it("returns a structured 400 when /help uses a malformed Adventure id", async () => {
+    mocks.mutation.mockRejectedValueOnce(
+      new Error('ArgumentValidationError: Value does not match validator for field "adventureId"'),
+    );
+
+    const response = await POST(utilityRequest("/help"));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "The selected Adventure id is invalid. Seed or reload the Adventure and try again.",
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
+  it("returns a structured 404 when /help uses a deleted Adventure", async () => {
+    mocks.mutation.mockResolvedValueOnce({
+      ok: false,
+      error: "Adventure could not be found.",
+    });
+
+    const response = await POST(utilityRequest("/help"));
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "The selected Adventure is missing required state. Seed or reload the Adventure and try again.",
+    });
+    expect(response.status).toBe(404);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
   it("persists unsupported commands as utility errors without creating turns", async () => {
     const response = await POST(utilityRequest("/dance"));
 
