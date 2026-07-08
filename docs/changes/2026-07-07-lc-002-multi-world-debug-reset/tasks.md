@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: second `/sdd-review` safe-fix remediation verified; commit pending
-- Last completed action: reran focused tests, typecheck, Convex codegen, and `npm run ci:required` after reset cleanup remediation
-- Next action: commit safe remediation, then rerun `/sdd-review`
+- Current state: second `/sdd-review` safe-fix remediation committed
+- Last completed action: committed second review remediation slice `5fbf43e`
+- Next action: rerun `/sdd-review`
 - Active branch/ref: `fix/lc-002-multi-world-debug-reset`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
@@ -58,8 +58,8 @@
 | 2026-07-07 | Updated LC-002 Epic evidence and `CHANGELOG.md` for the debug reset/accounting fix. | `2742b0b` |
 | 2026-07-07 | Remediated apply self-check findings by preserving Mira legacy fact cleanup in the Stormbound baseline and removing contradictory changelog status. | `2742b0b` |
 | 2026-07-07 | Remediated `/sdd-review` findings by passing legacy cleanup keys through seeded NPC reset and adding a fallback for older stored Stormbound baselines. | `712844b` |
-| 2026-07-08 | Remediated second `/sdd-review` artifact finding by aligning LC-002 S2/S4/S5 Story Index and story-local verification dates with the new 2026-07-07 evidence rows. | pending artifact review-fix commit |
-| 2026-07-08 | Remediated second `/sdd-review` code finding by clearing all seeded NPC actor facts before restoring source baseline facts, so debug-added profile facts absent from the baseline do not survive reset. | pending code review-fix commit |
+| 2026-07-08 | Remediated second `/sdd-review` artifact finding by aligning LC-002 S2/S4/S5 Story Index and story-local verification dates with the new 2026-07-07 evidence rows. | `5fbf43e` |
+| 2026-07-08 | Remediated second `/sdd-review` code finding by clearing all seeded NPC actor facts before restoring source baseline facts, so debug-added profile facts absent from the baseline do not survive reset. | `5fbf43e` |
 
 ## Verification Ledger
 
@@ -108,8 +108,8 @@
 
 ## Closeout
 
-- Review record: second `/sdd-review` found safe artifact and code findings; remediation verified and commit pending. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
+- Review record: second `/sdd-review` found safe artifact and code findings; remediation verified and committed. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first code review-fix committed; second safe-fix pending; not merged.
+- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first and second review-fixes committed; not merged.
 - Folder location: active under `docs/changes/`.
