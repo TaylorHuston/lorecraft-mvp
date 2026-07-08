@@ -12,6 +12,7 @@ export type AdventureBaseline = {
     description: string;
     roomKey: string;
     facts: BaselineFact[];
+    legacyFactKeys?: readonly string[];
   }>;
   objects: Array<{
     key: string;
@@ -284,6 +285,7 @@ export function buildStormboundBaseline(): AdventureBaseline {
       description: npc.description,
       roomKey: npc.roomKey,
       facts: npc.facts.map((fact) => ({ key: fact.key, value: fact.value })),
+      legacyFactKeys: "legacyFactKeys" in npc ? npc.legacyFactKeys : undefined,
     })),
     objects: SEEDED_OBJECTS.map((object) => ({
       key: object.key,

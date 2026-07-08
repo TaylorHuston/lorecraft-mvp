@@ -26,6 +26,10 @@ The format is based on Keep a Changelog 1.1.0.
 - NPC state extraction is more conservative about momentary reactions, so transient beats are less likely to become durable NPC facts.
 - The startup screen now supports multiple seeded World containers instead of assuming Stormbound Chapel is the only World.
 
+### Fixed
+
+- Debug NPC reset and debug-created NPC/Location limits now use the selected Adventure's source WorldVersion baseline, so Tutorial seeded entities are no longer treated as Stormbound debug-created rows.
+
 ## [0.2.0] - 2026-07-01
 
 Second MVP release focused on turning the initial chat spike into a more inspectable persistent-world playtest loop, with deterministic browser coverage, bounded state extraction, and lightweight location state.
