@@ -99,19 +99,23 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
   return (
     <aside
       id="player-card"
-      className={`border-b border-zinc-900 bg-zinc-950/40 px-5 py-4 lg:h-[calc(100vh-3rem)] lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:px-4 ${
-        isCollapsed ? "lg:w-16" : ""
+      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 px-4 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-0 lg:ml-5 lg:mr-2 lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:self-start lg:overflow-y-auto ${
+        isCollapsed ? "lg:w-16 lg:px-3" : ""
       }`}
     >
+      <div
+        id="player-card-accent"
+        className="mb-4 h-1 w-16 rounded-full bg-amber-300/80 shadow-[0_0_18px_rgba(252,211,77,0.28)]"
+      />
       <div id="player-card-header" className="flex items-start justify-between gap-3">
         <div id="player-card-title-block" className={isCollapsed ? "lg:sr-only" : "min-w-0"}>
-          <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-zinc-500">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
             Player
           </p>
           <h2 id="player-card-name" className="mt-1 truncate text-base font-medium text-zinc-100">
             {player.name}
           </h2>
-          <p id="player-card-location" className="mt-1 text-xs leading-5 text-zinc-500">
+          <p id="player-card-location" className="mt-1 text-xs leading-5 text-zinc-400">
             {player.locationName}
           </p>
         </div>
@@ -121,7 +125,7 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
           aria-expanded={!isCollapsed}
           aria-controls={fieldsId}
           onClick={() => setIsCollapsed((current) => !current)}
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-950/80 text-zinc-400 shadow-inner shadow-black/40 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:text-zinc-100 hover:ring-zinc-600"
           title={isCollapsed ? "Expand Player Card" : "Collapse Player Card"}
         >
           <span aria-hidden="true">{isCollapsed ? ">" : "<"}</span>
@@ -160,7 +164,7 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
                 id="player-card-edit-button"
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="h-9 rounded-md bg-zinc-900 px-3 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="h-10 rounded-full bg-zinc-950/80 px-4 text-sm font-medium text-zinc-200 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:ring-zinc-600"
               >
                 Edit
               </button>
@@ -207,7 +211,7 @@ export function PlayerCard({ adventureId, player, onError }: PlayerCardProps) {
                   }
                   setIsEditing(false);
                 }}
-                className="h-9 rounded-md bg-zinc-900 px-3 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="h-10 rounded-full bg-zinc-950/80 px-4 text-sm font-medium text-zinc-200 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:ring-zinc-600"
               >
                 Done
               </button>

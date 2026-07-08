@@ -118,7 +118,7 @@ Record the user's manual testing feedback after implementation starts.
 
 | Date | Feedback | Classification | Action / Artifact Updates | Status |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | defect / verification gap / artifact drift / requirement refinement / scope expansion / product drift | TBD | open |
+| 2026-07-08 | Player Card should feel more like a floating video-game panel instead of a fixed sidebar. | requirement refinement | Updated Player Card surface styling with inset spacing, rounded elevated panel, softer ring, shadow, and contained controls. | addressed |
 
 ## Planning Updates
 
