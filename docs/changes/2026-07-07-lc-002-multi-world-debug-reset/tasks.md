@@ -2,9 +2,9 @@
 
 ## Resume Here
 
-- Current state: second `/sdd-review` safe-fix remediation committed
-- Last completed action: committed second review remediation slice `5fbf43e`
-- Next action: rerun `/sdd-review`
+- Current state: third `/sdd-review` safe-fix remediation pending verification and commit
+- Last completed action: updated `docs/data-model.md` Adventure-scoped debug cap wording and stale reset evidence wording
+- Next action: rerun lightweight checks, commit safe remediation, then rerun `/sdd-review`
 - Active branch/ref: `fix/lc-002-multi-world-debug-reset`
 - Expected dirty files: change artifacts, Convex/world helper code, tests, LC-002 Epic, changelog
 - Known blockers: none identified
@@ -60,6 +60,7 @@
 | 2026-07-07 | Remediated `/sdd-review` findings by passing legacy cleanup keys through seeded NPC reset and adding a fallback for older stored Stormbound baselines. | `712844b` |
 | 2026-07-08 | Remediated second `/sdd-review` artifact finding by aligning LC-002 S2/S4/S5 Story Index and story-local verification dates with the new 2026-07-07 evidence rows. | `5fbf43e` |
 | 2026-07-08 | Remediated second `/sdd-review` code finding by clearing all seeded NPC actor facts before restoring source baseline facts, so debug-added profile facts absent from the baseline do not survive reset. | `5fbf43e` |
+| 2026-07-08 | Remediated third `/sdd-review` doc finding by updating `docs/data-model.md` to describe debug-created caps and NPC edits as Adventure-scoped. | pending docs review-fix commit |
 
 ## Verification Ledger
 
@@ -80,7 +81,7 @@
 | 2026-07-07 | delegated code review | required finding remediated | source-vs-target code review | Found that seeded NPC reset did not pass legacy cleanup keys into `restoreSeededNpc`. |
 | 2026-07-07 | delegated security review | required finding remediated | security review | Confirmed no debug write gate bypass, but flagged stale hidden fact retention until legacy cleanup keys were passed through. |
 | 2026-07-07 | delegated artifact review | blocking finding remediated | artifact/lifecycle review | Found task ledger claimed self-check remediation before the reset implementation actually used the legacy cleanup metadata. |
-| 2026-07-07 | `npm run test -- src/lib/world/adventure-baseline.test.ts` after review remediation | passed, 1 file / 4 tests | focused automated test | Confirms older stored Stormbound baselines still resolve Mira legacy fact cleanup keys. |
+| 2026-07-07 | `npm run test -- src/lib/world/adventure-baseline.test.ts` after review remediation | passed, 1 file / 4 tests | focused automated test | Confirmed selected-baseline helper behavior before seeded reset cleanup was later simplified to delete all actor facts and restore only source-baseline facts. |
 | 2026-07-07 | `npm run typecheck` after review remediation | passed | broad supporting gate | Confirms helper and Convex integration types compile after review remediation. |
 | 2026-07-07 | `npx convex codegen` after review remediation | passed | Convex compile/codegen | Confirms Convex functions still compile after review remediation. |
 | 2026-07-07 | `npm run ci:required` after review remediation | passed | broad supporting gate | Lint, full unit suite, typecheck, and production build passed after the review fix. |
@@ -92,6 +93,8 @@
 | 2026-07-08 | `npm run typecheck` after second safe-fix remediation | passed | broad supporting gate | Confirms reset cleanup simplification compiles. |
 | 2026-07-08 | `npx convex codegen` after second safe-fix remediation | passed | Convex compile/codegen | Confirms Convex functions still compile after seeded reset clears all actor facts before restoring baseline facts. |
 | 2026-07-08 | `npm run ci:required` after second safe-fix remediation | passed, 8 files / 84 tests | broad supporting gate | Lint, full unit suite, typecheck, and production build passed after the second review fix. |
+| 2026-07-08 | third delegated artifact review | required finding remediated | artifact/docs review | Found `docs/data-model.md` still described debug-created caps as per demo world instead of per Adventure. |
+| 2026-07-08 | third delegated code review | suggestion remediated | source-vs-target code review | Found stale evidence wording that still referenced legacy cleanup keys after reset cleanup was simplified. |
 
 ## Manual UI Confirmation
 
@@ -108,8 +111,8 @@
 
 ## Closeout
 
-- Review record: second `/sdd-review` found safe artifact and code findings; remediation verified and committed. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
+- Review record: third `/sdd-review` found safe docs/evidence wording findings; remediation pending verification and commit. No `review.md` created because no unresolved unsafe findings remain after the safe-fix pass.
 - Manual UI confirmation status: pending Taylor.
 - Changelog status: updated under `Unreleased / Fixed`.
-- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first and second review-fixes committed; not merged.
+- PR / merge state: implementation committed on `fix/lc-002-multi-world-debug-reset`; first and second review-fixes committed; third safe-fix pending; not merged.
 - Folder location: active under `docs/changes/`.
