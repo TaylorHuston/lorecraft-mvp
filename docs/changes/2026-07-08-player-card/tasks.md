@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Current state: `LC-001-S16` Room Info Panel implemented and apply-side self-check passed after remediation
-- Last completed action: removed visible room key, reconciled Epic evidence, and reran `npm run ci:required`
+- Last completed action: committed Room Info implementation as `7918983`
 - Next action: run `/sdd-review`
 - Active branch/ref: `change/player-card`
 - Expected dirty files: Room Info UI/test/docs plus `docs/changes/2026-07-08-player-card/`
@@ -118,8 +118,8 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | Player Card implementation | main; Convex/Next/UI guidance; delegated discovery | `convex/world.ts`, `src/features/play/*`, `src/lib/world/*`, `src/lib/director/*`, E2E spec | Implemented named Adventure creation, Player Card profile editing, prompt context, reset preservation, and deterministic tests. | `5e9074a` |
 | 2026-07-08 | Documentation and Epic traceability | main | README, CHANGELOG, data model, persistence doc, LC-001, LC-002 | Updated user-facing docs and scenario-mapped Epic evidence for Player Card behavior. | `5e9074a` |
 | 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | pending |
-| 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | commit pending |
-| 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | commit pending |
+| 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | `7918983` |
+| 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | `7918983` |
 
 ## Verification Ledger
 
@@ -205,5 +205,6 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Planning updates resolved:
 - Manual UI confirmation status:
 - PR / merge state:
+- Implementation commit: `7918983`
 - Deferred scope accepted:
 - Change moved to `docs/changes/closed/`:
