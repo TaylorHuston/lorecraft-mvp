@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   countDebugCreatedLocationKeys,
   countDebugCreatedNpcKeys,
-  baselineNpcLegacyFactKeys,
   findBaselineNpc,
 } from "./adventure-baseline";
-import { buildStormboundBaseline, buildTutorialBaseline } from "./stormbound-baseline";
+import {
+  NPC_PROFILE_FACT_KEYS_FOR_WRITE,
+  buildStormboundBaseline,
+  buildTutorialBaseline,
+} from "./stormbound-baseline";
 
 describe("Adventure baseline helpers", () => {
   it("finds seeded NPCs from the selected Adventure baseline", () => {
@@ -18,14 +21,15 @@ describe("Adventure baseline helpers", () => {
     expect(findBaselineNpc(tutorial, "guide-serin")?.name).toBe("Guide Serin");
   });
 
-  it("preserves legacy fact cleanup for older stored Stormbound baselines", () => {
-    const stormbound = buildStormboundBaseline();
-    const oldStoredMira = {
-      ...findBaselineNpc(stormbound, "mira")!,
-      legacyFactKeys: undefined,
-    };
+  it("captures seeded NPC profile keys that can be absent from a source baseline", () => {
+    const tutorial = buildTutorialBaseline();
+    const mara = findBaselineNpc(tutorial, "mara")!;
+    const baselineFactKeys = new Set(mara.facts.map((fact) => fact.key));
 
-    expect(baselineNpcLegacyFactKeys(oldStoredMira)).toContain("knows_about_storm");
+    expect(NPC_PROFILE_FACT_KEYS_FOR_WRITE.filter((key) => !baselineFactKeys.has(key))).toEqual([
+      "background",
+      "knowledge",
+    ]);
   });
 
   it("counts debug-created locations against the selected Adventure baseline", () => {

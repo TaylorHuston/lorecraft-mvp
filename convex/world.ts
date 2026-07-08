@@ -19,7 +19,6 @@ import {
   type AdventureBaseline,
 } from "../src/lib/world/stormbound-baseline";
 import {
-  baselineNpcLegacyFactKeys,
   countDebugCreatedLocationKeys,
   countDebugCreatedNpcKeys,
   findBaselineNpc,
@@ -570,7 +569,6 @@ async function restoreSeededNpc(
     name: string;
     description: string;
     facts: readonly { key: string; value: FactValue }[];
-    legacyFactKeys?: readonly string[];
   },
 ) {
   const actor = await findActorByKeyOrName(ctx, args.adventureId, args.key, args.name);
@@ -584,9 +582,7 @@ async function restoreSeededNpc(
     description: args.description,
   });
 
-  for (const key of args.legacyFactKeys ?? []) {
-    await deleteActorFactByKey(ctx, args.adventureId, args.key, key);
-  }
+  await deleteActorFacts(ctx, args.adventureId, args.key);
 
   for (const fact of args.facts) {
     await setFact(ctx, {
@@ -2077,7 +2073,6 @@ export const resetNpcInternal = internalMutation({
       name: seededNpc.name,
       description: seededNpc.description,
       facts: seededNpc.facts,
-      legacyFactKeys: baselineNpcLegacyFactKeys(seededNpc),
     });
     const room = await findRoomByKey(ctx, args.adventureId, seededNpc.roomKey);
     if (room && actor.roomId !== room._id) {

@@ -51,10 +51,10 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
 | S1 | implemented | Start Adventure From World Version | 2026-07-02 | Startup screen can continue existing Adventures or create a new copy from the selected seeded WorldVersion. |
-| S2 | implemented | Adventure-Scoped Runtime State | 2026-07-01 | Runtime reads/writes and debug state use `adventureId`. |
+| S2 | implemented | Adventure-Scoped Runtime State | 2026-07-07 | Runtime reads/writes and debug state use `adventureId`. |
 | S3 | implemented | World Version Edits Do Not Mutate Existing Adventures | 2026-07-01 | Live Convex isolation smoke proved v1 Adventure stayed unchanged after v2 source creation. |
-| S4 | implemented | Reset Adventure To Source Version | 2026-07-01 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
-| S5 | implemented | Tutorial World Seed | 2026-07-06 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
+| S4 | implemented | Reset Adventure To Source Version | 2026-07-07 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
+| S5 | implemented | Tutorial World Seed | 2026-07-07 | Adds a second seeded World designed to teach Act, Pass, `/help`, `/look`, and NPC presence. |
 
 ## Stories
 
@@ -130,8 +130,8 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-02
-Last verified: 2026-07-02
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want story turns and state changes to belong to my Adventure, so that play can resume from the story I actually changed.
 
@@ -254,8 +254,8 @@ The system SHALL NOT apply WorldVersion changes to existing Adventures unless a 
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified: 2026-07-01
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a playtester, I want to reset the current Adventure to its starting WorldVersion, so that I can replay from a known baseline without changing the authored World.
 
@@ -307,8 +307,8 @@ The system SHALL reset an Adventure by replacing its mutable runtime state with 
 
 Status: implemented
 Created: 2026-07-05
-Modified: 2026-07-06
-Last verified: 2026-07-06
+Modified: 2026-07-07
+Last verified: 2026-07-07
 
 As a new playtester, I want a Tutorial World that teaches the basic interaction loop, so that I can learn Act, Pass, `/help`, `/look`, and NPC presence before entering a normal story world.
 
