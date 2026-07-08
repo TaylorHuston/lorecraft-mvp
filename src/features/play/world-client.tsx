@@ -514,11 +514,11 @@ export function WorldClient({
                   <section
                     id="story-stream"
                     ref={storyScrollerRef}
-                    className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10"
+                    className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-5 lg:px-0"
                   >
                     <div
                       id="story-stream-inner"
-                      className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end pr-0 sm:pr-12"
+                      className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end"
                     >
                       {snapshot.feed.length > 0 ? (
                         <div id="story-feed" className="space-y-8">
