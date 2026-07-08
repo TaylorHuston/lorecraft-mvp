@@ -61,6 +61,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await seedFreshWorld(page);
       await expect(page.locator("#player-card")).toBeVisible();
       await expect(page.locator("#player-card-name")).toContainText("Taylor");
+      await expect(page.locator("#room-info-card")).toBeVisible();
+      await expect(page.locator("#room-info-card-title")).toContainText("Chapel");
+      await expect(page.locator("#room-info-description")).toContainText("Rain taps against warped shutters");
+      await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+      await expect(page.locator("#room-info-npc-list")).toContainText("Brother Alden");
+      await expect(page.locator("#room-info-npc-list")).not.toContainText("Taylor");
       await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
 
       await page.locator("#act-turn-button").click();
@@ -250,6 +256,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#debug-list-scene-items")).toContainText(
       "Stormbound Chapel / Vestry",
     );
+    await expect(page.locator("#room-info-card-title")).toContainText("Vestry");
+    await expect(page.locator("#room-info-description")).toContainText(
+      "The vestry smells of old paper, damp wool, and fresh sealing wax.",
+    );
+    await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+    await expect(page.locator("#room-info-npc-list")).not.toContainText("Taylor");
     await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Vestry.",
     );
@@ -272,6 +284,8 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#debug-list-scene-items")).toContainText(
       "Stormbound Chapel / Bell Annex",
     );
+    await expect(page.locator("#room-info-card-title")).toContainText("Bell Annex");
+    await expect(page.locator("#room-info-npc-empty")).toContainText("No one else is here.");
     await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Bell Annex.",
     );
@@ -298,6 +312,9 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#story-stream")).toContainText("You stand in the chapel");
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
+    await expect(page.locator("#room-info-card-title")).toContainText("Chapel");
+    await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+    await expect(page.locator("#room-info-npc-list")).toContainText("Brother Alden");
     await page.locator("#debug-tab-locations").click();
     await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(

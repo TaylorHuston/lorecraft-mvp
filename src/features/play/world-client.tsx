@@ -19,6 +19,7 @@ import {
 import { AdventureLanding, type AdventureListItem } from "./adventure-landing";
 import { DebugActionButton, DebugPanelShell } from "./debug-panel-shell";
 import { PlayerCard } from "./player-card";
+import { RoomInfoCard } from "./room-info-card";
 import { TurnActionPanel } from "./turn-action-panel";
 import {
   NPC_PROFILE_FACT_KEYS,
@@ -562,7 +563,7 @@ export function WorldClient({
                     onPass={handlePass}
                   />
                 </div>
-                <div id="story-balance-rail" className="hidden lg:block" aria-hidden="true" />
+                <RoomInfoCard room={snapshot.room} actors={snapshot.actors} />
               </div>
             )}
           </div>

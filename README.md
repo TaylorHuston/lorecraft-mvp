@@ -4,7 +4,7 @@ Lorecraft is a local-first prototype for AI Dungeon-style play with database-bac
 
 The experiment is simple: can a small narrative world remember what changed because the world has explicit state, not because a long chat transcript happens to mention it?
 
-This is not a complete RPG. The current MVP is a playable persistent-world spike with resettable demo worlds, a narrative story feed, an AI Game Master, a persistent Player Card, inspectable debug state, NPC Cards, Location Cards, pre-turn utility commands, and bounded state mutation through Convex.
+This is not a complete RPG. The current MVP is a playable persistent-world spike with resettable demo worlds, a narrative story feed, an AI Game Master, persistent Player and Room Info panels, inspectable debug state, NPC Cards, Location Cards, pre-turn utility commands, and bounded state mutation through Convex.
 
 ## Current Features
 
@@ -19,6 +19,7 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Startup World container screen showing seeded Worlds with local Adventures listed inside them, with each Adventure opened at `/adventures/<id>` and removable from the list.
 - Player name prompt when starting a new Adventure, with the name shown in an Adventure-owned Player Card.
 - Persistent collapsible Player Card for player-facing character context, including optional physical description, backstory, status, and current location.
+- Persistent read-only Room Info panel with the current room name, description, and NPCs present in the player's location.
 - Pre-turn `/help` and `/look` utility commands, with autocomplete for supported commands and visible `/look` targets, that persist in the feed without incrementing turns or entering future Game Master story context.
 - Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
@@ -158,7 +159,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, name a new Adventure player, view and edit the Player Card, add Story setup, use hidden Guide steering, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, name a new Adventure player, view and edit the Player Card, inspect the Room Info panel, add Story setup, use hidden Guide steering, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 

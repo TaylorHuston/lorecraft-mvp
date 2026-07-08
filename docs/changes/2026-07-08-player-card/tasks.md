@@ -1,13 +1,13 @@
-# Tasks: Player Card
+# Tasks: Player And Room Info Panels
 
 ## Resume Here
 
-- Current state: implementation committed; ready for `/sdd-review`
-- Last completed action: committed player name creation, Player Card UI/profile persistence, prompt context, docs, and Epic traceability
+- Current state: `LC-001-S16` Room Info Panel implemented and apply-side self-check passed after remediation
+- Last completed action: removed visible room key, reconciled Epic evidence, and reran `npm run ci:required`
 - Next action: run `/sdd-review`
 - Active branch/ref: `change/player-card`
-- Expected dirty files: implementation, docs, tests, and `docs/changes/2026-07-08-player-card/`
-- Known blockers: full E2E and `convex:once` conflict with the intentionally running local dev Convex backend on port `3210`
+- Expected dirty files: Room Info UI/test/docs plus `docs/changes/2026-07-08-player-card/`
+- Known blockers: `npm run e2e` cannot run without stopping the intentionally running local Convex dev server on port `3210`.
 
 ## Specialist Checkpoint
 
@@ -16,6 +16,7 @@
 | 2026-07-08 | Discovery and branch setup | SDD artifacts / branch policy / app repo boundaries | `sdd-apply`; project `AGENTS.md`; `03-spaces/developer-guide.md` | loaded | Confirmed planning docs may exist on `develop`, but code/runtime changes require `change/player-card`. |
 | 2026-07-08 | `LC-002/S1/R3`; `LC-001-S15` planning for backend/UI split | Convex runtime state / Next App Router UI / player-facing left rail | Convex AI guidelines; `convex`; `next-best-practices`; Next.js 16.2.9 docs; `ui-ux-pro-max`; shared visual style guide | loaded; read-only discovery delegated to subagents | Use existing actor/facts contract with validated Convex functions, keep Next pages thin/client components scoped, and make the Player Card persistent, collapsible, accessible, and visually aligned with the narrative workbench. |
 | 2026-07-08 | Implementation review before commit | Convex state mutation / prompt context / browser user paths | Convex AI guidelines; Next.js/UI guidance; delegated discovery notes | loaded | Added deterministic unit coverage where possible and browser coverage in the E2E spec; left full E2E execution blocked by intentionally running dev server. |
+| 2026-07-08 | `LC-001-S16` Room Info Panel | player-facing Next.js UI / current-location snapshot projection / responsive side rails | `ui-ux-pro-max`; `next-best-practices`; Next.js 16.2.9 docs; Convex AI guidelines; shared visual style guide | loaded; implementation kept local because write set is small and tightly coupled | Derive Room Info from existing snapshot state, keep it read-only and player-facing, avoid schema changes, preserve story centering, and verify with focused tests plus browser coverage. |
 
 ## Task Checklist
 
@@ -64,6 +65,22 @@
 - [x] 4.4 Update `docs/persistence-system.md` with the Player Card prompt/state boundary.
 - [x] 4.5 Update README current features and `CHANGELOG.md` when implementation is accepted.
 - [x] 4.6 Update Story-level Implemented By maps with current code locations.
+- [x] 4.7 Implement `LC-001-S16` Room Info Panel.
+  - [x] Story: `LC-001-S16` - Room Info Panel
+    - [x] Requirement R1: Persistent Room Info Surface
+      - [x] Scenario R1-S1: Room Info shows current location
+      - [x] Scenario R1-S2: Room Info updates after location changes
+      - [x] Scenario R1-S3: Story remains centered
+    - [x] Requirement R2: Present NPC List
+      - [x] Scenario R2-S1: Present NPCs are listed
+      - [x] Scenario R2-S2: No NPCs present
+      - [x] Scenario R2-S3: NPC list follows canonical actor locations
+    - [x] Requirement R3: Read-Only Player-Facing Context
+      - [x] Scenario R3-S1: No editing controls in Room Info
+      - [x] Scenario R3-S2: No new movement semantics
+  - [x] Reuse existing Adventure snapshot/current Location Card state rather than adding schema.
+  - [x] Update `docs/epics/lc-001-provider-agnostic-chat-experience/epic.md` with `LC-001-S16`.
+  - [x] Update Story-level Implemented By maps with current code locations.
 
 ### 5. Verification
 
@@ -72,9 +89,12 @@
 - [x] 5.3 Add or update focused prompt tests for Player Card inclusion and player-agency instruction preservation.
 - [x] 5.4 Add deterministic E2E or browser coverage for name prompt, cancel path, Player Card expand/collapse, profile edit persistence, and reload.
 - [x] 5.5 Run `npm run ci:required`.
-- [ ] 5.6 Run `npm run convex:once` when Convex generated function shape changes.
+- [x] 5.6 Run `npm run convex:once` when Convex generated function shape changes. Not required for `LC-001-S16`; no Convex functions or generated API shape changed.
 - [x] 5.7 Update Story-level Verified By maps with scenario-mapped evidence.
 - [x] 5.8 Perform manual UI confirmation or record pending Taylor status.
+- [x] 5.9 Add deterministic coverage for Room Info deriving room name, description, and present NPCs from canonical snapshot state.
+- [x] 5.10 Add or update browser/E2E coverage for the right-side Room Info panel on an Adventure route.
+- [x] 5.11 Update `LC-001-S16` Verified By maps with scenario-mapped evidence.
 
 ### 6. Review And Closeout
 
@@ -97,6 +117,9 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | Planning | main; `sdd-propose`; project AGENTS; shared visual style guide; UI/UX guidance | `proposal.md`, `design.md`, `tasks.md` | Proposed Player Card scope and Epic updates. | `5e9074a` |
 | 2026-07-08 | Player Card implementation | main; Convex/Next/UI guidance; delegated discovery | `convex/world.ts`, `src/features/play/*`, `src/lib/world/*`, `src/lib/director/*`, E2E spec | Implemented named Adventure creation, Player Card profile editing, prompt context, reset preservation, and deterministic tests. | `5e9074a` |
 | 2026-07-08 | Documentation and Epic traceability | main | README, CHANGELOG, data model, persistence doc, LC-001, LC-002 | Updated user-facing docs and scenario-mapped Epic evidence for Player Card behavior. | `5e9074a` |
+| 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | pending |
+| 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | commit pending |
+| 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | commit pending |
 
 ## Verification Ledger
 
@@ -111,6 +134,11 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-08 | `npm run convex:once` | Convex validation | Could not run because the local dev Convex backend is intentionally running on port `3210`; dev server was left running per standing user preference. | Blocked |
 | 2026-07-08 | `npm run e2e` | deterministic browser gate | Not run because Playwright starts its own Convex backend on `3210` with `reuseExistingServer: false`, which conflicts with the intentionally running dev server. E2E spec coverage was updated. | Blocked |
 | 2026-07-08 | `npm run ci:required` | required local CI gate | Lint, unit tests, typecheck, and production build pass with Player Card changes. | Passed |
+| 2026-07-08 | `npm run test -- src/features/play/room-info-card.test.ts` | focused automated test | Proves `LC-001-S16/R2` NPC list derivation excludes the player and returns empty when no NPC actors are present. | Passed |
+| 2026-07-08 | `npm run ci:required` | required local CI gate | Lint, 89 Vitest tests, typecheck, and production build pass with Room Info changes. | Passed |
+| 2026-07-08 | `lsof -nP -iTCP:3210 -sTCP:LISTEN`; `lsof -nP -iTCP:3000 -sTCP:LISTEN`; `curl http://localhost:3000/` | runtime / blocked E2E evidence | Confirms the standing dev loop is still running on Next `3000` and Convex `3210`, the app returns HTTP 200, and deterministic E2E would conflict with the active Convex port. | E2E blocked; dev server healthy |
+| 2026-07-08 | delegated apply-side self-check | fresh-context review | Found visible room key in the player-facing panel and stale Epic gap wording; both were remediated before commit. | Addressed |
+| 2026-07-08 | `npm run ci:required` | required local CI gate | Re-ran after self-check fixes; lint, 89 Vitest tests, typecheck, and production build pass. | Passed |
 
 ## Manual Feedback
 
@@ -127,7 +155,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 | Date | Discovery | Classification | Planning Updates | Next Apply Starting Point |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | proposal.md / design.md / tasks.md | `/sdd-apply` TBD |
+| 2026-07-08 | The Player Card side-rail work also needs a matching right-side room info floating box with room name, description, and NPC list. | in-scope refinement | Updated `proposal.md`, `design.md`, and `tasks.md` to add `LC-001-S16: Room Info Panel`; scoped it as read-only UI derived from existing current-location snapshot state. | `/sdd-apply` starting at `LC-001-S16: Room Info Panel` |
 
 ## Manual UI Confirmation
 
@@ -142,15 +170,21 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
   - Fill in physical description, backstory, and status.
   - Reload the Adventure.
   - Optionally open the debug drawer and submit a turn to inspect prompt/log context.
+  - Inspect the right Room Info panel for the current room name, description, and present NPC list.
+  - Move to another existing location through a clear player action and confirm the Room Info panel updates after the accepted move.
 - Expected result:
   - The Player Card feels like part of the player-facing story surface, not debug UI.
   - The story stream remains readable with the Player Card expanded and collapsed.
   - Filled player profile fields persist across reload and appear in Game Master context.
   - Blank or cleared fields do not show stale or misleading content.
+  - The Room Info panel feels like player-facing scene context, not debug UI or a movement map.
+  - Room Info derives NPC presence from canonical location state and does not show stale NPCs after movement/reset.
 - Feedback that would change artifacts:
   - Left rail feels too intrusive.
   - Inline editing feels too form-like.
   - Player profile context causes the Game Master to over-author player thoughts, feelings, dialogue, or goals.
+  - Right-side Room Info makes the story stream feel cramped or visually unbalanced.
+  - Room Info needs exits, objects, or collapse behavior earlier than planned.
 
 ## Blockers / Open Questions
 

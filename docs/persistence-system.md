@@ -18,6 +18,7 @@ In the MVP, that state is intentionally small:
 - Adventures contain the mutable playable copy of that baseline.
 - Facts represent current durable truth.
 - The Player Card represents Adventure-owned protagonist context.
+- The Room Info panel represents the player's current room/location context.
 - Commands, narrations, Story inserts, events, and utility messages reconstruct the visible play feed.
 - Turns group each resolved story beat with the Game Master work it caused.
 - State diffs record accepted mutations.
@@ -36,6 +37,8 @@ Game Master output is untrusted model output. The story-generation step returns 
 Persistent mode gives the Game Master current Location Cards, known locations, and current-scene NPC Cards as canonical read context. The model can write story prose from that context, but prose is not accepted as state by itself.
 
 The Player Card is also canonical read context. It carries the Adventure player's name, current location, optional physical description, optional backstory, and optional current status. The Game Master can use those details to ground perception and continuity, but it must not use them to decide new player intent, speech, thoughts, feelings, or goals.
+
+The Room Info panel is a player-facing projection of the current Location Card. It shows the current room name, room description, and NPCs whose canonical actor location matches the player's current room. It is not a movement map, location editor, or transcript inference surface.
 
 Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the current action or Pass trigger, completed narration, current Location Card, Known Locations, NPC Cards, and the same story-visible narration history as story generation, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 

@@ -20,6 +20,7 @@ stories:
   - LC-001-S13
   - LC-001-S14
   - LC-001-S15
+  - LC-001-S16
 ---
 
 # LC-001 Core Game Master Play Loop
@@ -70,6 +71,7 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 | LC-001-S13 | implemented | Pre-Turn Slash Command Utilities | 2026-07-07 | Revalidated against Story/Guide context boundaries. |
 | LC-001-S14 | implemented | Pre-Turn Story And Guide Actions | 2026-07-07 | Adds canonical player-authored Story inserts and hidden Guide turns. |
 | LC-001-S15 | implemented | Player Card | 2026-07-08 | Adds persistent player-facing protagonist context and prompt grounding. |
+| LC-001-S16 | implemented | Room Info Panel | 2026-07-08 | Adds persistent player-facing current-room context from canonical location and actor state. |
 
 ## Stories
 
@@ -2141,6 +2143,105 @@ The system SHALL include filled Player Card context in Game Master requests whil
 - The Player Card is Adventure-owned runtime context, not source World data.
 - The Player Card is not a rules/stat sheet yet. Inventory, equipment, HP, stats, and TTRPG character mechanics remain deferred.
 - Reset Session preserves the Player Card identity/profile while resetting the rest of the Adventure runtime copy to its source WorldVersion.
+
+### Story LC-001-S16: Room Info Panel
+
+Status: implemented
+Created: 2026-07-08
+Modified: 2026-07-08
+Last verified: 2026-07-08
+
+As a player, I want the current room's key details visible beside the story, so that I can stay oriented without opening debug or treating the transcript as the only source of scene truth.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Persistent Room Info Surface
+
+The system SHALL show a persistent player-facing Room Info panel while an Adventure is open.
+
+###### Scenario R1-S1: Room Info shows current location
+
+- WHEN an Adventure is open
+- THEN the right-side Room Info panel shows the current room/location name
+- AND it shows the current room/location description
+- AND it uses the same floating visual language as the Player Card
+
+###### Scenario R1-S2: Room Info updates after location changes
+
+- WHEN accepted actor movement changes the player's canonical current location
+- THEN the Room Info panel updates to the new room/location name and description
+- AND it does not continue to show stale room details from the prior location
+
+###### Scenario R1-S3: Story remains centered
+
+- WHEN the Player Card and Room Info panel are visible on a wide desktop viewport
+- THEN the story stream remains centered in the main reading column
+- AND the side panels do not create horizontal page scroll
+
+##### Requirement R2: Present NPC List
+
+The system SHALL show NPCs currently present in the player's room/location.
+
+###### Scenario R2-S1: Present NPCs are listed
+
+- WHEN NPC actors are in the same current room/location as the player
+- THEN the Room Info panel lists those NPC names
+- AND it excludes the player actor from the NPC list
+
+###### Scenario R2-S2: No NPCs present
+
+- WHEN no NPC actors are in the current room/location
+- THEN the Room Info panel shows a compact empty state such as "No one else is here."
+
+###### Scenario R2-S3: NPC list follows canonical actor locations
+
+- WHEN accepted actor movement or reset changes which NPCs share the player's location
+- THEN the Room Info panel updates from canonical actor location state
+- AND it does not infer NPC presence from stale story text alone
+
+##### Requirement R3: Read-Only Player-Facing Context
+
+The system SHALL keep the Room Info panel as readable scene context rather than debug or editor tooling.
+
+###### Scenario R3-S1: No editing controls in Room Info
+
+- WHEN the player views the Room Info panel
+- THEN it does not expose location edit controls, raw IDs, raw fact rows, movement debug controls, or reset controls
+- AND location editing remains in the existing debug Locations tab
+
+###### Scenario R3-S2: No new movement semantics
+
+- WHEN the Room Info panel is added
+- THEN it does not add click-to-travel, links, exits, maps, room graphs, or dungeon traversal behavior
+- AND movement remains governed by the existing clear player-action and extractor validation rules
+
+#### Implemented By
+
+| Path | Role | Recheck Trigger |
+|---|---|---|
+| `src/features/play/room-info-card.tsx` | Renders the read-only Room Info panel from current room snapshot data and filters present NPC names from current-room actors. | Recheck when the room panel, current-scene actor display, or side-rail layout changes. |
+| `src/features/play/world-client.tsx` | Places Room Info in the right rail of the Adventure play layout beside the centered story stream. | Recheck when the play layout or snapshot consumption changes. |
+| `src/lib/world/convex-snapshot-read-model.ts` | Supplies current room/location data and current-room actors from canonical Adventure state. | Recheck when snapshot room or actor filtering changes. |
+| `tests/e2e/lorecraft-playtest.spec.ts` | Covers Room Info visibility, current room details, NPC exclusion of the player, location update after accepted movement, empty NPC state, and reset back to Chapel. | Recheck when browser user paths change. |
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| R2-S1 and R2-S2 | `src/features/play/room-info-card.test.ts` on 2026-07-08 | proves the Room Info NPC helper lists NPCs and excludes the player, including the no-NPC empty-list case. | Passing |
+| R1-S1 through R3-S2 | `tests/e2e/lorecraft-playtest.spec.ts` updated on 2026-07-08 | browser coverage exists for Room Info display, canonical movement updates, empty NPC state, and reset behavior. | Added; not run in this apply pass |
+| Supporting gate | `npm run ci:required` on 2026-07-08 | proves lint, 89 Vitest tests, typecheck, and production build pass with the Room Info component, play-layout import, browser spec updates, and documentation changes. | Passing |
+
+#### Verification Gaps
+
+- `npm run e2e` was updated but not executed during this apply pass because the local dev server is expected to keep using the Convex test port unless explicitly stopped.
+- Manual visual review is still useful for whether the right rail balances the Player Card and keeps the story stream centered on the user's real viewport.
+
+#### Story Notes
+
+- Room Info is a player-facing projection of canonical current-location state, not a new location editor.
+- Room Info deliberately does not expose exits, maps, traversal controls, object actions, raw IDs, or debug reset controls.
+- `LC-001-S12` remains the owner of Location Cards and movement validation; this Story only surfaces the current room to the player.
 
 ## Cross-Story Concerns
 

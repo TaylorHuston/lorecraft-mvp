@@ -13,6 +13,7 @@ The format is based on Keep a Changelog 1.1.0.
 - Home-screen deletion for local Adventures without changing the source WorldVersion.
 - Player name prompt when creating a new Adventure.
 - Persistent collapsible Player Card with editable physical description, backstory, status, and current location context.
+- Persistent read-only Room Info panel showing the current room description and present NPCs beside the story.
 - Player-facing Pass turns that let the Game Master continue the current scene without adding player prose.
 - Player-facing Story inserts that add canonical scene prose before the next resolving turn without incrementing turn count.
 - Player-facing Guide turns that privately steer the next Game Master narration while keeping raw Guide text out of the story stream.

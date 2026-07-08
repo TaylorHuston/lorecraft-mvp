@@ -5,7 +5,7 @@ modified: 2026-07-08
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, a player-facing Player Card, and a tiny readable NPC state surface.
+The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, a player-facing Player Card, a player-facing Room Info panel, and a tiny readable NPC state surface.
 
 ## World
 
@@ -87,12 +87,30 @@ A room is the current storage model for a lightweight Location Card. Product-fac
 Strategy:
 
 - Location Cards provide canonical scene context for the Game Master.
+- The player-facing Room Info panel projects the player's current room name, description, and present NPCs from canonical Adventure state.
 - Persistent Game Master requests include the current Location Card plus a compact list of known locations that can be movement targets.
 - Clear narrative travel to an existing location can mutate actor `roomId` only through the post-narration extractor and Convex validation.
 - Movement does not require linked exits yet; any existing location is eligible for this MVP slice.
 - Unknown destinations are handled in narration/debug evidence and do not create canonical locations.
 - A future `Dungeon` concept may add linked rooms, path constraints, locks, hazards, and stricter navigation, but that is not part of the current model.
 - Dynamic room state should be stored as facts, not by rewriting `description`.
+
+### Current Room Info Panel Fields
+
+The Room Info panel is the player-facing version of the current Location Card. It is visible outside debug and helps the player stay oriented without making the story transcript carry all current-scene context.
+
+| Field | Backing storage | Meaning |
+|---|---|---|
+| Room name | Current player actor `roomId` joined to Room `name` | The canonical current location name. |
+| Room description | Current Room `description` | Stable baseline description for the current location. |
+| Present NPCs | Actors with `role = "npc"` and `roomId` matching the player's current Room | NPCs currently present with the player. The player actor is excluded. |
+
+Strategy:
+
+- Room Info is read-only player-facing context, not a location editor.
+- Location editing stays in the debug Locations tab for the MVP.
+- Room Info does not add movement controls, exits-as-buttons, maps, object interactions, or dungeon traversal behavior.
+- NPC presence is derived from canonical actor locations, not from recent story text alone.
 
 ## Exit
 
