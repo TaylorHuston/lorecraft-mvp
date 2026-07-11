@@ -4,24 +4,24 @@
 
 changes-requested
 
-The fresh review found additional safe artifact and overlapping-autosave deficiencies. They were remediated in this pass; rerun `/sdd-review` for a clean verdict before merge-and-close.
+Review of exact source commit `76db46b66c93b0d3e1a038f7296119de9d7f452f` found final safe artifact and collapse-control accessibility deficiencies. They were remediated in this pass; rerun `/sdd-review` for a clean verdict before merge-and-close.
 
 ## Gate Scorecard
 
 | Gate | Result | Notes |
 |---|---|---|
-| Change artifacts | remediated | Reconciled stale implementation/verification wording and always-editable Player Card field semantics. |
-| Epic truth | remediated | Added missing LC-002 optional blank profile scenario and corrected E2E evidence language. |
+| Change artifacts | remediated | Replaced pre-commit placeholders with the exact reviewed implementation commit and current lifecycle state. |
+| Epic truth | remediated | Reconciled LC-001-S16 Room Info E2E evidence and verification date with the passing July 10 run. |
 | Requirements and Scenarios | remediated | Preserved implemented behavior: blank fields remain editable in the Player Card and are omitted from prompt context until filled. |
 | Story reference traceability | pass | LC-001-S15, LC-001-S16, and LC-002/S1 remain the owning Stories. |
 | Tests and verification | pass | `npm run ci:required` and deterministic `npm run e2e` pass; the normal debug loop was restored afterward. |
 | Manual UI confirmation | pending Taylor | Manual walkthrough remains recorded in `tasks.md`. |
 | Code review | remediated | Fixed bounded Player Card fact loading and Player Card save/turn submission race. |
-| Visual / UX consistency | remediated | Fixed collapsed Player Card width behavior and narrow stacked layout story-stream squeeze. |
+| Visual / UX consistency | remediated | Kept the Player Card `aria-controls` target mounted and hidden while collapsed. |
 | Security review | accepted prototype gap plus remediation | Production auth/ownership remains deferred by scope; bounded profile fact loading was fixed. |
 | Documentation | remediated | Updated data model, design, proposal, tasks, and Epics. |
 | Changelog | pass | User-facing Player Card and Room Info changes are already under `Unreleased / Added`. |
-| Branch and merge readiness | pending fresh review | Conflict check was clean against `develop`; rerun after this review-fix commit. |
+| Branch and merge readiness | pending fresh review | Safe remediation commit `87eddcb` merges cleanly into `develop`; rerun after this review-record commit. |
 | PRD alignment | not applicable | No PRD update required for this scoped MVP slice. |
 
 ## Findings
@@ -46,6 +46,9 @@ The fresh review found additional safe artifact and overlapping-autosave deficie
 - [x] Player-name validation rejected names containing only non-ASCII letters. Remediated with Unicode letter/number validation.
 - [x] Reset World/bootstrap intentionally creates its fixed local playtest Adventure without the normal name prompt, but the exception was undocumented. Reconciled as a destructive local-only bootstrap exception; player-created Adventures continue to require a name.
 - [x] `tasks.md` and this review still described pre-`efa9269` dirty state, blocked E2E, and pending ledger references. Remediated with current lifecycle and verification evidence.
+- [x] `tasks.md` and this review still used pre-commit placeholders instead of exact reviewed source `76db46b66c93b0d3e1a038f7296119de9d7f452f`. Remediated with an immutable review watermark and current lifecycle state.
+- [x] LC-001-S16 still described its passing Room Info E2E as added but unexecuted. Remediated with current July 10 evidence and verification date.
+- [x] The Player Card collapse button's `aria-controls` target was removed from the DOM while collapsed. Remediated by keeping the region mounted with `hidden` and adding browser coverage.
 
 ### SUGGESTION
 
@@ -65,31 +68,34 @@ The fresh review found additional safe artifact and overlapping-autosave deficie
 ## Review Bundle
 
 - Source branch/ref: `change/player-card`
+- Exact reviewed source commit: `76db46b66c93b0d3e1a038f7296119de9d7f452f`
 - Target branch/ref: `develop`
 - Merge base: `6e8b06ddac95ca28cc9b3e589c85b58fb645807e`
-- Source-only commits before this review-fix commit: `5e9074a`, `8f4786f`, `f46ccb5`, `cebf8f5`, `9f6a684`, `9ea8161`, `fa5a6e0`, `7918983`, `53e69ad`, `efa9269`
+- Source-only commits through the reviewed implementation: `5e9074a`, `8f4786f`, `f46ccb5`, `cebf8f5`, `9f6a684`, `9ea8161`, `fa5a6e0`, `7918983`, `53e69ad`, `efa9269`, `76db46b`
 - Target-only commits: none
-- Changed files: see `git diff --name-status develop...HEAD`
-- Diff stat before second-pass remediation: 25 files, 2343 insertions, 211 deletions
-- Conflict check: `git merge-tree --write-tree develop HEAD` returned tree `244f3ed35a8bbecdfa98419f0639c34a8bbbe563`
-- Dirty state: app repo contains only intended second-pass review remediation before its review-fix commit; unrelated vault dirty state is ignored
+- Changed files: 27 files in `git diff --name-status develop...76db46b`
+- Diff stat: 27 files, 2507 insertions, 213 deletions
+- Conflict check: `git merge-tree --write-tree develop 76db46b` returned tree `2a7e5b1e826732f3be133218e7dd6dfc1b3ebaf3`
+- Dirty state at review start: app repo clean; unrelated vault dirty state ignored
 - Branch policy: implementation branch `change/player-card` targeting `develop`; no merge/close authorized by this review invocation
 
 ## Delegated Review Passes
 
 | Pass | Reviewer | Result | Notes |
 |---|---|---|---|
-| Artifact truth | subagent | findings remediated | Found stale design text, blank-field contradiction, missing LC-002 scenario, and E2E evidence overstatement. |
-| Code / security | subagent | one accepted gap, one remediated finding | Authz is deferred prototype scope; bounded profile fact loading was fixed. |
-| UI / visual identity | subagent plus main browser check | findings remediated | Fixed pending autosave race, collapsed width behavior, focus treatment, and narrow story height. |
-| Integration readiness | main | pending fresh review | Required CI and deterministic E2E are green; safe second-pass fixes require one fresh review. |
+| Artifact truth | subagent | findings remediated | Found pre-commit placeholders and stale LC-001-S16 E2E evidence. |
+| Code / security | main plus delegated pass | pass with accepted prototype gap | No new actionable code/security finding; production auth/ownership remains explicitly deferred. |
+| UI / visual identity | subagent plus main inspection | finding remediated | Kept the collapse control's referenced region mounted while hidden. |
+| Integration readiness | main | pending fresh review | Required CI is green and the reviewed commit merges cleanly; final safe fixes require one fresh review. |
 
 ## PR / Merge Readiness
 
 - Source branch: `change/player-card`
 - Target branch: `develop`
-- Conflict check: clean before second-pass remediation; rerun on fresh review
-- Commit state: second-pass remediation will be included in a scoped local review-fix commit
+- Exact reviewed implementation commit: `76db46b66c93b0d3e1a038f7296119de9d7f452f`
+- Safe remediation commit: `87eddcbfef2471c186afcd4e9b7d9f01bf620824`
+- Conflict check: `git merge-tree --write-tree develop 87eddcb` returned tree `0ebb7f410c158ad0597a0e0274659cf9e198804b`
+- Commit state: code/Epic/E2E remediation committed; this review-record update is the only remaining local change
 - PR status: none
 - Merge status: not authorized in this review invocation
 
@@ -97,3 +103,4 @@ The fresh review found additional safe artifact and overlapping-autosave deficie
 
 - 2026-07-08: Review created during safe remediation pass.
 - 2026-07-10: Fresh review ran required CI and E2E, restored the dev loop, and remediated stale traceability plus overlapping Player Card autosaves.
+- 2026-07-10: Review of exact source `76db46b` passed code/security checks and remediated final lifecycle, Room Info evidence, and collapse semantics drift.

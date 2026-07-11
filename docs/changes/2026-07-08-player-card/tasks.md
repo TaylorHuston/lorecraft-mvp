@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: fresh `/sdd-review` found and remediated stale traceability plus an overlapping Player Card autosave race
-- Last completed action: ran required CI and deterministic E2E, restored the debug dev loop, and applied focused review fixes
+- Current state: fresh `/sdd-review` at `76db46b` found final artifact/accessibility drift; remediation is committed in `87eddcb`
+- Last completed action: reran required CI and deterministic E2E, restored `dev:debug`, and committed the focused correction
 - Next action: rerun `/sdd-review` for a fresh clean verdict
 - Active branch/ref: `change/player-card`
-- Expected dirty files: second-pass review remediation until committed
+- Expected dirty files: none once this review record update is committed
 - Known blockers: none
 
 ## Specialist Checkpoint
@@ -121,7 +121,8 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | `7918983` |
 | 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | `7918983` |
 | 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, planning/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | `efa9269` |
-| 2026-07-10 | Fresh review remediation | main; delegated artifact/code/security/UI review | Player Card save queue and tests; design, Epic, tasks, and review artifacts | Serialized overlapping Player Card autosaves, added missing LC-001-S15/R1-S3 Epic truth, corrected remaining blank-field wording, and refreshed verification/lifecycle state. | review-fix commit |
+| 2026-07-10 | Fresh review remediation | main; delegated artifact/code/security/UI review | Player Card save queue and tests; design, Epic, tasks, and review artifacts | Serialized overlapping Player Card autosaves, added missing LC-001-S15/R1-S3 Epic truth, corrected remaining blank-field wording, and refreshed verification/lifecycle state. | `76db46b` |
+| 2026-07-10 | Final review remediation | main; delegated artifact/security/UI review | Player Card collapse semantics; LC-001-S16 evidence; tasks and review records | Kept the `aria-controls` target mounted while collapsed, reconciled Room Info E2E truth, and recorded immutable review coverage of `76db46b`. | `87eddcb` |
 
 ## Verification Ledger
 
@@ -147,6 +148,7 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-10 | `npm run ci:required` | required local CI gate | Lint, 93 Vitest tests, typecheck, and production build passed after second-pass remediation. | Passed |
 | 2026-07-10 | `npm run test -- src/features/play/player-card-save-queue.test.ts` | focused automated test | Proves overlapping Player Card saves are serialized, intermediate drafts collapse to the latest value, failed final writes remain pending, and retry persists the retained draft. | Passed, 3 tests |
 | 2026-07-10 | `npm run e2e` after second-pass remediation | deterministic browser gate | Revalidated both complete browser flows and proved an immediate return to Adventures flushes the latest Player Card edits before navigation. | Passed, 2 tests |
+| 2026-07-10 | `npm run ci:required`; `npm run e2e` after final review remediation | required and browser gates | Revalidated lint, 93 tests, typecheck, production build, both browser flows, and the mounted-but-hidden Player Card collapse region. | Passed |
 
 ## Manual Feedback
 
@@ -207,12 +209,14 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Superseded earlier Epic truth reconciled: yes
 - ADR status: not applicable
 - Changelog current: yes, `Unreleased / Added`
-- `/sdd-review` verdict: changes-requested after safe second-pass remediation; fresh rerun required
+- `/sdd-review` verdict: changes-requested after safe final artifact/accessibility remediation; fresh rerun required
 - Review record: `docs/changes/2026-07-08-player-card/review.md`
 - `review.md` findings resolved: safe findings resolved; production auth remains accepted prototype scope
 - Planning updates resolved: yes
 - Manual UI confirmation status: pending Taylor
 - PR / merge state: not authorized; not merged
-- Implementation commits: `5e9074a` through `efa9269`, plus second-pass review-fix commit
+- Reviewed implementation commit: `76db46b66c93b0d3e1a038f7296119de9d7f452f`
+- Safe review remediation commit: `87eddcbfef2471c186afcd4e9b7d9f01bf620824`
+- Implementation commits: `5e9074a` through `87eddcb`
 - Deferred scope accepted: production auth/ownership, RPG systems, avatar, and cross-Adventure identity
 - Change moved to `docs/changes/closed/`: no
