@@ -155,39 +155,37 @@ export function PlayerCard({
         </button>
       </div>
 
-      {!isCollapsed ? (
-        <div id={fieldsId} className="mt-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-zinc-400">Character</p>
-            <span
-              id="player-card-save-status"
-              role="status"
-              aria-live="polite"
-              className={`text-xs uppercase ${saveStatusClassName(saveStatus)}`}
-            >
-              {saveStatusLabel(saveStatus)}
-            </span>
-          </div>
-          <PlayerCardTextarea
-            id="player-card-edit-physical-description"
-            label="Physical description"
-            value={draft.physicalDescription}
-            onChange={(physicalDescription) => updateDraft({ ...draft, physicalDescription })}
-          />
-          <PlayerCardTextarea
-            id="player-card-edit-backstory"
-            label="Backstory"
-            value={draft.backstory}
-            onChange={(backstory) => updateDraft({ ...draft, backstory })}
-          />
-          <PlayerCardTextarea
-            id="player-card-edit-status"
-            label="Status"
-            value={draft.status}
-            onChange={(status) => updateDraft({ ...draft, status })}
-          />
+      <div id={fieldsId} hidden={isCollapsed} className="mt-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs uppercase tracking-[0.14em] text-zinc-400">Character</p>
+          <span
+            id="player-card-save-status"
+            role="status"
+            aria-live="polite"
+            className={`text-xs uppercase ${saveStatusClassName(saveStatus)}`}
+          >
+            {saveStatusLabel(saveStatus)}
+          </span>
         </div>
-      ) : null}
+        <PlayerCardTextarea
+          id="player-card-edit-physical-description"
+          label="Physical description"
+          value={draft.physicalDescription}
+          onChange={(physicalDescription) => updateDraft({ ...draft, physicalDescription })}
+        />
+        <PlayerCardTextarea
+          id="player-card-edit-backstory"
+          label="Backstory"
+          value={draft.backstory}
+          onChange={(backstory) => updateDraft({ ...draft, backstory })}
+        />
+        <PlayerCardTextarea
+          id="player-card-edit-status"
+          label="Status"
+          value={draft.status}
+          onChange={(status) => updateDraft({ ...draft, status })}
+        />
+      </div>
     </aside>
   );
 }

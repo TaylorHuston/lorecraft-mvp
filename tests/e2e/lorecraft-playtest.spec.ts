@@ -370,6 +370,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "aria-expanded",
         "false",
       );
+      await expect(page.locator("#player-card-fields")).toBeHidden();
       await page.locator("#player-card-collapse-toggle").click();
       await expect(page.locator("#player-card-collapse-toggle")).toHaveAttribute(
         "aria-expanded",

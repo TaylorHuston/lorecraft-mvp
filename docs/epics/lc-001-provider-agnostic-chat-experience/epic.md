@@ -2153,8 +2153,8 @@ The system SHALL include filled Player Card context in Game Master requests whil
 
 Status: implemented
 Created: 2026-07-08
-Modified: 2026-07-08
-Last verified: 2026-07-08
+Modified: 2026-07-10
+Last verified: 2026-07-10
 
 As a player, I want the current room's key details visible beside the story, so that I can stay oriented without opening debug or treating the transcript as the only source of scene truth.
 
@@ -2234,12 +2234,11 @@ The system SHALL keep the Room Info panel as readable scene context rather than 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R2-S1 and R2-S2 | `src/features/play/room-info-card.test.ts` on 2026-07-08 | proves the Room Info NPC helper lists NPCs and excludes the player, including the no-NPC empty-list case. | Passing |
-| R1-S1 through R3-S2 | `tests/e2e/lorecraft-playtest.spec.ts` updated on 2026-07-08 | browser coverage exists for Room Info display, canonical movement updates, empty NPC state, and reset behavior. | Added; not run in this apply pass |
-| Supporting gate | `npm run ci:required` on 2026-07-08 | proves lint, 89 Vitest tests, typecheck, and production build pass with the Room Info component, play-layout import, browser spec updates, and documentation changes. | Passing |
+| R1-S1 through R3-S2 | `npm run e2e` on 2026-07-10 | proves Room Info display, canonical movement updates, empty NPC state, reset behavior, and Player Card collapse semantics in the complete browser flow. | Passing |
+| Supporting gate | `npm run ci:required` on 2026-07-10 | proves lint, 93 Vitest tests, typecheck, and production build pass with the Room Info component, play layout, browser coverage, and review remediation. | Passing |
 
 #### Verification Gaps
 
-- `npm run e2e` was updated but not executed during this apply pass because the local dev server is expected to keep using the Convex test port unless explicitly stopped.
 - Manual visual review is still useful for whether the right rail balances the Player Card and keeps the story stream centered on the user's real viewport.
 
 #### Story Notes
