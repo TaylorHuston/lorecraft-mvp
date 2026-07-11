@@ -2083,6 +2083,11 @@ The system SHALL show a persistent player-facing Player Card while an Adventure 
 - THEN the story stream remains readable
 - AND a clear control remains available to expand the Player Card again
 
+###### Scenario R1-S3: No debug dependency
+
+- WHEN the debug panel is closed
+- THEN the Player Card remains available as a player-facing surface
+
 ##### Requirement R2: Editable Adventure Profile
 
 The system SHALL let the player fill in optional Player Card fields for the current Adventure.
@@ -2128,14 +2133,14 @@ The system SHALL include filled Player Card context in Game Master requests whil
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| R1-S1 through R2-S2 | `tests/e2e/lorecraft-playtest.spec.ts` updated on 2026-07-08 | Browser coverage exists for name prompt, cancel, card display, editing, collapse/expand, and reload persistence. | Added |
+| R1-S1 through R2-S2 | `npm run e2e` on 2026-07-10 | Browser coverage passes for name prompt, cancel, card display without debug dependency, editing, collapse/expand, and reload persistence. | Passing |
+| R2-S1 and R2-S2 | `src/features/play/player-card-save-queue.test.ts` and immediate-navigation coverage in `npm run e2e` on 2026-07-10 | proves rapid edits serialize to the latest draft, failures remain pending for retry, and returning to Adventures flushes pending Player Card edits. | Passing |
 | R1-S1 through R3-S1 | `src/lib/world/convex-snapshot-read-model.test.ts` | proves snapshot Player Card fields are available even when debug facts are hidden. | Passing |
 | R3-S1 and R3-S2 | `src/lib/director/director.test.ts` | proves Player Card enters prompt context and agency guidance remains present. | Passing |
-| Supporting gate | `npm run lint`, `npm run test`, and `npm run typecheck` on 2026-07-08 | prove the implemented UI, route fixtures, prompt tests, and read-model tests compile and pass. | Passing |
+| Supporting gate | `npm run ci:required` on 2026-07-10 | proves lint, 93 unit tests, typecheck, and production build pass after review remediation. | Passing |
 
 #### Verification Gaps
 
-- `npm run e2e` was not executed during the 2026-07-08 apply run because the local dev Convex backend was already running on port `3210` and Playwright is configured with `reuseExistingServer: false`.
 - Manual visual review is still useful for story width and Player Card collapse feel on narrow screens.
 
 #### Story Notes

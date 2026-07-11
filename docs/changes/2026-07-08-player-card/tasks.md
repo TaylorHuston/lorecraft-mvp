@@ -2,12 +2,12 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` found safe artifact, Player Card fact loading, autosave race, and narrow-layout findings; remediation has been applied
-- Last completed action: reran affected verification after safe review fixes
+- Current state: fresh `/sdd-review` found and remediated stale traceability plus an overlapping Player Card autosave race
+- Last completed action: ran required CI and deterministic E2E, restored the debug dev loop, and applied focused review fixes
 - Next action: rerun `/sdd-review` for a fresh clean verdict
 - Active branch/ref: `change/player-card`
-- Expected dirty files: review remediation in code, tests, and documentation artifacts until committed
-- Known blockers: `npm run e2e` cannot run without stopping the intentionally running local Convex dev server on port `3210`.
+- Expected dirty files: second-pass review remediation until committed
+- Known blockers: none
 
 ## Specialist Checkpoint
 
@@ -98,12 +98,12 @@
 
 ### 6. Review And Closeout
 
-- [ ] 6.1 Update root `CHANGELOG.md` under `Unreleased / Added` when implemented.
+- [x] 6.1 Update root `CHANGELOG.md` under `Unreleased / Added` when implemented.
 - [ ] 6.2 Run `/sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
-- [ ] 6.3 Record review outcome as a `review.md` path, clean review entry, or explicit user-approved review waiver.
-- [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
-- [ ] 6.5 Record manual UI confirmation status as `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
-- [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
+- [x] 6.3 Record review outcome as a `review.md` path, clean review entry, or explicit user-approved review waiver.
+- [x] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
+- [x] 6.5 Record manual UI confirmation status as `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
+- [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
@@ -117,10 +117,11 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | Planning | main; `sdd-propose`; project AGENTS; shared visual style guide; UI/UX guidance | `proposal.md`, `design.md`, `tasks.md` | Proposed Player Card scope and Epic updates. | `5e9074a` |
 | 2026-07-08 | Player Card implementation | main; Convex/Next/UI guidance; delegated discovery | `convex/world.ts`, `src/features/play/*`, `src/lib/world/*`, `src/lib/director/*`, E2E spec | Implemented named Adventure creation, Player Card profile editing, prompt context, reset preservation, and deterministic tests. | `5e9074a` |
 | 2026-07-08 | Documentation and Epic traceability | main | README, CHANGELOG, data model, persistence doc, LC-001, LC-002 | Updated user-facing docs and scenario-mapped Epic evidence for Player Card behavior. | `5e9074a` |
-| 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | pending |
+| 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | `7918983` |
 | 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | `7918983` |
 | 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | `7918983` |
-| 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, planning/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | pending |
+| 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, planning/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | `efa9269` |
+| 2026-07-10 | Fresh review remediation | main; delegated artifact/code/security/UI review | Player Card save queue and tests; design, Epic, tasks, and review artifacts | Serialized overlapping Player Card autosaves, added missing LC-001-S15/R1-S3 Epic truth, corrected remaining blank-field wording, and refreshed verification/lifecycle state. | review-fix commit |
 
 ## Verification Ledger
 
@@ -142,7 +143,10 @@ Record proof as it happens. Keep chronological command output here; summarize on
 | 2026-07-08 | `npm run ci:required` | required local CI gate | Re-ran after self-check fixes; lint, 89 Vitest tests, typecheck, and production build pass. | Passed |
 | 2026-07-08 | `/sdd-review` live browser check at 1440x900 and 390x844 | deterministic local browser inspection | Found no horizontal overflow; found narrow viewport story-stream squeeze caused by stacked side rails. Remediated by giving the story workspace its own viewport-height block on sub-`lg` layouts. | Finding addressed |
 | 2026-07-08 | `/sdd-review` delegated artifact/code/UI reviews | fresh-context review | Found stale blank-field artifact wording, missing LC-002 blank-field scenario, bounded Player Card fact loading, Player Card autosave/turn race, collapsed rail width behavior, and blocked E2E evidence. | Findings addressed or recorded as accepted gap |
-| 2026-07-08 | `npm run e2e` | deterministic browser gate | Still not run during review because the user requested the dev server remain running and Playwright would need port `3210`. | Accepted operational gap for this local review |
+| 2026-07-10 | `npm run e2e` | deterministic browser gate | The fixed E2E port became available; Playwright verified the complete seeded Adventure flow, including Player Card, Room Info, profile persistence, and reload behavior. The normal debug loop was restored afterward. | Passed, 2 tests |
+| 2026-07-10 | `npm run ci:required` | required local CI gate | Lint, 93 Vitest tests, typecheck, and production build passed after second-pass remediation. | Passed |
+| 2026-07-10 | `npm run test -- src/features/play/player-card-save-queue.test.ts` | focused automated test | Proves overlapping Player Card saves are serialized, intermediate drafts collapse to the latest value, failed final writes remain pending, and retry persists the retained draft. | Passed, 3 tests |
+| 2026-07-10 | `npm run e2e` after second-pass remediation | deterministic browser gate | Revalidated both complete browser flows and proved an immediate return to Adventures flushes the latest Player Card edits before navigation. | Passed, 2 tests |
 
 ## Manual Feedback
 
@@ -196,19 +200,19 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Closeout
 
-- Epic files updated:
-- Story labels/references and Requirement/Scenario IDs current:
-- Implemented By maps current:
-- Scenario-mapped Verified By maps current:
-- Superseded earlier Epic truth reconciled:
-- ADR status:
-- Changelog current:
-- `/sdd-review` verdict:
-- Review record:
-- `review.md` findings resolved:
-- Planning updates resolved:
-- Manual UI confirmation status:
-- PR / merge state:
-- Implementation commit: `7918983`
-- Deferred scope accepted:
-- Change moved to `docs/changes/closed/`:
+- Epic files updated: yes, LC-001 and LC-002
+- Story labels/references and Requirement/Scenario IDs current: yes after second-pass remediation
+- Implemented By maps current: yes
+- Scenario-mapped Verified By maps current: yes, including deterministic E2E
+- Superseded earlier Epic truth reconciled: yes
+- ADR status: not applicable
+- Changelog current: yes, `Unreleased / Added`
+- `/sdd-review` verdict: changes-requested after safe second-pass remediation; fresh rerun required
+- Review record: `docs/changes/2026-07-08-player-card/review.md`
+- `review.md` findings resolved: safe findings resolved; production auth remains accepted prototype scope
+- Planning updates resolved: yes
+- Manual UI confirmation status: pending Taylor
+- PR / merge state: not authorized; not merged
+- Implementation commits: `5e9074a` through `efa9269`, plus second-pass review-fix commit
+- Deferred scope accepted: production auth/ownership, RPG systems, avatar, and cross-Adventure identity
+- Change moved to `docs/changes/closed/`: no

@@ -357,9 +357,11 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "Edda came to the chapel after hearing the bell in a dream.",
       );
       await page.locator("#player-card-edit-status").fill("trying to stay calm in the storm");
-      await expect(page.locator("#player-card-save-status")).toContainText("Saved", {
-        timeout: 10_000,
-      });
+      await page.locator("#back-to-adventures-button").click();
+      await expect(page).toHaveURL("/");
+      await page.locator(`#continue-adventure-${temporaryStormboundAdventureId}`).click();
+      await expect(page).toHaveURL(`/adventures/${temporaryStormboundAdventureId}`);
+      await expect(page.locator("#player-card-save-status")).toContainText("Current");
       await expect(page.locator("#player-card-edit-physical-description")).toHaveValue(
         /weathered green cloak/,
       );

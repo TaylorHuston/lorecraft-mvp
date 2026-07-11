@@ -139,11 +139,10 @@ The system SHALL ask for the player name before creating a new Adventure.
 | R1-S1, R1-S2, R2-S1 | `npm run convex:once`; `LORECRAFT_ENABLE_DEBUG_ROUTES=1 npx convex run world:seedDemoWorld`; `npx convex run world:getSnapshot '{\"adventureId\":\"kn7dej4650m780jyn93w55qhfn89rnxc\"}'` | Convex schema compiles, seed creates a default Adventure, snapshot exposes Adventure/source WorldVersion identity, and playable rows are copied into Adventure-owned state. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run test`; `npm run typecheck` | Type and unit coverage compile against the new Adventure context contract. | Passing |
 | R1-S1, R1-S2, R2-S1 | Browser smoke and E2E against `http://localhost:3000`: startup screen showed seeded World containers, listed existing Adventures by turns and last played date, New Adventure created an Adventure under the selected container, the story stream opened at `/adventures/<id>` with source-version opening narration, reload preserved that Adventure URL, Back returned to the World container list, and a temporary Adventure could be deleted from the list. | The player-facing startup flow supports continue/create/delete and opens a copied playable Adventure at a direct URL. | Passing |
-| R3-S1 through R3-S3 | `tests/e2e/lorecraft-playtest.spec.ts` updated on 2026-07-08 plus `npm run test` and `npm run typecheck` | Browser coverage exists for prompting for a player name, canceling creation, opening a named Adventure, showing that name in the Player Card, and showing blank editable optional profile fields. | Added |
+| R3-S1 through R3-S3 | `npm run e2e` plus `npm run ci:required` on 2026-07-10 | Browser coverage passes for prompting for a player name, canceling creation, opening a named Adventure, showing that name in the Player Card, and showing blank editable optional profile fields. | Passing |
 
 #### Verification Gaps
 
-- `npm run e2e` was not executed in the 2026-07-08 apply pass because the local dev Convex backend was already running on port `3210` and Playwright is configured with `reuseExistingServer: false`.
 - Optional live-provider smoke remains deferred.
 
 #### Story Notes

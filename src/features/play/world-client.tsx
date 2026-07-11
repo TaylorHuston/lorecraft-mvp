@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
@@ -124,6 +124,10 @@ export function WorldClient({
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
+  const playerCardFlushRef = useRef<() => Promise<boolean>>(async () => true);
+  const registerPlayerCardFlush = useCallback((flush: () => Promise<boolean>) => {
+    playerCardFlushRef.current = flush;
+  }, []);
 
   const adventureId = selectedAdventureId;
   const isLoadingAdventures = selectedAdventureId === null && worldContainers === undefined;
@@ -166,6 +170,9 @@ export function WorldClient({
     try {
       await npcDebug.cancelQueuedSavesAndWaitForActive();
       await locationDebug.flushActiveSaves();
+      if (!(await playerCardFlushRef.current())) {
+        return;
+      }
       setError(null);
       const seededAdventureId = await seedWorld();
       setSelectedAdventureId(seededAdventureId);
@@ -237,6 +244,9 @@ export function WorldClient({
     setNotice(null);
     await npcDebug.flushQueuedSaves();
     await locationDebug.flushActiveSaves();
+    if (!(await playerCardFlushRef.current())) {
+      return;
+    }
     setSelectedAdventureId(null);
     router.push("/");
     resetLocalDraftState();
@@ -258,6 +268,9 @@ export function WorldClient({
     try {
       await npcDebug.cancelQueuedSavesAndWaitForActive();
       await locationDebug.flushActiveSaves();
+      if (!(await playerCardFlushRef.current())) {
+        return;
+      }
       setError(null);
       const result = await resetPlaytestWorld({ adventureId });
       resetLocalDraftState();
@@ -546,6 +559,7 @@ export function WorldClient({
                   isCollapsed={isPlayerCardCollapsed}
                   onError={setError}
                   onCollapseChange={setIsPlayerCardCollapsed}
+                  onFlushReady={registerPlayerCardFlush}
                   onSavePendingChange={setIsPlayerCardSavePending}
                 />
                 <div

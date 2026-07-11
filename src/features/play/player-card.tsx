@@ -5,6 +5,10 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { errorMessage } from "./debug-formatters";
+import {
+  PlayerCardSaveQueue,
+  type PlayerCardSaveStatus,
+} from "./player-card-save-queue";
 
 export type PlayerCardProfile = {
   physicalDescription: string;
@@ -34,10 +38,9 @@ type PlayerCardProps = {
   isCollapsed: boolean;
   onError: (message: string | null) => void;
   onCollapseChange: (isCollapsed: boolean) => void;
+  onFlushReady: (flush: () => Promise<boolean>) => void;
   onSavePendingChange: (isPending: boolean) => void;
 };
-
-type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
 
 export function PlayerCard({
   adventureId,
@@ -45,16 +48,51 @@ export function PlayerCard({
   isCollapsed,
   onError,
   onCollapseChange,
+  onFlushReady,
   onSavePendingChange,
 }: PlayerCardProps) {
   const updatePlayerProfile = useMutation(api.world.updatePlayerProfile);
   const [draft, setDraft] = useState<PlayerCardDraft>(() => draftFromPlayer(player));
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveStatus, setSaveStatus] = useState<PlayerCardSaveStatus>("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveHandlers = useRef({ adventureId, onError, updatePlayerProfile });
+  const saveQueue = useRef<PlayerCardSaveQueue<PlayerCardDraft> | null>(null);
 
   useEffect(() => {
-    onSavePendingChange(saveStatus === "unsaved" || saveStatus === "saving");
+    saveHandlers.current = { adventureId, onError, updatePlayerProfile };
+    if (!saveQueue.current) {
+      saveQueue.current = new PlayerCardSaveQueue<PlayerCardDraft>(async (next) => {
+        const handlers = saveHandlers.current;
+        handlers.onError(null);
+        try {
+          const result = await handlers.updatePlayerProfile({
+            adventureId: handlers.adventureId,
+            description: next.physicalDescription,
+            facts: {
+              backstory: next.backstory,
+              status: next.status,
+            },
+          });
+          if (!result.ok) {
+            handlers.onError(result.error ?? "Failed to save Player Card.");
+            return false;
+          }
+          return true;
+        } catch (saveError) {
+          handlers.onError(errorMessage(saveError));
+          return false;
+        }
+      }, setSaveStatus);
+    }
+  }, [adventureId, onError, updatePlayerProfile]);
+
+  useEffect(() => {
+    onSavePendingChange(saveStatus !== "idle" && saveStatus !== "saved");
   }, [onSavePendingChange, saveStatus]);
+
+  useEffect(() => {
+    onFlushReady(async () => await (saveQueue.current?.flush() ?? true));
+  }, [onFlushReady]);
 
   useEffect(() => {
     return () => {
@@ -67,40 +105,14 @@ export function PlayerCard({
 
   function updateDraft(next: PlayerCardDraft) {
     setDraft(next);
-    setSaveStatus("unsaved");
+    saveQueue.current?.stage(next);
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
     }
     saveTimer.current = setTimeout(() => {
       saveTimer.current = null;
-      void save(next);
+      void saveQueue.current?.flush();
     }, 700);
-  }
-
-  async function save(next: PlayerCardDraft) {
-    onError(null);
-    setSaveStatus("saving");
-    try {
-      const result = await updatePlayerProfile({
-        adventureId,
-        description: next.physicalDescription,
-        facts: {
-          backstory: next.backstory,
-          status: next.status,
-        },
-      });
-      if (!result.ok) {
-        onError(result.error ?? "Failed to save Player Card.");
-        setSaveStatus("error");
-        return false;
-      }
-      setSaveStatus("saved");
-      return true;
-    } catch (saveError) {
-      onError(errorMessage(saveError));
-      setSaveStatus("error");
-      return false;
-    }
   }
 
   const fieldsId = "player-card-fields";
@@ -108,6 +120,7 @@ export function PlayerCard({
   return (
     <aside
       id="player-card"
+      aria-label="Player Card"
       className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-auto lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto ${
         isCollapsed ? "px-3 lg:w-16" : "px-4 lg:w-[calc(100%-2rem)] lg:max-w-72"
       }`}
@@ -145,12 +158,12 @@ export function PlayerCard({
       {!isCollapsed ? (
         <div id={fieldsId} className="mt-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Character</p>
+            <p className="text-xs uppercase tracking-[0.14em] text-zinc-400">Character</p>
             <span
               id="player-card-save-status"
               role="status"
               aria-live="polite"
-              className="text-xs uppercase text-emerald-300/70"
+              className={`text-xs uppercase ${saveStatusClassName(saveStatus)}`}
             >
               {saveStatusLabel(saveStatus)}
             </span>
@@ -196,7 +209,7 @@ function PlayerCardTextarea({
         <label htmlFor={id} className="text-xs font-medium text-zinc-400">
           {label}
         </label>
-        <span className="text-xs tabular-nums text-zinc-600">{value.length}/1200</span>
+        <span className="text-xs tabular-nums text-zinc-400">{value.length}/1200</span>
       </div>
       <textarea
         id={id}
@@ -218,7 +231,7 @@ function draftFromPlayer(player: PlayerCardPlayer): PlayerCardDraft {
   };
 }
 
-function saveStatusLabel(status: SaveStatus) {
+function saveStatusLabel(status: PlayerCardSaveStatus) {
   if (status === "unsaved") {
     return "Unsaved";
   }
@@ -232,4 +245,17 @@ function saveStatusLabel(status: SaveStatus) {
     return "Save failed";
   }
   return "Current";
+}
+
+function saveStatusClassName(status: PlayerCardSaveStatus) {
+  if (status === "error") {
+    return "text-red-300";
+  }
+  if (status === "unsaved") {
+    return "text-amber-300";
+  }
+  if (status === "saving") {
+    return "text-zinc-300";
+  }
+  return "text-emerald-300";
 }

@@ -52,6 +52,7 @@ The next slice should make the player a first-class Adventure-owned character ca
   - Blank optional fields should remain editable in the expanded Player Card but should not be sent as filled prompt context.
   - Existing debug panels can continue to expose raw player facts indirectly through hidden state until a dedicated debug view is needed.
   - The Room Info panel should not add movement controls, location editing, object inspection, or debug-only metadata in this slice.
+  - The destructive local-only Reset World/bootstrap path may recreate its fixed default playtest Adventure without the normal player-name prompt; player-created Adventures always use the named creation flow.
 - User decisions that shaped the Story/Requirement split:
   - The player model should be similar to NPC storage.
   - The Player Card should be a persistent left-side element, not a debug tab.

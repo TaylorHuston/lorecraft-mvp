@@ -194,7 +194,7 @@ function validatePlayerAuthoredText(
   if (!text) {
     return { ok: false, error: `${args.label} is required.` };
   }
-  if (!/[A-Za-z0-9]/.test(text)) {
+  if (!/[\p{L}\p{N}]/u.test(text)) {
     return { ok: false, error: `${args.label} must include words or numbers.` };
   }
   if (text.length > args.maxLength) {

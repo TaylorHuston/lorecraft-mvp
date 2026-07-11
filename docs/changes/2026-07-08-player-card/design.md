@@ -42,6 +42,7 @@ This change makes the player character a first-class readable card while preserv
   - The left rail may collapse to protect story reading width.
 - Deferred scope:
   - Rich character creation, avatars, inventory, equipment, health, stats, TTRPG rules, auth-owned profiles, and automatic player fact mutation.
+  - Reworking the destructive local-only Reset World/bootstrap path; it may continue to recreate its fixed default playtest Adventure without the normal player-name prompt.
 - Story boundaries challenged:
   - Adventure creation behavior belongs in LC-002 because it changes how Adventures are created from WorldVersions.
   - The persistent Player Card and Game Master context belong in LC-001 because they affect the play loop, prompt context, and player-facing surface.
@@ -147,11 +148,12 @@ As a player, I want my character's identity and durable profile visible beside t
 
 The system SHALL show a persistent player-facing Player Card while an Adventure is open.
 
-###### Scenario R1-S1: Expanded Player Card shows filled profile fields
+###### Scenario R1-S1: Expanded Player Card shows editable profile fields
 
 - WHEN an Adventure is open and the Player Card is expanded
 - THEN it shows the player name and current location
-- AND it shows physical description, backstory, and status only when those fields have values
+- AND physical description, backstory, and status remain visible and editable when blank
+- AND blank optional fields are omitted from Game Master prompt context until filled
 
 ###### Scenario R1-S2: Player Card collapses
 

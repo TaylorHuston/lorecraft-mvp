@@ -39,7 +39,7 @@ export function RoomInfoCard({ room, actors }: RoomInfoCardProps) {
         <section id="room-info-description" aria-labelledby="room-info-description-title">
           <h3
             id="room-info-description-title"
-            className="text-xs uppercase tracking-[0.14em] text-zinc-500"
+            className="text-xs uppercase tracking-[0.14em] text-zinc-400"
           >
             Description
           </h3>
@@ -47,7 +47,7 @@ export function RoomInfoCard({ room, actors }: RoomInfoCardProps) {
         </section>
 
         <section id="room-info-npcs" aria-labelledby="room-info-npcs-title">
-          <h3 id="room-info-npcs-title" className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+          <h3 id="room-info-npcs-title" className="text-xs uppercase tracking-[0.14em] text-zinc-400">
             NPCs
           </h3>
           {npcNames.length > 0 ? (
@@ -62,7 +62,7 @@ export function RoomInfoCard({ room, actors }: RoomInfoCardProps) {
               ))}
             </ul>
           ) : (
-            <p id="room-info-npc-empty" className="mt-3 text-sm leading-6 text-zinc-500">
+            <p id="room-info-npc-empty" className="mt-3 text-sm leading-6 text-zinc-400">
               No one else is here.
             </p>
           )}
