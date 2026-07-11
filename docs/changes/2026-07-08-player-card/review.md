@@ -4,7 +4,7 @@
 
 ready
 
-Fresh review of exact source commit `de087ac976aaad92e96d0048da425cbf4fcf3b6a` found no unresolved blocking or required deficiencies. The source is ready to integrate into `develop`; manual UI confirmation remains a documented nonblocking `pending Taylor` item.
+Fresh review of exact source commit `de087ac976aaad92e96d0048da425cbf4fcf3b6a` found no unresolved blocking or required deficiencies. The source is ready to integrate into `develop`; the remaining suggested manual UI walkthrough is an accepted nonblocking gap for closeout.
 
 ## Gate Scorecard
 
@@ -15,7 +15,7 @@ Fresh review of exact source commit `de087ac976aaad92e96d0048da425cbf4fcf3b6a` f
 | Requirements and Scenarios | pass | All in-scope scenarios are implemented or explicitly deferred. |
 | Story reference traceability | pass | LC-001-S15, LC-001-S16, and LC-002/S1 remain the owning Stories. |
 | Tests and verification | pass | `npm run ci:required` and deterministic `npm run e2e` pass; the normal debug loop was restored afterward. |
-| Manual UI confirmation | pending Taylor | Manual walkthrough remains recorded in `tasks.md`. |
+| Manual UI confirmation | accepted gap | Deterministic E2E passed; the remaining subjective walkthrough is accepted by the close-and-merge authorization. |
 | Code review | pass | No actionable correctness or maintainability findings at the reviewed commit. |
 | Visual / UX consistency | pass | Fresh UI review found no actionable accessibility, responsive, or visual findings. |
 | Security review | pass with accepted prototype gap | No new actionable security finding; production auth/ownership remains explicitly deferred. |

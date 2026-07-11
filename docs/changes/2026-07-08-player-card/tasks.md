@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` is ready at exact source `de087ac976aaad92e96d0048da425cbf4fcf3b6a`
-- Last completed action: fresh artifact, code/security, UI, verification, and merge-readiness passes completed cleanly
-- Next action: confirm or accept the pending manual UI walkthrough, then authorize merge-and-close into `develop`
+- Current state: `/sdd-review` is ready and merge-and-close into `develop` is authorized
+- Last completed action: accepted the remaining subjective manual UI walkthrough as a nonblocking closeout gap
+- Next action: commit closeout preparation, merge locally into `develop`, then archive the change folder
 - Active branch/ref: `change/player-card`
-- Expected dirty files: none after the all-clear review record commit
+- Expected dirty files: none after the closeout-preparation commit
 - Known blockers: none
 
 ## Specialist Checkpoint
@@ -170,7 +170,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Manual UI Confirmation
 
-- Status: pending Taylor
+- Status: accepted gap
 - App URL / route: `http://localhost:3000/` and an Adventure route such as `/adventures/<id>`
 - Required setup or test data: seeded Worlds with at least one newly created Adventure using a custom player name
 - Steps for the user:
@@ -214,8 +214,8 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Review record: `docs/changes/2026-07-08-player-card/review.md`
 - `review.md` findings resolved: safe findings resolved; production auth remains accepted prototype scope
 - Planning updates resolved: yes
-- Manual UI confirmation status: pending Taylor
-- PR / merge state: not authorized; not merged
+- Manual UI confirmation status: accepted gap; deterministic E2E passed and subjective checks remain optional
+- PR / merge state: local merge-and-close into `develop` authorized; merge pending
 - Reviewed source commit: `de087ac976aaad92e96d0048da425cbf4fcf3b6a`
 - Safe review remediation commit: `87eddcbfef2471c186afcd4e9b7d9f01bf620824`
 - Implementation commits: `5e9074a` through `87eddcb`
