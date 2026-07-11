@@ -2,11 +2,11 @@
 
 ## Resume Here
 
-- Current state: `/sdd-review` is ready and merge-and-close into `develop` is authorized
-- Last completed action: accepted the remaining subjective manual UI walkthrough as a nonblocking closeout gap
-- Next action: commit closeout preparation, merge locally into `develop`, then archive the change folder
-- Active branch/ref: `change/player-card`
-- Expected dirty files: none after the closeout-preparation commit
+- Current state: closed after merge into `develop`
+- Last completed action: moved the change to `docs/changes/closed/2026-07-08-player-card/`
+- Next action: none
+- Active branch/ref: `develop`
+- Expected dirty files: none after the closeout commit
 - Known blockers: none
 
 ## Specialist Checkpoint
@@ -105,8 +105,8 @@
 - [x] 6.5 Record manual UI confirmation status as `pending Taylor`, `Taylor confirmed`, or `accepted gap`.
 - [x] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [x] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [x] 6.8 Create a PR or merge only after `/sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [x] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
 ## Implementation Ledger
 
@@ -211,13 +211,13 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - ADR status: not applicable
 - Changelog current: yes, `Unreleased / Added`
 - `/sdd-review` verdict: ready at `de087ac976aaad92e96d0048da425cbf4fcf3b6a`
-- Review record: `docs/changes/2026-07-08-player-card/review.md`
+- Review record: `docs/changes/closed/2026-07-08-player-card/review.md`
 - `review.md` findings resolved: safe findings resolved; production auth remains accepted prototype scope
 - Planning updates resolved: yes
 - Manual UI confirmation status: accepted gap; deterministic E2E passed and subjective checks remain optional
-- PR / merge state: local merge-and-close into `develop` authorized; merge pending
+- PR / merge state: merged locally into `develop` at `b05399ed4bf2abf5c3f512815534055a8a779b72`; no PR required
 - Reviewed source commit: `de087ac976aaad92e96d0048da425cbf4fcf3b6a`
 - Safe review remediation commit: `87eddcbfef2471c186afcd4e9b7d9f01bf620824`
 - Implementation commits: `5e9074a` through `87eddcb`
 - Deferred scope accepted: production auth/ownership, RPG systems, avatar, and cross-Adventure identity
-- Change moved to `docs/changes/closed/`: no
+- Change moved to `docs/changes/closed/`: yes, as part of the closeout commit following merge `b05399e`

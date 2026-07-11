@@ -62,7 +62,7 @@ The next slice should make the player a first-class Adventure-owned character ca
 
 ## Change Folder
 
-- Active location: `docs/changes/2026-07-08-player-card/`
+- Active location: none; change closed after merge into `develop`
 - Closed location: `docs/changes/closed/2026-07-08-player-card/`
 
 ## Impact

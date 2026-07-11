@@ -96,7 +96,7 @@ Fresh review of exact source commit `de087ac976aaad92e96d0048da425cbf4fcf3b6a` f
 - Conflict check: clean, tree `785699d35f85823647f56c0fdc917344065a7359`
 - Commit state: clean at review start; this all-clear review record is the only metadata update
 - PR status: none
-- Merge status: not authorized in this review invocation
+- Merge status: merged locally into `develop` at `b05399ed4bf2abf5c3f512815534055a8a779b72`
 
 ## Review Log
 
