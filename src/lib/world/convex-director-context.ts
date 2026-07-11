@@ -24,7 +24,7 @@ export async function loadDirectorContextReadModel(
   },
 ) {
   const { adventure, world, worldVersion, player, room } = args.loaded;
-  const [exits, actors, objects, facts, recentFeed, storyVisibleHistory, allRooms] = await Promise.all([
+  const [exits, actors, objects, facts, playerFacts, recentFeed, storyVisibleHistory, allRooms] = await Promise.all([
     loadVisibleExits(ctx, args.adventureId, room._id),
     ctx.db
       .query("actors")
@@ -42,6 +42,7 @@ export async function loadDirectorContextReadModel(
       .query("facts")
       .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
       .take(100),
+    loadPlayerProfileFacts(ctx, args.adventureId, player),
     loadFeed(ctx, args.adventureId, 20),
     loadStoryVisibleHistory(ctx, args.adventureId, 20),
     ctx.db
@@ -83,6 +84,10 @@ export async function loadDirectorContextReadModel(
       id: player._id,
       key: stableActorKey(player),
       name: player.name,
+      description: player.description,
+      locationKey: room.key,
+      locationName: room.name,
+      profile: playerProfileFromFacts(player, playerFacts),
     },
     room: {
       id: room._id,
@@ -139,6 +144,37 @@ export async function loadDirectorContextReadModel(
     recentFeed,
     storyVisibleHistory,
   };
+}
+
+function playerProfileFromFacts(
+  player: Doc<"actors">,
+  facts: Array<Doc<"facts">>,
+) {
+  const actorKey = stableActorKey(player);
+  const actorFacts = facts.filter((fact) => fact.subjectId === actorSubjectId(actorKey));
+  return {
+    physicalDescription: player.description,
+    backstory: stringFactValue(actorFacts, "backstory"),
+    status: stringFactValue(actorFacts, "status"),
+  };
+}
+
+async function loadPlayerProfileFacts(
+  ctx: QueryCtx,
+  adventureId: Id<"adventures">,
+  player: Doc<"actors">,
+) {
+  return await ctx.db
+    .query("facts")
+    .withIndex("by_adventureId_and_subjectId", (q) =>
+      q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(stableActorKey(player))),
+    )
+    .take(20);
+}
+
+function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
+  const fact = facts.find((candidate) => candidate.key === key);
+  return typeof fact?.value === "string" ? fact.value : "";
 }
 
 export async function loadTranscriptDirectorContextReadModel(

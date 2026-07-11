@@ -99,6 +99,14 @@ export type DirectorContext = {
     id: string;
     key: string;
     name: string;
+    description: string;
+    locationKey: string;
+    locationName: string;
+    profile: {
+      physicalDescription: string;
+      backstory: string;
+      status: string;
+    };
   };
   room: {
     id: string;

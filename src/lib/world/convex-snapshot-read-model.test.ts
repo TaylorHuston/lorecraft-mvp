@@ -1,8 +1,177 @@
 import { describe, expect, it } from "vitest";
 import type { QueryCtx } from "../../../convex/_generated/server";
-import { loadFeed, loadStoryVisibleHistory, loadTranscript } from "./convex-snapshot-read-model";
+import {
+  loadFeed,
+  loadSnapshotReadModel,
+  loadStoryVisibleHistory,
+  loadTranscript,
+} from "./convex-snapshot-read-model";
 
 describe("Convex snapshot read model", () => {
+  it("returns Player Card profile fields even when debug facts are hidden", async () => {
+    const adventure = row("adventure-1", {
+      name: "Stormbound Chapel",
+      worldId: "world-1",
+      worldVersionId: "world-version-1",
+    });
+    const world = row("world-1", {
+      name: "Stormbound Chapel",
+      description: "A chapel in a storm.",
+    });
+    const worldVersion = row("world-version-1", {
+      versionNumber: 1,
+      name: "Stormbound Chapel",
+    });
+    const room = row("room-1", {
+      key: "chapel",
+      name: "Chapel",
+      description: "Rain taps against warped shutters.",
+    });
+    const player = row("actor-player", {
+      key: "taylor",
+      name: "Taylor",
+      role: "player",
+      roomId: "room-1",
+      description: "A rain-soaked traveler.",
+    });
+    const ctx = fakeQueryCtx({
+      rooms: [room],
+      actors: [player],
+      worldObjects: [],
+      facts: [
+        row("fact-backstory", {
+          subjectType: "actor",
+          subjectId: "actor:taylor",
+          key: "backstory",
+          value: "Taylor came to investigate the bell.",
+          source: "player",
+        }),
+        row("fact-status", {
+          subjectType: "actor",
+          subjectId: "actor:taylor",
+          key: "status",
+          value: "standing near the chapel aisle",
+          source: "player",
+        }),
+      ],
+      exits: [],
+      commands: [],
+      narrations: [],
+      events: [],
+      utilityMessages: [],
+      stateDiffs: [],
+      directorCalls: [],
+      turns: [],
+    });
+
+    const snapshot = await loadSnapshotReadModel(ctx, {
+      adventureId: "adventure-1" as never,
+      loaded: {
+        adventure,
+        world,
+        worldVersion,
+        player,
+        room,
+      } as never,
+      includeDebugState: false,
+    });
+
+    expect(snapshot.facts).toEqual([]);
+    expect(snapshot.player).toMatchObject({
+      name: "Taylor",
+      description: "A rain-soaked traveler.",
+      locationName: "Chapel",
+      profile: {
+        physicalDescription: "A rain-soaked traveler.",
+        backstory: "Taylor came to investigate the bell.",
+        status: "standing near the chapel aisle",
+      },
+    });
+  });
+
+  it("loads Player Card facts outside the bounded general fact list", async () => {
+    const adventure = row("adventure-1", {
+      name: "Stormbound Chapel",
+      worldId: "world-1",
+      worldVersionId: "world-version-1",
+    });
+    const world = row("world-1", {
+      name: "Stormbound Chapel",
+      description: "A chapel in a storm.",
+    });
+    const worldVersion = row("world-version-1", {
+      versionNumber: 1,
+      name: "Stormbound Chapel",
+    });
+    const room = row("room-1", {
+      key: "chapel",
+      name: "Chapel",
+      description: "Rain taps against warped shutters.",
+    });
+    const player = row("actor-player", {
+      key: "taylor",
+      name: "Taylor",
+      role: "player",
+      roomId: "room-1",
+      description: "A rain-soaked traveler.",
+    });
+    const playerFacts = [
+      row("fact-backstory", {
+        subjectType: "actor",
+        subjectId: "actor:taylor",
+        key: "backstory",
+        value: "Taylor remembers the old bell.",
+        source: "player",
+      }),
+      row("fact-status", {
+        subjectType: "actor",
+        subjectId: "actor:taylor",
+        key: "status",
+        value: "keeping one hand near the lantern",
+        source: "player",
+      }),
+    ];
+    const fillerFacts = Array.from({ length: 100 }, (_, index) =>
+      row(`fact-filler-${index}`, {
+        subjectType: "actor",
+        subjectId: `actor:filler-${index}`,
+        key: "status",
+        value: `filler ${index}`,
+        source: "debug",
+      }),
+    );
+    const ctx = fakeQueryCtx({
+      rooms: [room],
+      actors: [player],
+      worldObjects: [],
+      facts: [...playerFacts, ...fillerFacts],
+      exits: [],
+      commands: [],
+      narrations: [],
+      events: [],
+      utilityMessages: [],
+      stateDiffs: [],
+      directorCalls: [],
+      turns: [],
+    });
+
+    const snapshot = await loadSnapshotReadModel(ctx, {
+      adventureId: "adventure-1" as never,
+      loaded: {
+        adventure,
+        world,
+        worldVersion,
+        player,
+        room,
+      } as never,
+      includeDebugState: true,
+    });
+
+    expect(snapshot.facts).not.toContainEqual(expect.objectContaining({ key: "backstory" }));
+    expect(snapshot.player.profile.backstory).toBe("Taylor remembers the old bell.");
+    expect(snapshot.player.profile.status).toBe("keeping one hand near the lantern");
+  });
+
   it("shows player Story inserts as distinct feed entries", async () => {
     const ctx = fakeQueryCtx({
       commands: [],
@@ -123,7 +292,11 @@ function fakeQueryCtx(tables: Record<string, Array<Record<string, unknown>>>) {
       query(table: string) {
         let rows = [...(tables[table] ?? [])];
         return {
-          withIndex() {
+          withIndex(_indexName: string, build?: (query: FakeIndexQuery) => FakeIndexQuery) {
+            const filters = build?.(new FakeIndexQuery()).filters ?? [];
+            rows = rows.filter((row) =>
+              filters.every(({ field, value }) => row[field] === value),
+            );
             return this;
           },
           order(direction: "asc" | "desc") {
@@ -146,4 +319,13 @@ function fakeQueryCtx(tables: Record<string, Array<Record<string, unknown>>>) {
       },
     },
   } as unknown as QueryCtx;
+}
+
+class FakeIndexQuery {
+  filters: Array<{ field: string; value: unknown }> = [];
+
+  eq(field: string, value: unknown) {
+    this.filters.push({ field, value });
+    return this;
+  }
 }

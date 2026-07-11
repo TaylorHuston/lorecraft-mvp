@@ -1,11 +1,11 @@
 ---
-modified: 2026-06-30
+modified: 2026-07-08
 ---
 # Data Model
 
 This is the canonical human-readable data model for the current Lorecraft MVP. It should match `convex/schema.ts` and the persistence behavior in `convex/world.ts`.
 
-The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, and a tiny readable NPC state surface.
+The model is intentionally small. It supports authored demo Worlds, immutable WorldVersion baselines, playable Adventure copies, a resumable narrative feed, player-authored Story inserts, hidden Guide turns, pre-turn utility messages, bounded Game Master calls, a player-facing Player Card, a player-facing Room Info panel, and a tiny readable NPC state surface.
 
 ## World
 
@@ -68,6 +68,7 @@ Strategy:
 - Runtime tables retain `worldId` as source metadata during the MVP migration, but implemented reads/writes use `adventureId` as the runtime identity.
 - Reset Session deletes the selected Adventure's runtime rows and recopies its original source WorldVersion.
 - Delete Adventure removes that Adventure and its Adventure-owned runtime rows. It does not delete the source World or WorldVersion.
+- New Adventure creation asks for the player name. That name is copied into the Adventure-owned player actor without changing the source WorldVersion.
 
 ## Room / Location
 
@@ -86,12 +87,30 @@ A room is the current storage model for a lightweight Location Card. Product-fac
 Strategy:
 
 - Location Cards provide canonical scene context for the Game Master.
+- The player-facing Room Info panel projects the player's current room name, description, and present NPCs from canonical Adventure state.
 - Persistent Game Master requests include the current Location Card plus a compact list of known locations that can be movement targets.
 - Clear narrative travel to an existing location can mutate actor `roomId` only through the post-narration extractor and Convex validation.
 - Movement does not require linked exits yet; any existing location is eligible for this MVP slice.
 - Unknown destinations are handled in narration/debug evidence and do not create canonical locations.
 - A future `Dungeon` concept may add linked rooms, path constraints, locks, hazards, and stricter navigation, but that is not part of the current model.
 - Dynamic room state should be stored as facts, not by rewriting `description`.
+
+### Current Room Info Panel Fields
+
+The Room Info panel is the player-facing version of the current Location Card. It is visible outside debug and helps the player stay oriented without making the story transcript carry all current-scene context.
+
+| Field | Backing storage | Meaning |
+|---|---|---|
+| Room name | Current player actor `roomId` joined to Room `name` | The canonical current location name. |
+| Room description | Current Room `description` | Stable baseline description for the current location. |
+| Present NPCs | Actors with `role = "npc"` and `roomId` matching the player's current Room | NPCs currently present with the player. The player actor is excluded. |
+
+Strategy:
+
+- Room Info is read-only player-facing context, not a location editor.
+- Location editing stays in the debug Locations tab for the MVP.
+- Room Info does not add movement controls, exits-as-buttons, maps, object interactions, or dungeon traversal behavior.
+- NPC presence is derived from canonical actor locations, not from recent story text alone.
 
 ## Exit
 
@@ -135,6 +154,26 @@ Strategy:
 - Put mutable state in actor-scoped facts.
 - Actor location is canonical state, not transcript inference. The Game Master can propose actor moves only through the extractor, and Convex validates current-scene actor presence plus destination existence before patching `roomId`.
 - Do not add an `npcs` table until NPC-specific behavior outgrows generic actors plus facts.
+
+### Current Player Card Fields
+
+The Player Card is the player-facing version of the Adventure-owned player actor. It is visible outside the debug panel and is included in Game Master context as protagonist grounding, not as permission for the model to choose the player's next intent.
+
+| Field | Backing storage | Meaning |
+|---|---|---|
+| Player name | Player actor `name` | The name entered when the Adventure is created. Future versions may use account username, character name, or both. |
+| Current location | Player actor `roomId` joined to Location name | Canonical current player location. This updates only through accepted movement or reset/debug tooling. |
+| Physical description | Player actor `description` | Optional visible character appearance. Blank on new Adventures until the player fills it in. |
+| Backstory | Actor fact `backstory` with `source = "player"` | Optional short history before this Adventure's current story. |
+| Status | Actor fact `status` with `source = "player"` | Optional current player condition or circumstance that should ground narration. |
+
+Strategy:
+
+- The Player Card belongs to the Adventure, not the source WorldVersion. Editing it does not mutate seeded World data.
+- Blank optional fields remain visible and editable in the expanded Player Card, but are omitted from prompt text until filled.
+- Reset Session preserves the current player name and Player Card optional fields while recopying the source WorldVersion runtime rows.
+- The Game Master sees the Player Card as canonical context for appearance, backstory, status, and current location. It may use that context for continuity and perception, but it must not invent player thoughts, goals, speech, feelings, or actions from it.
+- Future inventory, equipment, stats, health, or TTRPG character data can extend this Player Card only after playtesting proves the need.
 
 ## World Object
 

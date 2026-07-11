@@ -11,6 +11,9 @@ The format is based on Keep a Changelog 1.1.0.
 - Adventure instances created from frozen WorldVersions, with the default Stormbound Chapel playtest now running inside a mutable Adventure copy.
 - Startup World container screen for Stormbound Chapel, with local Adventures listed by turn count and last played date and opened at `/adventures/<id>`.
 - Home-screen deletion for local Adventures without changing the source WorldVersion.
+- Player name prompt when creating a new Adventure.
+- Persistent collapsible Player Card with editable physical description, backstory, status, and current location context.
+- Persistent read-only Room Info panel showing the current room description and present NPCs beside the story.
 - Player-facing Pass turns that let the Game Master continue the current scene without adding player prose.
 - Player-facing Story inserts that add canonical scene prose before the next resolving turn without incrementing turn count.
 - Player-facing Guide turns that privately steer the next Game Master narration while keeping raw Guide text out of the story stream.
@@ -25,6 +28,7 @@ The format is based on Keep a Changelog 1.1.0.
 - Recent Game Master context now includes player-authored Story inserts while continuing to exclude slash utility output and raw Guide text.
 - NPC state extraction is more conservative about momentary reactions, so transient beats are less likely to become durable NPC facts.
 - The startup screen now supports multiple seeded World containers instead of assuming Stormbound Chapel is the only World.
+- Game Master prompts now include filled Player Card fields as canonical protagonist context while preserving player agency.
 
 ### Fixed
 

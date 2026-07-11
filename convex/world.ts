@@ -47,10 +47,17 @@ type DebugNpcWriteResult = {
   error?: string;
   actorId?: Id<"actors">;
 };
+type PlayerProfileWriteResult = {
+  ok: boolean;
+  error?: string;
+  actorId?: Id<"actors">;
+};
 
 const DEMO_RESET_ROW_LIMIT = 500;
 const DEBUG_CREATED_LOCATION_LIMIT = 25;
 const DEBUG_CREATED_NPC_LIMIT = 25;
+const PLAYER_NAME_MAX_LENGTH = 80;
+const PLAYER_PROFILE_FIELD_MAX_LENGTH = 1200;
 const STORY_INSERT_MAX_LENGTH = 4000;
 const GUIDE_GUIDANCE_MAX_LENGTH = 1200;
 
@@ -112,7 +119,16 @@ const npcDebugFacts = v.object({
   memory: v.optional(v.string()),
   knowledge: v.optional(v.string()),
 });
+const playerProfileFacts = v.object({
+  backstory: v.optional(v.string()),
+  status: v.optional(v.string()),
+});
 const debugNpcWriteResult = v.object({
+  ok: v.boolean(),
+  error: v.optional(v.string()),
+  actorId: v.optional(v.id("actors")),
+});
+const playerProfileWriteResult = v.object({
   ok: v.boolean(),
   error: v.optional(v.string()),
   actorId: v.optional(v.id("actors")),
@@ -178,7 +194,7 @@ function validatePlayerAuthoredText(
   if (!text) {
     return { ok: false, error: `${args.label} is required.` };
   }
-  if (!/[A-Za-z0-9]/.test(text)) {
+  if (!/[\p{L}\p{N}]/u.test(text)) {
     return { ok: false, error: `${args.label} must include words or numbers.` };
   }
   if (text.length > args.maxLength) {
@@ -286,6 +302,11 @@ async function createAdventureFromBaseline(
     worldId: Id<"worlds">;
     worldVersionId: Id<"worldVersions">;
     baseline: AdventureBaseline;
+    playerProfile?: {
+      name: string;
+      description: string;
+      facts: Partial<Record<"backstory" | "status", string>>;
+    };
   },
 ) {
   const adventureId = await ctx.db.insert("adventures", {
@@ -300,6 +321,7 @@ async function createAdventureFromBaseline(
     worldVersionId: args.worldVersionId,
     adventureId,
     baseline: args.baseline,
+    playerProfile: args.playerProfile,
   });
   return adventureId;
 }
@@ -413,6 +435,11 @@ async function copyBaselineRuntimeRows(
     worldVersionId: Id<"worldVersions">;
     adventureId: Id<"adventures">;
     baseline: AdventureBaseline;
+    playerProfile?: {
+      name: string;
+      description: string;
+      facts: Partial<Record<"backstory" | "status", string>>;
+    };
   },
 ) {
   const roomsByKey = new Map<string, Id<"rooms">>();
@@ -452,11 +479,20 @@ async function copyBaselineRuntimeRows(
     adventureId: args.adventureId,
     roomId: playerRoomId,
     key: args.baseline.player.key,
-    name: args.baseline.player.name,
+    name: args.playerProfile?.name ?? args.baseline.player.name,
     role: "player",
-    description: args.baseline.player.description,
+    description: args.playerProfile?.description ?? args.baseline.player.description,
   });
   await ctx.db.patch(args.adventureId, { currentPlayerActorId: playerId });
+  if (args.playerProfile) {
+    await writePlayerProfileFacts(
+      ctx,
+      args.worldId,
+      args.adventureId,
+      args.baseline.player.key,
+      args.playerProfile.facts,
+    );
+  }
 
   for (const npc of args.baseline.npcs) {
     const roomId = roomsByKey.get(npc.roomKey);
@@ -773,9 +809,18 @@ export const createAdventure = mutation({
   args: {
     worldId: v.optional(v.id("worlds")),
     name: v.optional(v.string()),
+    playerName: v.string(),
   },
   returns: adventureCreateResult,
   handler: async (ctx, args) => {
+    const playerName = validatePlayerAuthoredText(args.playerName, {
+      label: "Player name",
+      maxLength: PLAYER_NAME_MAX_LENGTH,
+    });
+    if (!playerName.ok) {
+      return { ok: false as const, error: playerName.error };
+    }
+
     const stormbound = await ensureDemoWorldVersion(ctx);
     const tutorial = await ensureTutorialWorldVersion(ctx);
     const selected =
@@ -795,9 +840,47 @@ export const createAdventure = mutation({
       worldId: selected.worldId,
       worldVersionId: selected.worldVersionId,
       baseline: selected.baseline,
+      playerProfile: {
+        name: playerName.text,
+        description: "",
+        facts: {},
+      },
     });
 
     return { ok: true as const, adventureId };
+  },
+});
+
+export const updatePlayerProfile = mutation({
+  args: {
+    adventureId: v.id("adventures"),
+    description: v.string(),
+    facts: playerProfileFacts,
+  },
+  returns: playerProfileWriteResult,
+  handler: async (ctx, args): Promise<PlayerProfileWriteResult> => {
+    const adventure = await ctx.db.get(args.adventureId);
+    if (!adventure?.currentPlayerActorId) {
+      return { ok: false, error: "No active player exists in this Adventure yet." };
+    }
+
+    const player = await ctx.db.get(adventure.currentPlayerActorId);
+    if (!player || player.adventureId !== args.adventureId || player.role !== "player") {
+      return { ok: false, error: "Player actor could not be found in this Adventure." };
+    }
+
+    await ctx.db.patch(player._id, {
+      description: args.description.trim().slice(0, PLAYER_PROFILE_FIELD_MAX_LENGTH),
+    });
+    await writePlayerProfileFacts(
+      ctx,
+      adventure.worldId,
+      args.adventureId,
+      stableActorKey(player),
+      args.facts,
+    );
+
+    return { ok: true, actorId: player._id };
   },
 });
 
@@ -979,7 +1062,14 @@ export const getSnapshot = query({
         _id: v.id("actors"),
         key: v.string(),
         name: v.string(),
+        description: v.string(),
         roomId: v.id("rooms"),
+        locationName: v.string(),
+        profile: v.object({
+          physicalDescription: v.string(),
+          backstory: v.string(),
+          status: v.string(),
+        }),
       }),
       room: v.object({
         _id: v.id("rooms"),
@@ -1123,7 +1213,19 @@ export const getDirectorContext = query({
         versionNumber: v.number(),
         name: v.string(),
       }),
-      player: v.object({ id: v.string(), key: v.string(), name: v.string() }),
+      player: v.object({
+        id: v.string(),
+        key: v.string(),
+        name: v.string(),
+        description: v.string(),
+        locationKey: v.string(),
+        locationName: v.string(),
+        profile: v.object({
+          physicalDescription: v.string(),
+          backstory: v.string(),
+          status: v.string(),
+        }),
+      }),
       room: v.object({
         id: v.string(),
         key: v.string(),
@@ -1721,6 +1823,29 @@ export const resetPlaytestWorld = mutation({
       throw new Error("Adventure source WorldVersion could not be found.");
     }
     const baseline = worldVersion.baseline as AdventureBaseline;
+    const currentPlayer = adventure.currentPlayerActorId
+      ? await ctx.db.get(adventure.currentPlayerActorId)
+      : null;
+    const currentPlayerFacts = currentPlayer
+      ? await ctx.db
+          .query("facts")
+          .withIndex("by_adventureId_and_subjectId", (q) =>
+            q
+              .eq("adventureId", args.adventureId)
+              .eq("subjectId", actorSubjectId(stableActorKey(currentPlayer))),
+          )
+          .take(20)
+      : [];
+    const playerProfile = currentPlayer
+      ? {
+          name: currentPlayer.name,
+          description: currentPlayer.description,
+          facts: {
+            backstory: stringFactValue(currentPlayerFacts, "backstory"),
+            status: stringFactValue(currentPlayerFacts, "status"),
+          },
+        }
+      : undefined;
 
     const deletedNarrations = await deleteNarrations(ctx, args.adventureId);
     const deletedEvents = await deleteEvents(ctx, args.adventureId);
@@ -1740,6 +1865,7 @@ export const resetPlaytestWorld = mutation({
       worldVersionId: adventure.worldVersionId,
       adventureId: args.adventureId,
       baseline,
+      ...(playerProfile ? { playerProfile } : {}),
     });
 
     return {
@@ -2107,6 +2233,37 @@ async function writeNpcFacts(
       overwrite: true,
     });
   }
+}
+
+async function writePlayerProfileFacts(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  adventureId: Id<"adventures">,
+  actorKey: string,
+  facts: Partial<Record<"backstory" | "status", string>>,
+) {
+  for (const key of ["backstory", "status"] as const) {
+    const value = facts[key]?.trim();
+    if (!value) {
+      await deleteActorFactByKey(ctx, adventureId, actorKey, key);
+      continue;
+    }
+    await setFact(ctx, {
+      worldId,
+      adventureId,
+      subjectType: "actor",
+      subjectId: actorSubjectId(actorKey),
+      key,
+      value: value.slice(0, PLAYER_PROFILE_FIELD_MAX_LENGTH),
+      source: "player",
+      overwrite: true,
+    });
+  }
+}
+
+function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
+  const fact = facts.find((candidate) => candidate.key === key);
+  return typeof fact?.value === "string" ? fact.value : "";
 }
 
 function debugLocationWritesEnabled() {

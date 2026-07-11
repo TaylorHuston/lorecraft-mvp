@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +18,8 @@ import {
 } from "./debug-formatters";
 import { AdventureLanding, type AdventureListItem } from "./adventure-landing";
 import { DebugActionButton, DebugPanelShell } from "./debug-panel-shell";
+import { PlayerCard } from "./player-card";
+import { RoomInfoCard } from "./room-info-card";
 import { TurnActionPanel } from "./turn-action-panel";
 import {
   NPC_PROFILE_FACT_KEYS,
@@ -116,10 +118,16 @@ export function WorldClient({
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
+  const [isPlayerCardCollapsed, setIsPlayerCardCollapsed] = useState(false);
+  const [isPlayerCardSavePending, setIsPlayerCardSavePending] = useState(false);
   const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
     DEFAULT_PROMPT_GUIDANCE,
   );
   const storyScrollerRef = useRef<HTMLElement | null>(null);
+  const playerCardFlushRef = useRef<() => Promise<boolean>>(async () => true);
+  const registerPlayerCardFlush = useCallback((flush: () => Promise<boolean>) => {
+    playerCardFlushRef.current = flush;
+  }, []);
 
   const adventureId = selectedAdventureId;
   const isLoadingAdventures = selectedAdventureId === null && worldContainers === undefined;
@@ -162,6 +170,9 @@ export function WorldClient({
     try {
       await npcDebug.cancelQueuedSavesAndWaitForActive();
       await locationDebug.flushActiveSaves();
+      if (!(await playerCardFlushRef.current())) {
+        return;
+      }
       setError(null);
       const seededAdventureId = await seedWorld();
       setSelectedAdventureId(seededAdventureId);
@@ -175,12 +186,12 @@ export function WorldClient({
     }
   }
 
-  async function handleCreateAdventure(worldId: Id<"worlds">) {
+  async function handleCreateAdventure(worldId: Id<"worlds">, playerName: string) {
     setError(null);
     setNotice(null);
     setCreatingWorldId(worldId);
     try {
-      const result = await createAdventure({ worldId });
+      const result = await createAdventure({ worldId, playerName });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -233,6 +244,9 @@ export function WorldClient({
     setNotice(null);
     await npcDebug.flushQueuedSaves();
     await locationDebug.flushActiveSaves();
+    if (!(await playerCardFlushRef.current())) {
+      return;
+    }
     setSelectedAdventureId(null);
     router.push("/");
     resetLocalDraftState();
@@ -254,6 +268,9 @@ export function WorldClient({
     try {
       await npcDebug.cancelQueuedSavesAndWaitForActive();
       await locationDebug.flushActiveSaves();
+      if (!(await playerCardFlushRef.current())) {
+        return;
+      }
       setError(null);
       const result = await resetPlaytestWorld({ adventureId });
       resetLocalDraftState();
@@ -268,7 +285,14 @@ export function WorldClient({
   }
 
   async function handlePass() {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -276,7 +300,14 @@ export function WorldClient({
   }
 
   async function handleActSubmit(input: string): Promise<"close" | "keep-open" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -289,7 +320,14 @@ export function WorldClient({
   }
 
   async function handleStorySubmit(input: string): Promise<"close" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -298,7 +336,14 @@ export function WorldClient({
   }
 
   async function handleGuideSubmit(input: string): Promise<"close" | false> {
-    if (!adventureId || isSubmitting || isSeeding || isResetting || creatingWorldId !== null) {
+    if (
+      !adventureId ||
+      isSubmitting ||
+      isSeeding ||
+      isResetting ||
+      creatingWorldId !== null ||
+      isPlayerCardSavePending
+    ) {
       return false;
     }
 
@@ -478,7 +523,7 @@ export function WorldClient({
                 error={error}
                 notice={notice}
                 onSeedWorld={() => void handleSeed()}
-                onCreateAdventure={(worldId) => void handleCreateAdventure(worldId)}
+                onCreateAdventure={(worldId, playerName) => void handleCreateAdventure(worldId, playerName)}
                 onSelectAdventure={handleSelectAdventure}
                 onDeleteAdventure={(adventure) => void handleDeleteAdventure(adventure)}
               />
@@ -499,58 +544,86 @@ export function WorldClient({
                 </button>
               </div>
             ) : (
-              <>
-                <section
-                  id="story-stream"
-                  ref={storyScrollerRef}
-                  className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10"
-                >
-                  <div
-                    id="story-stream-inner"
-                    className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end pr-0 sm:pr-12"
-                  >
-                    {snapshot.feed.length > 0 ? (
-                      <div id="story-feed" className="space-y-8">
-                        {snapshot.feed.map((entry) => {
-                          const kind = normalizeFeedKind(entry.kind, entry.source);
-                          const turnId = "turnId" in entry ? entry.turnId : undefined;
-                          return (
-                            <StoryEntry
-                              key={entry.id}
-                              id={entry.id}
-                              kind={kind}
-                              text={entry.text}
-                              turnNumber={
-                                shouldShowTurnNumber(kind) && turnId
-                                  ? turnSequenceById.get(turnId)
-                                  : undefined
-                              }
-                            />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
-                        <p className="max-w-md text-base leading-7 text-zinc-400">
-                          The chapel waits in rain and lantern light.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <TurnActionPanel
-                  disabled={isSeeding || isResetting || creatingWorldId !== null}
-                  isSubmitting={isSubmitting}
-                  notice={notice}
-                  error={error}
-                  slashCommandTargets={slashCommandTargets}
-                  onActSubmit={handleActSubmit}
-                  onStorySubmit={handleStorySubmit}
-                  onGuideSubmit={handleGuideSubmit}
-                  onPass={handlePass}
+              <div
+                id="play-layout"
+                className={`flex min-h-0 flex-1 flex-col lg:grid ${
+                  isPlayerCardCollapsed
+                    ? "lg:grid-cols-[6rem_56fr_23fr]"
+                    : "lg:grid-cols-[23fr_56fr_23fr]"
+                }`}
+              >
+                <PlayerCard
+                  key={snapshot.player._id}
+                  adventureId={adventureId}
+                  player={snapshot.player}
+                  isCollapsed={isPlayerCardCollapsed}
+                  onError={setError}
+                  onCollapseChange={setIsPlayerCardCollapsed}
+                  onFlushReady={registerPlayerCardFlush}
+                  onSavePendingChange={setIsPlayerCardSavePending}
                 />
-              </>
+                <div
+                  id="story-workspace"
+                  className="flex min-h-[calc(100vh-3rem)] min-w-0 flex-col lg:min-h-0"
+                >
+                  <section
+                    id="story-stream"
+                    ref={storyScrollerRef}
+                    className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-5 lg:px-0"
+                  >
+                    <div
+                      id="story-stream-inner"
+                      className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end"
+                    >
+                      {snapshot.feed.length > 0 ? (
+                        <div id="story-feed" className="space-y-8">
+                          {snapshot.feed.map((entry) => {
+                            const kind = normalizeFeedKind(entry.kind, entry.source);
+                            const turnId = "turnId" in entry ? entry.turnId : undefined;
+                            return (
+                              <StoryEntry
+                                key={entry.id}
+                                id={entry.id}
+                                kind={kind}
+                                text={entry.text}
+                                turnNumber={
+                                  shouldShowTurnNumber(kind) && turnId
+                                    ? turnSequenceById.get(turnId)
+                                    : undefined
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
+                          <p className="max-w-md text-base leading-7 text-zinc-400">
+                            The chapel waits in rain and lantern light.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  <TurnActionPanel
+                    disabled={
+                      isSeeding ||
+                      isResetting ||
+                      creatingWorldId !== null ||
+                      isPlayerCardSavePending
+                    }
+                    isSubmitting={isSubmitting}
+                    notice={notice}
+                    error={error}
+                    slashCommandTargets={slashCommandTargets}
+                    onActSubmit={handleActSubmit}
+                    onStorySubmit={handleStorySubmit}
+                    onGuideSubmit={handleGuideSubmit}
+                    onPass={handlePass}
+                  />
+                </div>
+                <RoomInfoCard room={snapshot.room} actors={snapshot.actors} />
+              </div>
             )}
           </div>
         </section>

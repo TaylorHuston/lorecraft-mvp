@@ -23,6 +23,7 @@ export async function loadSnapshotReadModel(
     actors,
     objects,
     facts,
+    playerFacts,
     events,
     narrations,
     diffs,
@@ -50,6 +51,7 @@ export async function loadSnapshotReadModel(
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
         .order("desc")
         .take(80),
+      loadPlayerProfileFacts(ctx, args.adventureId, player),
       ctx.db
         .query("events")
         .withIndex("by_adventureId", (q) => q.eq("adventureId", args.adventureId))
@@ -92,11 +94,14 @@ export async function loadSnapshotReadModel(
       versionNumber: worldVersion.versionNumber,
       name: worldVersion.name,
     },
-    player: {
+      player: {
       _id: player._id,
       key: stableActorKey(player),
       name: player.name,
+      description: player.description,
       roomId: player.roomId,
+      locationName: room.name,
+      profile: playerProfileFromFacts(player, playerFacts),
     },
     room: {
       _id: room._id,
@@ -174,6 +179,37 @@ export async function loadSnapshotReadModel(
         }))
       : [],
   };
+}
+
+function playerProfileFromFacts(
+  player: Doc<"actors">,
+  facts: Array<Doc<"facts">>,
+) {
+  const actorKey = stableActorKey(player);
+  const actorFacts = facts.filter((fact) => fact.subjectId === actorSubjectId(actorKey));
+  return {
+    physicalDescription: player.description,
+    backstory: stringFactValue(actorFacts, "backstory"),
+    status: stringFactValue(actorFacts, "status"),
+  };
+}
+
+async function loadPlayerProfileFacts(
+  ctx: QueryCtx,
+  adventureId: Id<"adventures">,
+  player: Doc<"actors">,
+) {
+  return await ctx.db
+    .query("facts")
+    .withIndex("by_adventureId_and_subjectId", (q) =>
+      q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(stableActorKey(player))),
+    )
+    .take(20);
+}
+
+function stringFactValue(facts: Array<Doc<"facts">>, key: string) {
+  const fact = facts.find((candidate) => candidate.key === key);
+  return typeof fact?.value === "string" ? fact.value : "";
 }
 
 export async function loadVisibleExits(
@@ -452,4 +488,8 @@ async function loadTurnSummaries(ctx: QueryCtx, adventureId: Id<"adventures">, l
 
 function stableActorKey(actor: { key?: string; name: string }) {
   return actor.key ?? actor.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function actorSubjectId(actorKey: string) {
+  return `actor:${actorKey}`;
 }

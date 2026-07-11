@@ -59,6 +59,15 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#lorecraft-app")).toBeVisible();
 
       await seedFreshWorld(page);
+      await expect(page.locator("#player-card")).toBeVisible();
+      await expect(page.locator("#player-card-name")).toContainText("Taylor");
+      await expect(page.locator("#room-info-card")).toBeVisible();
+      await expect(page.locator("#room-info-card-title")).toContainText("Chapel");
+      await expect(page.locator("#room-info-description")).toContainText("Rain taps against warped shutters");
+      await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+      await expect(page.locator("#room-info-npc-list")).toContainText("Brother Alden");
+      await expect(page.locator("#room-info-npc-list")).not.toContainText("Taylor");
+      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
 
       await page.locator("#act-turn-button").click();
       const directorInput = page.locator("#director-input");
@@ -114,129 +123,129 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
       await openDebugPanel(page);
 
-    const debugPanel = page.locator("#debug-panel");
-    const debugToggle = page.locator("#debug-panel-toggle");
-    await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
-    await debugToggle.click();
-    await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
-    await expect(debugPanel).toHaveJSProperty("inert", true);
-    await openDebugPanel(page);
-    await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
+      const debugPanel = page.locator("#debug-panel");
+      const debugToggle = page.locator("#debug-panel-toggle");
+      await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
+      await debugToggle.click();
+      await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
+      await expect(debugPanel).toHaveJSProperty("inert", true);
+      await openDebugPanel(page);
+      await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
 
-    await page.locator("#debug-tab-state").click();
-    await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
-    await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
-    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: Act succeeded");
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "lorecraft-fixture-model",
-    );
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "story_generation",
-    );
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "worldVersionId",
-    );
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "npc_state_extraction",
-    );
-    await expect(page.locator("#debug-list-state-changes-items")).toContainText(
-      "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
-    );
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
+      await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
+      await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #1: Act succeeded");
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "lorecraft-fixture-model",
+      );
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "story_generation",
+      );
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "worldVersionId",
+      );
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "npc_state_extraction",
+      );
+      await expect(page.locator("#debug-list-state-changes-items")).toContainText(
+        "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
+      );
 
-    await page.locator("#debug-panel-toggle").click();
-    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
-    await page.locator("#pass-turn-button").click();
-    await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
-    await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
-    await expect(page.locator("#story-stream")).toContainText(
-      "rain presses harder against the chapel roof",
-    );
-    await expect(page.locator("#story-feed [data-story-kind='player']")).not.toContainText("Pass");
-    await openDebugPanel(page);
-    await page.locator("#debug-tab-state").click();
-    await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #2: Pass succeeded");
-    await page.locator("#debug-panel-toggle").click();
-    await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+      await page.locator("#debug-panel-toggle").click();
+      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+      await page.locator("#pass-turn-button").click();
+      await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
+      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator("#story-stream")).toContainText(
+        "rain presses harder against the chapel roof",
+      );
+      await expect(page.locator("#story-feed [data-story-kind='player']")).not.toContainText("Pass");
+      await openDebugPanel(page);
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #2: Pass succeeded");
+      await page.locator("#debug-panel-toggle").click();
+      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
 
-    const failureText = "I trigger a fixture provider failure.";
-    await submitAct(page, failureText);
-    await expect(page.locator("#turn-error-message")).toContainText(
-      "LLM provider returned HTTP 503.",
-      { timeout: 60_000 },
-    );
-    await expect(page.locator("#story-stream")).toContainText(playerText);
+      const failureText = "I trigger a fixture provider failure.";
+      await submitAct(page, failureText);
+      await expect(page.locator("#turn-error-message")).toContainText(
+        "LLM provider returned HTTP 503.",
+        { timeout: 60_000 },
+      );
+      await expect(page.locator("#story-stream")).toContainText(playerText);
 
-    await page.reload();
-    await expect(page.locator("#story-stream")).toContainText(playerText);
-    await openDebugPanel(page);
-    await page.locator("#debug-tab-state").click();
-    await expect(page.locator("#debug-list-turns-items")).toContainText(
-      `Turn #3: Act failed - ${failureText}`,
-    );
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "provider_error",
-    );
+      await page.reload();
+      await expect(page.locator("#story-stream")).toContainText(playerText);
+      await openDebugPanel(page);
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-turns-items")).toContainText(
+        `Turn #3: Act failed - ${failureText}`,
+      );
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "provider_error",
+      );
 
-    await page.locator("#debug-tab-npcs").click();
-    await expect(page.locator("#npc-debug-panel")).toContainText("Mira");
-    await expect(page.locator("#npc-debug-panel")).toContainText("Brother Alden");
-    await page.locator("#npc-card-mira-collapse-toggle").click();
-    await expect(page.locator("#npc-card-mira-collapse-toggle")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await page.locator("#npc-debug-mira-description").fill(
-      "She has bright red hair and green eyes.",
-    );
-    await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
-      timeout: 10_000,
-    });
-    await page.locator("#npc-debug-mira-knowledge").fill("");
-    await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
-      timeout: 10_000,
-    });
-    await page.locator("#add-debug-npc-button").click();
-    await expect(page.locator("#npc-card-debug-npc-1")).toContainText("New NPC");
-    await expect(page.locator("#npc-card-debug-npc-1-location")).toContainText("Chapel");
+      await page.locator("#debug-tab-npcs").click();
+      await expect(page.locator("#npc-debug-panel")).toContainText("Mira");
+      await expect(page.locator("#npc-debug-panel")).toContainText("Brother Alden");
+      await page.locator("#npc-card-mira-collapse-toggle").click();
+      await expect(page.locator("#npc-card-mira-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await page.locator("#npc-debug-mira-description").fill(
+        "She has bright red hair and green eyes.",
+      );
+      await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
+        timeout: 10_000,
+      });
+      await page.locator("#npc-debug-mira-knowledge").fill("");
+      await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
+        timeout: 10_000,
+      });
+      await page.locator("#add-debug-npc-button").click();
+      await expect(page.locator("#npc-card-debug-npc-1")).toContainText("New NPC");
+      await expect(page.locator("#npc-card-debug-npc-1-location")).toContainText("Chapel");
 
-    await page.locator("#debug-tab-state").click();
-    await expect(page.locator("#debug-list-hidden-facts-items")).not.toContainText(
-      "actor:mira.knowledge",
-    );
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-list-hidden-facts-items")).not.toContainText(
+        "actor:mira.knowledge",
+      );
 
-    await submitAct(page, "I look at Mira.");
-    await expect(page.locator("#story-stream")).toContainText("I look at Mira.", {
-      timeout: 60_000,
-    });
-    await page.locator("#debug-tab-state").click();
-    await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
-      "She has bright red hair and green eyes.",
-    );
+      await submitAct(page, "I look at Mira.");
+      await expect(page.locator("#story-stream")).toContainText("I look at Mira.", {
+        timeout: 60_000,
+      });
+      await page.locator("#debug-tab-state").click();
+      await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(
+        "She has bright red hair and green eyes.",
+      );
 
-    await page.locator("#debug-tab-locations").click();
-    await expect(page.locator("#location-debug-panel")).toContainText("Chapel");
-    await expect(page.locator("#location-debug-panel")).toContainText("Vestry");
-    await expect(page.locator("#location-debug-panel")).toContainText("Lantern & Bell Tavern");
-    await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
-    await expect(page.locator("#location-card-tavern")).toContainText("Rowan (npc)");
-    await expect(page.locator("#location-card-tavern")).toContainText("Lena (npc)");
-    await page.locator("#location-card-vestry-collapse-toggle").click();
-    await expect(page.locator("#location-card-vestry-collapse-toggle")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await page.locator("#location-card-vestry-description").fill(
-      "The vestry smells of old paper, damp wool, and fresh sealing wax.",
-    );
-    await page.locator("#location-card-vestry-description").blur();
-    await expect(page.locator("#location-card-vestry-save-status")).toContainText("Saved");
-    await page.locator("#new-location-key").fill("bell-annex");
-    await page.locator("#new-location-name").fill("Bell Annex");
-    await page.locator("#new-location-description").fill(
-      "A cramped annex below the bell rope, dry enough for old tools.",
-    );
-    await page.locator("#create-location-button").click();
-    await expect(page.locator("#location-card-bell-annex")).toContainText("Bell Annex");
+      await page.locator("#debug-tab-locations").click();
+      await expect(page.locator("#location-debug-panel")).toContainText("Chapel");
+      await expect(page.locator("#location-debug-panel")).toContainText("Vestry");
+      await expect(page.locator("#location-debug-panel")).toContainText("Lantern & Bell Tavern");
+      await expect(page.locator("#location-card-chapel")).toContainText("Taylor (player)");
+      await expect(page.locator("#location-card-tavern")).toContainText("Rowan (npc)");
+      await expect(page.locator("#location-card-tavern")).toContainText("Lena (npc)");
+      await page.locator("#location-card-vestry-collapse-toggle").click();
+      await expect(page.locator("#location-card-vestry-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await page.locator("#location-card-vestry-description").fill(
+        "The vestry smells of old paper, damp wool, and fresh sealing wax.",
+      );
+      await page.locator("#location-card-vestry-description").blur();
+      await expect(page.locator("#location-card-vestry-save-status")).toContainText("Saved");
+      await page.locator("#new-location-key").fill("bell-annex");
+      await page.locator("#new-location-name").fill("Bell Annex");
+      await page.locator("#new-location-description").fill(
+        "A cramped annex below the bell rope, dry enough for old tools.",
+      );
+      await page.locator("#create-location-button").click();
+      await expect(page.locator("#location-card-bell-annex")).toContainText("Bell Annex");
 
     await submitAct(page, "I go to the vestry.");
     await expect(page.locator("#story-stream")).toContainText("I go to the vestry.", {
@@ -247,6 +256,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#debug-list-scene-items")).toContainText(
       "Stormbound Chapel / Vestry",
     );
+    await expect(page.locator("#room-info-card-title")).toContainText("Vestry");
+    await expect(page.locator("#room-info-description")).toContainText(
+      "The vestry smells of old paper, damp wool, and fresh sealing wax.",
+    );
+    await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+    await expect(page.locator("#room-info-npc-list")).not.toContainText("Taylor");
     await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Vestry.",
     );
@@ -269,6 +284,8 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#debug-list-scene-items")).toContainText(
       "Stormbound Chapel / Bell Annex",
     );
+    await expect(page.locator("#room-info-card-title")).toContainText("Bell Annex");
+    await expect(page.locator("#room-info-npc-empty")).toContainText("No one else is here.");
     await expect(page.locator("#debug-list-state-changes-items")).toContainText(
       "Taylor: moved to Bell Annex.",
     );
@@ -295,6 +312,9 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page.locator("#story-stream")).toContainText("You stand in the chapel");
     await page.locator("#debug-tab-state").click();
     await expect(page.locator("#debug-list-scene-items")).toContainText("Source WorldVersion: v1");
+    await expect(page.locator("#room-info-card-title")).toContainText("Chapel");
+    await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
+    await expect(page.locator("#room-info-npc-list")).toContainText("Brother Alden");
     await page.locator("#debug-tab-locations").click();
     await page.locator("#location-card-vestry-collapse-toggle").click();
     await expect(page.locator("#location-card-vestry-description")).toHaveValue(
@@ -320,15 +340,51 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
     await expect(page).toHaveURL("/");
     await page.locator("#adventure-landing").waitFor({ timeout: 30_000 });
     await expect(page.locator("#world-container-list")).toContainText("Tutorial");
-      await clickCreateAdventureForWorld(page, "Stormbound Chapel");
+      await cancelCreateAdventureForWorld(page, "Stormbound Chapel");
+      await clickCreateAdventureForWorld(page, "Stormbound Chapel", "Edda");
       const temporaryStormboundAdventureId = await readAdventureIdFromUrl(page);
       temporaryAdventureIds.push(temporaryStormboundAdventureId);
       await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("#player-card-name")).toContainText("Edda");
+      await expect(page.locator("#player-card-edit-physical-description")).toBeVisible();
+      await expect(page.locator("#player-card-edit-physical-description")).toHaveValue("");
+      await expect(page.locator("#player-card-edit-backstory")).toHaveValue("");
+      await expect(page.locator("#player-card-edit-status")).toHaveValue("");
+      await page.locator("#player-card-edit-physical-description").fill(
+        "A short traveler with a weathered green cloak.",
+      );
+      await page.locator("#player-card-edit-backstory").fill(
+        "Edda came to the chapel after hearing the bell in a dream.",
+      );
+      await page.locator("#player-card-edit-status").fill("trying to stay calm in the storm");
+      await page.locator("#back-to-adventures-button").click();
+      await expect(page).toHaveURL("/");
+      await page.locator(`#continue-adventure-${temporaryStormboundAdventureId}`).click();
+      await expect(page).toHaveURL(`/adventures/${temporaryStormboundAdventureId}`);
+      await expect(page.locator("#player-card-save-status")).toContainText("Current");
+      await expect(page.locator("#player-card-edit-physical-description")).toHaveValue(
+        /weathered green cloak/,
+      );
+      await page.locator("#player-card-collapse-toggle").click();
+      await expect(page.locator("#player-card-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expect(page.locator("#player-card-fields")).toBeHidden();
+      await page.locator("#player-card-collapse-toggle").click();
+      await expect(page.locator("#player-card-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await page.reload();
+      await expect(page.locator("#player-card-name")).toContainText("Edda");
+      await expect(page.locator("#player-card-edit-backstory")).toHaveValue(/hearing the bell/);
+      await expect(page.locator("#player-card-edit-status")).toHaveValue(/trying to stay calm/);
       await deleteTemporaryAdventure(page, temporaryStormboundAdventureId);
       temporaryAdventureIds.splice(temporaryAdventureIds.indexOf(temporaryStormboundAdventureId), 1);
       await expect(page.locator("#adventure-landing-notice")).toContainText("Deleted");
 
-      await clickCreateAdventureForWorld(page, "Tutorial");
+      await clickCreateAdventureForWorld(page, "Tutorial", "Tutorial Player");
       const temporaryTutorialAdventureId = await readAdventureIdFromUrl(page);
       temporaryAdventureIds.push(temporaryTutorialAdventureId);
       await expect(page.locator("#story-stream")).toContainText("Guide Serin", {
@@ -389,7 +445,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
       await page.locator("#fresh-seed-button").click();
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     } else if (await stormboundContainer.locator("button[id^='create-adventure-']").isVisible()) {
-      await stormboundContainer.locator("button[id^='create-adventure-']").click();
+      await clickCreateAdventureForWorld(page, "Stormbound Chapel");
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
     }
   } else if (await page.locator("#seed-world-button").isVisible()) {
@@ -405,7 +461,24 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
   });
 }
 
-async function clickCreateAdventureForWorld(page: import("@playwright/test").Page, worldName: string) {
+async function cancelCreateAdventureForWorld(page: import("@playwright/test").Page, worldName: string) {
+  const worldContainer = page.locator("section[id^='world-container-']").filter({
+    hasText: worldName,
+  });
+
+  await expect(worldContainer.locator("button[id^='create-adventure-']")).toBeVisible();
+  await worldContainer.locator("button[id^='create-adventure-']").click();
+  await expect(worldContainer.locator("input[id^='create-adventure-player-name-']")).toBeVisible();
+  await worldContainer.locator("input[id^='create-adventure-player-name-']").fill("Canceled");
+  await worldContainer.locator("button[id^='cancel-create-adventure-']").click();
+  await expect(worldContainer.locator("input[id^='create-adventure-player-name-']")).toHaveCount(0);
+}
+
+async function clickCreateAdventureForWorld(
+  page: import("@playwright/test").Page,
+  worldName: string,
+  playerName = worldName === "Tutorial" ? "Tutorial Player" : "Taylor",
+) {
   const worldContainer = page.locator("section[id^='world-container-']").filter({
     hasText: worldName,
   });
@@ -417,6 +490,10 @@ async function clickCreateAdventureForWorld(page: import("@playwright/test").Pag
     element.scrollIntoView({ block: "center", inline: "nearest" });
   });
   await createButton.click();
+  const nameInput = worldContainer.locator("input[id^='create-adventure-player-name-']");
+  await expect(nameInput).toBeVisible();
+  await nameInput.fill(playerName);
+  await worldContainer.locator("button[id^='confirm-create-adventure-']").click();
 }
 
 async function readAdventureIdFromUrl(page: import("@playwright/test").Page) {

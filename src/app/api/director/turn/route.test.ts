@@ -537,6 +537,14 @@ function persistentContext() {
       id: "actor-player",
       key: "taylor",
       name: "Taylor",
+      description: "A rain-soaked traveler.",
+      locationKey: "chapel",
+      locationName: "Chapel",
+      profile: {
+        physicalDescription: "A rain-soaked traveler.",
+        backstory: "Taylor came to investigate the midnight bell.",
+        status: "standing near the chapel aisle",
+      },
     },
     room: {
       id: "room-chapel",

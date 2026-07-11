@@ -2,8 +2,8 @@
 id: LC-002
 status: implemented
 created: 2026-07-01
-modified: 2026-07-07
-last_verified: 2026-07-07
+modified: 2026-07-08
+last_verified: 2026-07-08
 stories:
   - S1
   - S2
@@ -50,7 +50,7 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 
 | Story | Status | Capability | Last Verified | Notes |
 |---|---|---|---|---|
-| S1 | implemented | Start Adventure From World Version | 2026-07-02 | Startup screen can continue existing Adventures or create a new copy from the selected seeded WorldVersion. |
+| S1 | implemented | Start Adventure From World Version | 2026-07-08 | Startup screen can continue existing Adventures or create a new named-player copy from the selected seeded WorldVersion. |
 | S2 | implemented | Adventure-Scoped Runtime State | 2026-07-07 | Runtime reads/writes and debug state use `adventureId`. |
 | S3 | implemented | World Version Edits Do Not Mutate Existing Adventures | 2026-07-01 | Live Convex isolation smoke proved v1 Adventure stayed unchanged after v2 source creation. |
 | S4 | implemented | Reset Adventure To Source Version | 2026-07-07 | Live Convex reset smoke proved reset restores selected Adventure from its original source version. |
@@ -62,8 +62,8 @@ Playtesters can start and resume Adventures from seeded Worlds that mutate indep
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-01
-Last verified: 2026-07-02
+Modified: 2026-07-08
+Last verified: 2026-07-08
 
 As a playtester, I want Lorecraft to start a playable Adventure from a World version, so that the story has its own mutable copy of the authored setup.
 
@@ -99,15 +99,38 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 - THEN the Game Master context includes Adventure-owned locations, NPCs, facts, objects, and recent story
 - AND no runtime prompt context is read from mutable World template rows
 
+##### Requirement R3: Player Name At Creation
+
+The system SHALL ask for the player name before creating a new Adventure.
+
+###### Scenario R3-S1: Adventure starts with named player
+
+- WHEN the player starts a new Adventure from a World container
+- THEN the startup screen asks for the player name
+- AND the created Adventure's player actor uses that name
+- AND opening the Adventure shows that name in the Player Card
+
+###### Scenario R3-S2: Creation can be canceled
+
+- WHEN the player opens the new Adventure form and cancels
+- THEN no Adventure is created
+- AND the World container remains available.
+
+###### Scenario R3-S3: Optional player profile fields start blank
+
+- WHEN a new Adventure is created
+- THEN the player actor has blank physical description, backstory, and status fields
+- AND opening the Adventure shows those fields as editable but empty in the Player Card
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `convex/schema.ts` | Defines `worldVersions`, `adventures`, source-version metadata, and Adventure-owned runtime row fields/indexes. | Recheck when WorldVersion/Adventure shape changes. |
-| `convex/world.ts` | Builds seeded World baselines, lists local Adventures by World container, creates new Adventures from the selected current WorldVersion, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
+| `convex/world.ts` | Builds seeded World baselines, lists local Adventures by World container, creates new Adventures from the selected current WorldVersion with the entered player name, deletes selected Adventures and their runtime rows, and copies locations, exits, actors, objects, facts, opening events, and opening narration into Adventure rows. | Recheck when seed/copy/repair/reset/delete behavior changes. |
 | `src/app/page.tsx` | Hosts the World container route at `/`. | Recheck when startup routing changes. |
 | `src/app/adventures/[adventureId]/page.tsx` | Hosts direct Adventure URLs at `/adventures/<id>`. | Recheck when Adventure routing changes. |
-| `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx` | Show the startup World container screen, list Adventures inside seeded World containers, navigate to Adventure URLs, create and delete local Adventures, and load the selected Adventure snapshot. | Recheck when startup or Adventure selection changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/adventure-landing.tsx`, `src/features/play/player-card.tsx` | Show the startup World container screen, list Adventures inside seeded World containers, ask for the player name before creation, navigate to Adventure URLs, create and delete local Adventures, and load the selected Adventure snapshot with Player Card identity. | Recheck when startup or Adventure selection changes. |
 
 #### Verified By
 
@@ -116,10 +139,11 @@ The system SHALL copy the WorldVersion baseline locations, actors, objects, fact
 | R1-S1, R1-S2, R2-S1 | `npm run convex:once`; `LORECRAFT_ENABLE_DEBUG_ROUTES=1 npx convex run world:seedDemoWorld`; `npx convex run world:getSnapshot '{\"adventureId\":\"kn7dej4650m780jyn93w55qhfn89rnxc\"}'` | Convex schema compiles, seed creates a default Adventure, snapshot exposes Adventure/source WorldVersion identity, and playable rows are copied into Adventure-owned state. | Passing |
 | R1-S1, R1-S2, R2-S1 | `npm run test`; `npm run typecheck` | Type and unit coverage compile against the new Adventure context contract. | Passing |
 | R1-S1, R1-S2, R2-S1 | Browser smoke and E2E against `http://localhost:3000`: startup screen showed seeded World containers, listed existing Adventures by turns and last played date, New Adventure created an Adventure under the selected container, the story stream opened at `/adventures/<id>` with source-version opening narration, reload preserved that Adventure URL, Back returned to the World container list, and a temporary Adventure could be deleted from the list. | The player-facing startup flow supports continue/create/delete and opens a copied playable Adventure at a direct URL. | Passing |
+| R3-S1 through R3-S3 | `npm run e2e` plus `npm run ci:required` on 2026-07-10 | Browser coverage passes for prompting for a player name, canceling creation, opening a named Adventure, showing that name in the Player Card, and showing blank editable optional profile fields. | Passing |
 
 #### Verification Gaps
 
-- Optional live-provider smoke remains deferred; deterministic route, reset, and runtime coverage is passing.
+- Optional live-provider smoke remains deferred.
 
 #### Story Notes
 
