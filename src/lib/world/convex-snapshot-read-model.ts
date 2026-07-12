@@ -76,6 +76,12 @@ export async function loadSnapshotReadModel(
       loadFeed(ctx, args.adventureId, 60),
       loadLocationSummaries(ctx, args.adventureId),
     ]);
+  const npcProfiles = await loadCurrentSceneNpcProfiles(
+    ctx,
+    args.adventureId,
+    room,
+    actors,
+  );
 
   return {
     adventure: {
@@ -109,6 +115,7 @@ export async function loadSnapshotReadModel(
       name: room.name,
       description: room.description,
     },
+    npcProfiles,
     locations,
     exits: exits.map((exit) => ({
       _id: exit._id,
@@ -179,6 +186,43 @@ export async function loadSnapshotReadModel(
         }))
       : [],
   };
+}
+
+async function loadCurrentSceneNpcProfiles(
+  ctx: QueryCtx,
+  adventureId: Id<"adventures">,
+  room: Doc<"rooms">,
+  actors: Array<Doc<"actors">>,
+) {
+  return await Promise.all(
+    actors
+      .filter((actor) => actor.role === "npc")
+      .map(async (actor) => {
+        const key = stableActorKey(actor);
+        const facts = await ctx.db
+          .query("facts")
+          .withIndex("by_adventureId_and_subjectId", (q) =>
+            q.eq("adventureId", adventureId).eq("subjectId", actorSubjectId(key)),
+          )
+          .take(20);
+
+        return {
+          _id: actor._id,
+          key,
+          name: actor.name,
+          locationKey: room.key,
+          locationName: room.name,
+          description: actor.description,
+          background: stringFactValue(facts, "background"),
+          persona: stringFactValue(facts, "persona"),
+          voice: stringFactValue(facts, "voice"),
+          mood: stringFactValue(facts, "mood"),
+          status: stringFactValue(facts, "status"),
+          memory: stringFactValue(facts, "memory"),
+          knowledge: stringFactValue(facts, "knowledge"),
+        };
+      }),
+  );
 }
 
 function playerProfileFromFacts(

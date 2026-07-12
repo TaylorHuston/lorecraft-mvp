@@ -38,7 +38,7 @@ Persistent mode gives the Game Master current Location Cards, known locations, a
 
 The Player Card is also canonical read context. It carries the Adventure player's name, current location, optional physical description, optional backstory, and optional current status. The Game Master can use those details to ground perception and continuity, but it must not use them to decide new player intent, speech, thoughts, feelings, or goals.
 
-The Room Info panel is a player-facing projection of the current Location Card. It shows the current room name, room description, and NPCs whose canonical actor location matches the player's current room. It is not a movement map, location editor, or transcript inference surface.
+The Room Info panel is a player-facing projection of the current Location Card. It shows the current room name, room description, and NPCs whose canonical actor location matches the player's current room. Selecting an NPC reads a typed, subject-complete profile directly from canonical Adventure state rather than the bounded debug fact feed. It is not a movement map, location editor, or transcript inference surface.
 
 Structured state mutation returns through a separate extractor step rather than being mixed into the creative writing response. The extractor reads the current action or Pass trigger, completed narration, current Location Card, Known Locations, NPC Cards, and the same story-visible narration history as story generation, then may propose bounded `npcUpdates` and `actorMoves` for backend validation.
 
@@ -303,13 +303,13 @@ Example:
 knowledge = "Mira knows the storm began after the chapel bell rang at midnight, but she is afraid to say that plainly."
 ```
 
-Read-only does not mean player-visible. The Game Master should not mechanically expose hidden fact keys or reveal private knowledge without an in-scene reason. These facts also remain non-mutable through Game Master output: if the model returns `knowledge`, `secret`, `occupation`, or relationship fields inside `npcUpdates`, the backend ignores them.
+Read-only does not normally mean player-visible. The Game Master should not mechanically reveal private knowledge without an in-scene reason, and these facts remain non-mutable through Game Master output: if the model returns `knowledge`, `secret`, `occupation`, or relationship fields inside `npcUpdates`, the backend ignores them. The internal MVP deliberately shows `knowledge` in the Room Info NPC inspector for complete playtest visibility; a future public product needs an explicit visibility policy.
 
 ### Debug NPC edits
 
 The debug panel includes an `NPCs` tab for rough playtest editing. These edits can replace an NPC name, description, or profile fact value in the next persistent-mode Game Master prompt.
 
-Debug NPC edits are canonical Convex Adventure state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Clearing an editable NPC fact removes that manual canonical fact instead of preserving stale prompt context. Reset Session restores seeded NPCs from the selected Adventure's source WorldVersion and removes debug-created NPCs; Reset World reseeds the full demo source and default Adventure.
+Debug NPC edits are canonical Convex Adventure state, not a polished World Builder contract. They exist so playtesting can answer questions like "does a stronger Mira description change the response?" without direct DB editing. Updates are patch-based: omitted actor fields and facts remain unchanged, while clearing one editable fact removes only that canonical fact. Per-NPC saves are serialized, and reset waits for an active save while discarding queued stale edits. Reset Session restores seeded NPCs from the selected Adventure's source WorldVersion and removes debug-created NPCs; Reset World reseeds the full demo source and default Adventure.
 
 Debug-created NPCs and locations are capped per Adventure so ordinary debug use stays resettable within the current bounded deletion limits.
 

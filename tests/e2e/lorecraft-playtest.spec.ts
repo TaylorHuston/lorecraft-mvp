@@ -19,7 +19,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await openDebugPanel(page);
       await page.locator("#debug-tab-state").click();
       await expect(page.locator("#debug-list-turns-items")).toContainText("None yet.");
-      await page.locator("#debug-panel-toggle").click();
+      await page.locator("#debug-panel-close").click();
 
       const guideText = "Privately steer Mira to mention the midnight bell.";
       await submitGuide(page, guideText);
@@ -35,7 +35,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "[Hidden Guide]",
       );
       await expect(page.locator("#debug-json-game-master-calls-content")).toContainText(guideText);
-      await page.locator("#debug-panel-toggle").click();
+      await page.locator("#debug-panel-close").click();
 
       await page.reload();
       await expect(page.locator("#story-feed [data-story-kind='story']")).toContainText(storyText);
@@ -67,9 +67,164 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#room-info-npc-list")).toContainText("Mira");
       await expect(page.locator("#room-info-npc-list")).toContainText("Brother Alden");
       await expect(page.locator("#room-info-npc-list")).not.toContainText("Taylor");
-      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+      await page.locator("#room-info-npc-mira").click();
+      await expect(page.locator("#room-info-card-title")).toContainText("Mira");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText(
+        "A careful local",
+      );
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Background");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Persona");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Voice");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Mood");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Status");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Memory");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Knowledge");
+      await expect(page.locator("#room-info-npc-profile-mira")).toContainText("Chapel");
+      await expect(page.locator("#room-info-npc-list")).not.toBeVisible();
+      await page.locator("#room-info-npc-back-button").click();
+      await expect(page.locator("#room-info-card-title")).toContainText("Chapel");
+      await expect(page.locator("#room-info-npc-list")).toBeVisible();
+      await expect(page.locator("#debug-panel")).not.toHaveAttribute("open", "");
+      await expect(page.locator("#help-dialog")).not.toHaveAttribute("open", "");
+      await page.locator("#help-dialog-toggle").click();
+      await expect(page.locator("#help-dialog")).toHaveAttribute("open", "");
+      await expect(page.locator("#help-dialog-content")).toContainText("Act");
+      await expect(page.locator("#help-dialog-content")).toContainText("Story");
+      await expect(page.locator("#help-dialog-content")).toContainText("Guide");
+      await expect(page.locator("#help-dialog-content")).toContainText("Pass");
+      await expect(page.locator("#help-dialog-content")).toContainText("/help");
+      await expect(page.locator("#help-dialog-content")).toContainText("/look <target>");
+      await expect(page.locator("#help-dialog-content")).toHaveCSS("overflow-y", "auto");
+      await page.locator("#help-dialog-close").press("Escape");
+      await expect(page.locator("#help-dialog")).not.toHaveAttribute("open", "");
+      await expect(page.locator("#help-dialog-toggle")).toBeFocused();
+      await page.locator("#help-dialog-toggle").click();
+      await page.locator("#help-dialog-close").click();
+      await expect(page.locator("#help-dialog-toggle")).toBeFocused();
+      await page.locator("#help-dialog-toggle").click();
+      await page.mouse.click(5, 5);
+      await expect(page.locator("#help-dialog")).not.toHaveAttribute("open", "");
+      await expect(page.locator("#help-dialog-toggle")).toBeFocused();
 
-      await page.locator("#act-turn-button").click();
+      const desktopPaneLayout = await page.evaluate(() => {
+        const player = document.querySelector<HTMLElement>("#player-card");
+        const story = document.querySelector<HTMLElement>("#story-workspace");
+        const room = document.querySelector<HTMLElement>("#room-info-card");
+        if (!player || !story || !room) {
+          return null;
+        }
+        return {
+          player: player.getBoundingClientRect().toJSON(),
+          story: story.getBoundingClientRect().toJSON(),
+          room: room.getBoundingClientRect().toJSON(),
+          playerOverflowY: getComputedStyle(player).overflowY,
+          storyStreamOverflowY: getComputedStyle(
+            document.querySelector<HTMLElement>("#story-stream")!,
+          ).overflowY,
+          roomOverflowY: getComputedStyle(room).overflowY,
+          documentScrollHeight: document.documentElement.scrollHeight,
+          viewportHeight: window.innerHeight,
+        };
+      });
+      expect(desktopPaneLayout).not.toBeNull();
+      expect(desktopPaneLayout!.story.width).toBeGreaterThan(desktopPaneLayout!.player.width);
+      expect(desktopPaneLayout!.story.width).toBeGreaterThan(desktopPaneLayout!.room.width);
+      expect(desktopPaneLayout!.player.height).toBe(desktopPaneLayout!.story.height);
+      expect(desktopPaneLayout!.room.height).toBe(desktopPaneLayout!.story.height);
+      expect(desktopPaneLayout!.playerOverflowY).toBe("auto");
+      expect(desktopPaneLayout!.storyStreamOverflowY).toBe("auto");
+      expect(desktopPaneLayout!.roomOverflowY).toBe("auto");
+      expect(desktopPaneLayout!.documentScrollHeight).toBe(desktopPaneLayout!.viewportHeight);
+      await expect(
+        page.locator("#mobile-player-pane[role='tabpanel'], #story-workspace[role='tabpanel'], #mobile-room-pane[role='tabpanel']"),
+      ).toHaveCount(0);
+
+      const contextToggleGeometry = await page.evaluate(() => {
+        const playerPane = document.querySelector<HTMLElement>("#player-card")!.getBoundingClientRect();
+        const playerToggle = document
+          .querySelector<HTMLElement>("#player-card-collapse-toggle")!
+          .getBoundingClientRect();
+        const roomPane = document.querySelector<HTMLElement>("#room-info-card")!.getBoundingClientRect();
+        const roomToggle = document
+          .querySelector<HTMLElement>("#room-info-collapse-toggle")!
+          .getBoundingClientRect();
+        const playerToggleVisual = document
+          .querySelector<HTMLElement>("#player-card-collapse-toggle > [aria-hidden='true']")!
+          .getBoundingClientRect();
+        const roomToggleVisual = document
+          .querySelector<HTMLElement>("#room-info-collapse-toggle > [aria-hidden='true']")!
+          .getBoundingClientRect();
+        return {
+          playerInset: playerToggle.x - playerPane.x,
+          roomInset: roomPane.right - roomToggle.right,
+          playerHitTarget: { width: playerToggle.width, height: playerToggle.height },
+          roomHitTarget: { width: roomToggle.width, height: roomToggle.height },
+          playerVisual: { width: playerToggleVisual.width, height: playerToggleVisual.height },
+          roomVisual: { width: roomToggleVisual.width, height: roomToggleVisual.height },
+        };
+      });
+      expect(contextToggleGeometry.playerInset).toBeLessThanOrEqual(20);
+      expect(contextToggleGeometry.roomInset).toBeLessThanOrEqual(20);
+      expect(contextToggleGeometry.playerHitTarget).toEqual({ width: 44, height: 44 });
+      expect(contextToggleGeometry.roomHitTarget).toEqual({ width: 44, height: 44 });
+      expect(contextToggleGeometry.playerVisual).toEqual({ width: 28, height: 28 });
+      expect(contextToggleGeometry.roomVisual).toEqual({ width: 28, height: 28 });
+
+      const storyBeforeContextCollapse = await page.locator("#story-workspace").boundingBox();
+      expect(storyBeforeContextCollapse).not.toBeNull();
+      await page.locator("#player-card-collapse-toggle").click();
+      await expect(page.locator("#player-card-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expect(page.locator("#player-card-fields")).toBeHidden();
+      const storyAfterPlayerCollapse = await page.locator("#story-workspace").boundingBox();
+      expect(storyAfterPlayerCollapse?.x).toBe(storyBeforeContextCollapse?.x);
+      expect(storyAfterPlayerCollapse?.width).toBe(storyBeforeContextCollapse?.width);
+      await page.locator("#player-card-collapse-toggle").click();
+
+      await page.locator("#room-info-collapse-toggle").click();
+      await expect(page.locator("#room-info-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expect(page.locator("#room-info-card-body")).toBeHidden();
+      const storyAfterRoomCollapse = await page.locator("#story-workspace").boundingBox();
+      expect(storyAfterRoomCollapse?.x).toBe(storyBeforeContextCollapse?.x);
+      expect(storyAfterRoomCollapse?.width).toBe(storyBeforeContextCollapse?.width);
+      await page.locator("#room-info-collapse-toggle").click();
+
+      await page.locator("#skip-to-story-link").focus();
+      await expect(page.locator("#skip-to-story-link")).toBeVisible();
+      await page.locator("#skip-to-story-link").press("Enter");
+      await expect(page.locator("#story-stream")).toBeFocused();
+
+      await page.setViewportSize({ width: 375, height: 812 });
+      await expect(page.locator("#mobile-story-tab")).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator("#story-workspace")).toBeVisible();
+      await expect(page.locator("#player-card")).toBeHidden();
+      await expect(page.locator("#room-info-card")).toBeHidden();
+      await page.locator("#mobile-story-tab").press("ArrowRight");
+      await expect(page.locator("#mobile-room-tab")).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator("#mobile-room-tab")).toBeFocused();
+      await page.locator("#mobile-room-tab").press("Home");
+      await expect(page.locator("#mobile-player-tab")).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator("#mobile-player-tab")).toBeFocused();
+      await page.locator("#mobile-player-tab").press("End");
+      await expect(page.locator("#mobile-room-tab")).toHaveAttribute("aria-selected", "true");
+      await page.locator("#mobile-room-tab").press("ArrowLeft");
+      await expect(page.locator("#mobile-story-tab")).toHaveAttribute("aria-selected", "true");
+      await page.locator("#mobile-player-tab").click();
+      await expect(page.locator("#player-card")).toBeVisible();
+      await expect(page.locator("#story-workspace")).toBeHidden();
+      await page.locator("#mobile-room-tab").click();
+      await expect(page.locator("#room-info-card")).toBeVisible();
+      await expect(page.locator("#player-card")).toBeHidden();
+      await page.locator("#mobile-story-tab").click();
+      await expect(page.locator("#story-workspace")).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
+      await page.setViewportSize({ width: 1440, height: 900 });
+
       const directorInput = page.locator("#director-input");
       await expect(directorInput).toBeVisible();
       await directorInput.fill("/");
@@ -99,15 +254,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#story-feed [data-story-kind='utility']").last()).toContainText(
         'You do not see "moonblade" here to inspect.',
       );
-      await page.locator("#close-act-input-button").click();
-      await expect(page.locator("#act-turn-button")).toBeVisible();
-
       const playerText = "Mira, what do you know about the storm?";
       await submitAct(page, playerText);
 
       await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
-      await expect(page.locator("#director-input")).toBeHidden();
-      await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator("#director-input")).toBeDisabled();
+      await expect(page.locator("#act-turn-button")).toBeEnabled({ timeout: 60_000 });
       await expect(page.locator("#story-stream")).toContainText(playerText);
       await expect(page.locator("#story-stream")).toContainText("chapel bell rang at midnight");
       await expect(page).toHaveURL(/\/adventures\/[^/]+$/);
@@ -125,12 +277,21 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
 
       const debugPanel = page.locator("#debug-panel");
       const debugToggle = page.locator("#debug-panel-toggle");
-      await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
-      await debugToggle.click();
-      await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
-      await expect(debugPanel).toHaveJSProperty("inert", true);
+      await expect(debugPanel).toHaveAttribute("open", "");
+      await expect(debugPanel).toHaveAttribute("aria-modal", "true");
+      await expect(page.locator("#debug-panel-content")).toHaveCSS("overflow-y", "auto");
+      await page.locator("#debug-panel-close").press("Escape");
+      await expect(debugPanel).not.toHaveAttribute("open", "");
+      await expect(debugToggle).toBeFocused();
       await openDebugPanel(page);
-      await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
+      await expect(debugPanel).toHaveAttribute("open", "");
+      await page.locator("#debug-panel-close").click();
+      await expect(debugToggle).toBeFocused();
+      await openDebugPanel(page);
+      await page.mouse.click(5, 5);
+      await expect(debugPanel).not.toHaveAttribute("open", "");
+      await expect(debugToggle).toBeFocused();
+      await openDebugPanel(page);
 
       await page.locator("#debug-tab-state").click();
       await expect(page.locator("#debug-list-scene-items")).toContainText("Adventure:");
@@ -152,8 +313,10 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "memory -> Mira told Taylor the storm began after the chapel bell rang at midnight.",
       );
 
-      await page.locator("#debug-panel-toggle").click();
-      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+      await page.locator("#debug-panel-close").click();
+      await expect(page.locator("#debug-panel")).not.toHaveAttribute("open", "");
+      const passDraft = "I am still deciding what to do.";
+      await page.locator("#director-input").fill(passDraft);
       await page.locator("#pass-turn-button").click();
       await expect(page.locator("#turn-pending-placeholder")).toBeVisible();
       await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 60_000 });
@@ -161,11 +324,12 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "rain presses harder against the chapel roof",
       );
       await expect(page.locator("#story-feed [data-story-kind='player']")).not.toContainText("Pass");
+      await expect(page.locator("#director-input")).toHaveValue(passDraft);
       await openDebugPanel(page);
       await page.locator("#debug-tab-state").click();
       await expect(page.locator("#debug-list-turns-items")).toContainText("Turn #2: Pass succeeded");
-      await page.locator("#debug-panel-toggle").click();
-      await expect(page.locator("#debug-panel")).toHaveAttribute("aria-hidden", "true");
+      await page.locator("#debug-panel-close").click();
+      await expect(page.locator("#debug-panel")).not.toHaveAttribute("open", "");
 
       const failureText = "I trigger a fixture provider failure.";
       await submitAct(page, failureText);
@@ -173,6 +337,7 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
         "LLM provider returned HTTP 503.",
         { timeout: 60_000 },
       );
+      await expect(page.locator("#director-input")).toHaveValue(failureText);
       await expect(page.locator("#story-stream")).toContainText(playerText);
 
       await page.reload();
@@ -204,9 +369,29 @@ test.describe("LC-001-S11, LC-001-S12, and LC-002 End To End Playtest Verificati
       await expect(page.locator("#npc-card-mira-save-status")).toContainText("Saved", {
         timeout: 10_000,
       });
-      await page.locator("#add-debug-npc-button").click();
-      await expect(page.locator("#npc-card-debug-npc-1")).toContainText("New NPC");
-      await expect(page.locator("#npc-card-debug-npc-1-location")).toContainText("Chapel");
+      await page.locator("#new-npc-key").fill("invalid npc key");
+      await expect(page.locator("#npc-create-error")).toContainText(
+        "NPC key must use lowercase letters, numbers, and hyphens.",
+      );
+      await expect(page.locator("#create-npc-button")).toBeDisabled();
+      await page.locator("#new-npc-key").fill("new-npc");
+      await page.locator("#new-npc-name").fill("New NPC");
+      await page.locator("#new-npc-description").fill("A temporary NPC for playtesting.");
+      await page.locator("#new-npc-location").selectOption("vestry");
+      await page.locator("#create-npc-button").click({ clickCount: 2 });
+      await expect(page.locator("#npc-card-new-npc")).toContainText("New NPC");
+      await expect(page.locator("#npc-card-new-npc")).toHaveCount(1);
+      await expect(page.locator("#npc-card-new-npc-location")).toContainText("Vestry");
+      await expect(page.locator("#new-npc-key")).toHaveValue("");
+      await expect(page.locator("#npc-card-new-npc-collapse-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await page.locator("#npc-debug-new-npc-location").selectOption("chapel");
+      await expect(page.locator("#npc-card-new-npc-save-status")).toContainText("Saved", {
+        timeout: 10_000,
+      });
+      await expect(page.locator("#npc-card-new-npc-location")).toContainText("Chapel");
 
       await page.locator("#debug-tab-state").click();
       await expect(page.locator("#debug-list-hidden-facts-items")).not.toContainText(
@@ -455,7 +640,7 @@ async function seedFreshWorld(page: import("@playwright/test").Page) {
 
   await expect(page.locator("#act-turn-button")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("#act-turn-button")).toBeEnabled({ timeout: 30_000 });
-  await expect(page.locator("#director-input")).toHaveCount(0);
+  await expect(page.locator("#director-input")).toBeVisible();
   await expect(page.locator("#story-stream")).toContainText("You stand in the chapel", {
     timeout: 30_000,
   });
@@ -532,7 +717,6 @@ async function deleteTemporaryAdventure(page: import("@playwright/test").Page, a
 }
 
 async function submitAct(page: import("@playwright/test").Page, input: string) {
-  await page.locator("#act-turn-button").click();
   const directorInput = page.locator("#director-input");
   await expect(directorInput).toBeVisible();
   await directorInput.fill(input);
@@ -540,9 +724,6 @@ async function submitAct(page: import("@playwright/test").Page, input: string) {
 }
 
 async function submitSlashCommand(page: import("@playwright/test").Page, input: string) {
-  if (!(await page.locator("#director-input").isVisible())) {
-    await page.locator("#act-turn-button").click();
-  }
   const directorInput = page.locator("#director-input");
   await expect(directorInput).toBeVisible();
   await directorInput.fill(input);
@@ -552,27 +733,25 @@ async function submitSlashCommand(page: import("@playwright/test").Page, input: 
 }
 
 async function submitStory(page: import("@playwright/test").Page, input: string) {
-  await page.locator("#story-turn-button").click();
-  const storyInput = page.locator("#story-action-input");
+  const storyInput = page.locator("#director-input");
   await expect(storyInput).toBeVisible();
   await storyInput.fill(input);
-  await storyInput.press("Enter");
-  await expect(storyInput).toHaveCount(0, { timeout: 30_000 });
+  await page.locator("#story-turn-button").click();
+  await expect(storyInput).toHaveValue("", { timeout: 30_000 });
 }
 
 async function submitGuide(page: import("@playwright/test").Page, input: string) {
-  await page.locator("#guide-turn-button").click();
-  const guideInput = page.locator("#guide-action-input");
+  const guideInput = page.locator("#director-input");
   await expect(guideInput).toBeVisible();
   await guideInput.fill(input);
-  await guideInput.press("Enter");
+  await page.locator("#guide-turn-button").click();
 }
 
 async function openDebugPanel(page: import("@playwright/test").Page) {
   const debugPanel = page.locator("#debug-panel");
-  await expect(debugPanel).toHaveAttribute("aria-hidden", "true");
+  await expect(debugPanel).not.toHaveAttribute("open", "");
   await page.locator("#debug-panel-toggle").click();
-  await expect(debugPanel).toHaveAttribute("aria-hidden", "false");
+  await expect(debugPanel).toHaveAttribute("open", "");
 }
 
 async function expectStoryStreamNearBottom(page: import("@playwright/test").Page) {

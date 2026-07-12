@@ -9,6 +9,7 @@ import {
   PlayerCardSaveQueue,
   type PlayerCardSaveStatus,
 } from "./player-card-save-queue";
+import { PaneCollapseIcon } from "./pane-collapse-icon";
 
 export type PlayerCardProfile = {
   physicalDescription: string;
@@ -121,15 +122,34 @@ export function PlayerCard({
     <aside
       id="player-card"
       aria-label="Player Card"
-      className={`mx-4 mt-4 rounded-2xl bg-zinc-900/85 py-4 shadow-2xl shadow-black/40 ring-1 ring-zinc-700/60 backdrop-blur lg:mx-auto lg:mt-5 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto ${
-        isCollapsed ? "px-3 lg:w-16" : "px-4 lg:w-[calc(100%-2rem)] lg:max-w-72"
+      className={`mx-4 mt-4 self-start rounded-sm border-2 border-zinc-700 bg-transparent py-4 lg:m-0 lg:h-full lg:max-h-none lg:self-stretch lg:overflow-y-auto ${
+        isCollapsed ? "px-3 lg:w-20 lg:justify-self-start" : "px-4 lg:w-full"
       }`}
     >
+      <div id="player-card-toolbar" className="mb-2 flex h-11 items-center justify-start">
+        <button
+          id="player-card-collapse-toggle"
+          type="button"
+          aria-expanded={!isCollapsed}
+          aria-controls={fieldsId}
+          onClick={() => onCollapseChange(!isCollapsed)}
+          className="group flex size-11 shrink-0 items-center justify-start rounded-sm text-zinc-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80"
+          title={isCollapsed ? "Expand Player Card" : "Collapse Player Card"}
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-7 items-center justify-center rounded-sm border-2 border-zinc-700 bg-transparent transition-colors group-hover:border-zinc-500 group-hover:bg-zinc-900 group-hover:text-zinc-100"
+          >
+            <PaneCollapseIcon direction={isCollapsed ? "right" : "left"} />
+          </span>
+          <span className="sr-only">{isCollapsed ? "Expand Player Card" : "Collapse Player Card"}</span>
+        </button>
+      </div>
       <div
         id="player-card-accent"
-        className="mb-4 h-1 w-16 rounded-full bg-amber-300/80 shadow-[0_0_18px_rgba(252,211,77,0.28)]"
+        className={`mb-4 h-1 rounded-full bg-amber-300/80 shadow-[0_0_18px_rgba(252,211,77,0.28)] ${isCollapsed ? "w-full" : "w-16"}`}
       />
-      <div id="player-card-header" className="flex items-start justify-between gap-3">
+      <div id="player-card-header">
         <div id="player-card-title-block" className={isCollapsed ? "lg:sr-only" : "min-w-0"}>
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
             Player
@@ -141,18 +161,6 @@ export function PlayerCard({
             {player.locationName}
           </p>
         </div>
-        <button
-          id="player-card-collapse-toggle"
-          type="button"
-          aria-expanded={!isCollapsed}
-          aria-controls={fieldsId}
-          onClick={() => onCollapseChange(!isCollapsed)}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-950/80 text-zinc-400 shadow-inner shadow-black/40 ring-1 ring-zinc-800 transition hover:bg-zinc-800 hover:text-zinc-100 hover:ring-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80"
-          title={isCollapsed ? "Expand Player Card" : "Collapse Player Card"}
-        >
-          <span aria-hidden="true">{isCollapsed ? ">" : "<"}</span>
-          <span className="sr-only">{isCollapsed ? "Expand Player Card" : "Collapse Player Card"}</span>
-        </button>
       </div>
 
       <div id={fieldsId} hidden={isCollapsed} className="mt-5 space-y-4">
@@ -215,7 +223,7 @@ function PlayerCardTextarea({
         maxLength={1200}
         rows={4}
         onChange={(event) => onChange(event.target.value)}
-        className="h-24 w-full resize-none overflow-y-auto rounded-md bg-zinc-900 px-3 py-2 text-sm leading-6 text-zinc-200 outline-none ring-1 ring-zinc-800 transition focus:ring-amber-300/70"
+        className="h-24 w-full resize-none overflow-y-auto rounded-sm border-2 border-zinc-700 bg-zinc-950/70 px-3 py-2 text-base leading-6 text-zinc-200 outline-none transition focus:border-amber-300/70 sm:text-sm"
       />
     </div>
   );

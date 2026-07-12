@@ -5,7 +5,7 @@ Lorecraft MVP is a Next.js + Convex persistent-world prototype. It tests whether
 ## System Boundaries
 
 - `src/app/`: thin App Router route composition, route-level loading/error fallbacks, and `/api/director/turn` plus `/api/director/utility` adapter exports.
-- `src/features/play/`: narrative playtest UI, Adventure landing, turn action panel, debug drawer shell, reset controls, debug autosave hooks, client-side interaction state, and browser-safe display helpers.
+- `src/features/play/`: narrative playtest UI, Adventure landing, turn action panel, Help/debug modal shells, reset controls, debug autosave hooks, client-side interaction state, and browser-safe display helpers.
 - `src/server/director/`: server-only Game Master turn/utility request parsing, local route guard helpers, Convex HTTP client orchestration, provider calls, persistence, extraction, logging, and response shaping.
 - `src/lib/director/`: prompt construction, OpenAI-compatible provider adapter, parsing, validation, and generation settings.
 - `convex/world.ts`: public Convex function registration, validators, WorldVersion/Adventure seed/copy/reset, canonical state writes, debug actions, and mutation validation.

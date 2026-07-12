@@ -8,6 +8,9 @@ The format is based on Keep a Changelog 1.1.0.
 
 ### Added
 
+- Responsive Player, Story, and Room workbench panes, with mobile tabs and independently scrolling desktop columns.
+- In-app Help for Act, Story, Guide, Pass, `/help`, and `/look`.
+- Read-only NPC profile inspection from the Room pane, including all canonical profile fields for internal playtesting.
 - Adventure instances created from frozen WorldVersions, with the default Stormbound Chapel playtest now running inside a mutable Adventure copy.
 - Startup World container screen for Stormbound Chapel, with local Adventures listed by turn count and last played date and opened at `/adventures/<id>`.
 - Home-screen deletion for local Adventures without changing the source WorldVersion.
@@ -23,6 +26,9 @@ The format is based on Keep a Changelog 1.1.0.
 
 ### Changed
 
+- The Adventure command area now keeps one persistent bounded textarea for Act, Story, and Guide, with Pass available alongside them.
+- Help and debug tools now open as contained modal dialogs, and Player and Room panes can collapse without resizing Story.
+- Debug NPC creation now requires an explicit location and shows validation, progress, and failure feedback in the editor.
 - Runtime story state, debug edits, Game Master turns, state diffs, and reset behavior now target the selected Adventure instead of using the authored World as mutable play state.
 - Game Master prompts now continue from canonical Adventure state plus recent successful narration, while prior player commands and world events remain visible/debuggable but are not treated as normal future story context.
 - Recent Game Master context now includes player-authored Story inserts while continuing to exclude slash utility output and raw Guide text.
@@ -32,6 +38,7 @@ The format is based on Keep a Changelog 1.1.0.
 
 ### Fixed
 
+- NPC debug edits now preserve omitted profile facts, serialize rapid saves, and prevent queued stale edits from applying after reset.
 - Debug NPC reset and debug-created NPC/Location limits now use the selected Adventure's source WorldVersion baseline, so Tutorial seeded entities are no longer treated as Stormbound debug-created rows.
 
 ## [0.2.0] - 2026-07-01

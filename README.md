@@ -19,14 +19,16 @@ This is not a complete RPG. The current MVP is a playable persistent-world spike
 - Startup World container screen showing seeded Worlds with local Adventures listed inside them, with each Adventure opened at `/adventures/<id>` and removable from the list.
 - Player name prompt when starting a new Adventure, with the name shown in an Adventure-owned Player Card.
 - Persistent collapsible Player Card for player-facing character context, including optional physical description, backstory, status, and current location.
-- Persistent read-only Room Info panel with the current room name, description, and NPCs present in the player's location.
+- Persistent read-only Room Info panel with the current room, present NPCs, and drill-down profiles for internal playtesting.
 - Pre-turn `/help` and `/look` utility commands, with autocomplete for supported commands and visible `/look` targets, that persist in the feed without incrementing turns or entering future Game Master story context.
 - Adventure-scoped locations, NPCs, story context, turns, Game Master calls, state diffs, and resettable local state.
 - NPC Cards with description, background, persona, voice, mood, status, memory, and private knowledge.
 - Location Cards with current-location context, known destination context, debug editing, and bounded movement.
 - Post-narration state extraction for validated NPC `mood`, `status`, and `memory` updates.
 - Bounded actor movement to existing canonical locations when the player clearly travels and the narration confirms arrival.
-- Debug panel for prompt guidance, NPCs, locations, hidden state, turns, Game Master calls, and state diffs.
+- Responsive three-pane Adventure workbench with mobile Player/Story/Room tabs, collapsible context panes, and contained Help and debug modals.
+- Persistent bounded command textarea for Act, Story, and Guide, with Pass available without discarding a draft.
+- Debug panel for prompt guidance, patch-safe NPC/location editing, hidden state, turns, Game Master calls, and state diffs.
 - Deterministic Playwright E2E coverage using a local OpenAI-compatible fixture provider.
 
 ## What This Is Testing
@@ -159,7 +161,7 @@ The deterministic browser test is:
 npm run e2e
 ```
 
-The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, name a new Adventure player, view and edit the Player Card, inspect the Room Info panel, add Story setup, use hidden Guide steering, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug turn/source-version evidence, edit/create debug locations, accept valid travel, reject unknown travel, reset Adventure location state, and create a Tutorial Adventure.
+The E2E command starts a local OpenAI-compatible fixture provider plus a debug-enabled Convex/Next app stack on test ports. It verifies that the browser can seed/reset Stormbound Chapel as an Adventure copied from a WorldVersion, name a new Adventure player, use the responsive Player/Story/Room workbench, edit the Player Card, inspect complete Room NPC profiles, use Help and debug modals, add Story setup, use hidden Guide steering, use `/help` and `/look` before acting, submit narrative input with Enter, use Pass, receive persisted Game Master responses, reload the story, inspect debug evidence, explicitly create and relocate NPCs, edit/create locations, validate travel, reset Adventure state, and create a Tutorial Adventure.
 
 `npm run e2e` does not call Ollama, OpenRouter, Vercel AI Gateway, or hosted models. It is local-only and destructive against its local test state. The local Convex port `3210` must be free; stop `npm run dev:debug` before treating an E2E port failure as an app regression.
 
