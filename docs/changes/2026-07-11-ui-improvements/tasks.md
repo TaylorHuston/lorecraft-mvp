@@ -2,7 +2,7 @@
 
 ## Resume Here
 
-Resume with `/sdd-apply` on `change/ui-improvements`. Code and deterministic remediation are complete. Await the delegated self-check results, address any findings, and then complete the manual UI confirmation plus full E2E when Convex port `3210` can be freed without violating the always-on server instruction.
+Resume with manual UI confirmation on `change/ui-improvements` at implementation commit `d93fdbf`. Code, deterministic remediation, delegated self-checks, supporting docs, and required CI are complete. Full E2E still requires Convex port `3210` to be freed without violating the always-on server instruction; after manual/E2E evidence, rerun `/sdd-review` against an immutable source commit.
 
 Preserve the unrelated historical path-migration documentation edits already present in the worktree. The current implementation is uncommitted.
 
@@ -68,7 +68,7 @@ Preserve the unrelated historical path-migration documentation edits already pre
 - [ ] Run `npm run e2e` with Convex port `3210` free.
 - [ ] Complete the manual UI confirmation walkthrough.
 - [x] Run delegated implementation self-checks for code, coverage, security, and artifacts.
-- [ ] Commit verified implementation slices without unrelated path-migration edits.
+- [x] Commit verified implementation slices without unrelated path-migration edits.
 - [ ] Rerun `/sdd-review` against an immutable source commit.
 
 ## Existing Implementation Ledger
@@ -78,6 +78,7 @@ Preserve the unrelated historical path-migration documentation edits already pre
 - Implemented but not yet accepted: responsive tabs, three desktop panes, independent scrolling, fixed-track collapses, Help/debug modals, explicit NPC creation form/location selector, Room-to-NPC drill-down, complete-field UI, and persistent command surface.
 - 2026-07-11 remediation: added subject-complete normal-mode NPC profiles, patch-only Convex writes, Adventure-aware serialized per-NPC save/reset ordering, bounded textarea reset behavior, creation validation/feedback, and desktop-only semantic cleanup. Supporting docs and Epic evidence were reconciled.
 - 2026-07-11 delegated self-check: fixed stale cross-Adventure save-queue ownership, blocked NPC writes/creation during reset, keyed Room selection by canonical room key, and added missing command/create/modal assertions. The public unauthenticated `knowledge` projection remains the accepted local-only MVP boundary and blocks production/shared deployment without auth/visibility work.
+- Implementation commit: `d93fdbf` (`feat: refine adventure workbench UI`). Unrelated historical path-migration edits remain unstaged.
 - Review record: `review.md` returned `changes-requested` on 2026-07-11.
 - Required CI at review: passed lint, 93 tests, typecheck, and production build.
 - Deterministic E2E: assertions parse but have not executed because the always-on debug server owns port `3210`.
@@ -124,7 +125,7 @@ Preserve the unrelated historical path-migration documentation edits already pre
 - Review record: `review.md`; latest verdict `changes-requested` on 2026-07-11.
 - Manual confirmation status: pending user.
 - Release communication status: `[Unreleased]` updated with user-facing behavior.
-- PR / merge state: source branch uncommitted; no PR or merge authorized.
+- PR / merge state: implementation committed at `d93fdbf`; no PR or merge authorized.
 - ADR status: not applicable; no durable cross-project architecture decision proposed.
 - Accepted deferred gaps: future public/authenticated NPC-field visibility policy.
 - Folder state: active under `docs/changes/2026-07-11-ui-improvements/`.
