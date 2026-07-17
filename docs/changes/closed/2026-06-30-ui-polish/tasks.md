@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: UI Polish
 
 ## Resume Here
@@ -10,7 +13,7 @@
 | Time | Request / Feedback | Classification | Files / Artifacts | Verification |
 |---|---|---|---|---|
 | 2026-06-30 | Start an interactive SDD session named `ui polish`. | artifact drift | Created this change folder. | Context loaded from app guidance, shared visual guide, Lorecraft visual identity, package scripts, git status, and LC-001 Epic. |
-| 2026-06-30 | Read the shared style guides and Lorecraft visual identity before making UI tweaks. | verification gap | `03-spaces/shared/visual-style-guide.md`, `03-spaces/spaces-docs/lorecraft/visual-identity.md` | Re-read both docs and searched `03-spaces` for related style/identity docs. |
+| 2026-06-30 | Read the shared style guides and Lorecraft visual identity before making UI tweaks. | verification gap | `03-spaces/shared/visual-style-guide.md`, `03-spaces/ideas/lorecraft/visual-identity.md` | Re-read both docs and searched `03-spaces` for related style/identity docs. |
 | 2026-06-30 | Take a first crack at tweaking the UI to follow the shared style guide and Lorecraft visual identity. | cosmetic | `src/app/world-client.tsx`, `src/app/globals.css` | `npm run lint`, `npm run typecheck`, `curl -I http://localhost:3000`, and Playwright render checks passed. |
 | 2026-06-30 | Make the debug panel collapsible. | small in-scope behavior | `src/app/world-client.tsx` | `npm run lint`, `npm run typecheck`, and Playwright collapse/reopen check passed. |
 | 2026-06-30 | Add a fixed top bar with `Lorecraft - <world name>` on the left and a gear icon toggle for the debug panel on the right. | small in-scope behavior | `src/app/world-client.tsx` | `npm run lint`, `npm run typecheck`, and Playwright gear toggle check passed. |
@@ -195,7 +198,7 @@
   - `git status --short --branch` showed Lorecraft on `develop...origin/develop [ahead 3]` with pre-existing dirty `docs/ci-cd.md`.
   - `git switch -c change/ui-polish` created the implementation branch.
   - Read `AGENTS.md`, `README.md`, package scripts, shared visual guide, Lorecraft visual identity, and LC-001 Epic.
-  - Re-read `03-spaces/shared/visual-style-guide.md` and `03-spaces/spaces-docs/lorecraft/visual-identity.md` after Taylor specifically called out the new style guidance.
+  - Re-read `03-spaces/shared/visual-style-guide.md` and `03-spaces/ideas/lorecraft/visual-identity.md` after Taylor specifically called out the new style guidance.
 - First UI polish verification:
   - `npm run lint` passed.
   - `npm run typecheck` passed.

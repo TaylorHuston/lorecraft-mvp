@@ -34,7 +34,7 @@ ready
 
 ### SUGGESTION
 
-- [ ] [src/app/world-client.tsx](/Users/taylor/src/my-life/my-vault/03-spaces/spaces-code/lorecraft-mvp/src/app/world-client.tsx:84) - `world-client.tsx` remains a very large client component. This does not block the current change, but future UI work should split the story stream, turn action panel, adventure landing, and debug panels into smaller components before adding more turn modes.
+- [ ] [src/app/world-client.tsx](/Users/taylor/src/my-life/my-vault/03-spaces/code/lorecraft-mvp/src/app/world-client.tsx:84) - `world-client.tsx` remains a very large client component. This does not block the current change, but future UI work should split the story stream, turn action panel, adventure landing, and debug panels into smaller components before adding more turn modes.
 
 ## Verification Evidence
 

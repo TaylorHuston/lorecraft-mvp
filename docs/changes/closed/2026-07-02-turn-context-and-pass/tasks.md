@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Turn Context And Pass
 
 ## Resume Here

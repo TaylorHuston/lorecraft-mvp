@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Transcript Director Mode
 
 ## Resume Here

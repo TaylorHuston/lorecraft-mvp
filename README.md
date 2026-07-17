@@ -1,5 +1,7 @@
 # Lorecraft MVP
 
+> **Archived:** This experimental repository is retained as a reference for the official [Lorecraft](https://github.com/TaylorHuston/lorecraft) application. It is no longer an active implementation target.
+
 Lorecraft is a local-first prototype for AI Dungeon-style play with database-backed world memory.
 
 The experiment is simple: can a small narrative world remember what changed because the world has explicit state, not because a long chat transcript happens to mention it?

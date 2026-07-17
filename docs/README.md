@@ -1,6 +1,6 @@
 # Docs
 
-This directory contains supporting engineering references for the Lorecraft MVP implementation.
+This directory contains supporting engineering references for the archived Lorecraft MVP implementation. These documents preserve prototype behavior and decisions; they do not define the current official Lorecraft product.
 
 Canonical product behavior lives in `docs/epics/**/epic.md`. Active or proposed work lives in `docs/changes/**`. Root docs explain architecture, state, persistence, verification, deployment posture, and visual direction.
 
@@ -19,5 +19,5 @@ Canonical product behavior lives in `docs/epics/**/epic.md`. Active or proposed 
 ## Maintenance
 
 - Keep these docs aligned with `README.md`, `AGENTS.md`, package scripts, and active SDD artifacts.
-- Keep private product direction in `../../../spaces-docs/lorecraft/`.
+- Keep private product direction in `../../../ideas/lorecraft/`.
 - Do not duplicate Epic/Story truth here; link to `docs/epics/` and `docs/changes/` when behavior evidence matters.

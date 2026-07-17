@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Slash Commands And Tutorial World
 
 ## Resume Here

@@ -1,5 +1,7 @@
 # Review: UI Improvements
 
+> Historical review: this verdict covers the pre-remediation source reviewed on 2026-07-11. The recorded findings were subsequently remediated or accepted, but fresh independent review, deterministic E2E, and manual confirmation were waived when the repository was archived on 2026-07-14. Unchecked findings below are preserved as review history, not active work.
+
 ## Verdict
 
 changes-requested

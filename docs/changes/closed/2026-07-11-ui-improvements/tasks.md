@@ -1,17 +1,18 @@
+---
+status: ready_to_close
+---
 # Tasks: Adventure Workbench UI And NPC Inspection
 
 ## Resume Here
 
-Resume with manual UI confirmation on `change/ui-improvements` at implementation commit `d93fdbf`. Code, deterministic remediation, delegated self-checks, supporting docs, and required CI are complete. Full E2E still requires Convex port `3210` to be freed without violating the always-on server instruction; after manual/E2E evidence, rerun `/sdd-review` against an immutable source commit.
-
-Preserve the unrelated historical path-migration documentation edits already present in the worktree. The current implementation is uncommitted.
+Closed as an intentionally retired prototype Change on 2026-07-14. Implementation is preserved at `d93fdbf`, with the handoff record at `ccb60aa`. The repository is archived in favor of the official creator-first Lorecraft application. Deterministic E2E, manual UI confirmation, and fresh independent rereview were accepted as archival gaps rather than represented as completed evidence.
 
 ## Replan Classification
 
 - Classification: accepted scope expansion plus technical/data constraint.
 - Trigger: 2026-07-11 `/sdd-review` returned `changes-requested` after the interactive UI session expanded beyond cosmetic scope.
 - Product decision: for the current internal MVP, Room Info intentionally exposes every canonical NPC field, including `knowledge`.
-- Next workflow: fresh `/sdd-apply` beginning with the data-safety Requirement slice.
+- Final disposition: remediation was implemented, but the repository was archived before fresh review and acceptance; no further workflow is scheduled.
 
 ## Planning Updates
 
@@ -65,11 +66,11 @@ Preserve the unrelated historical path-migration documentation edits already pre
 
 - [x] Run focused tests for each Requirement slice.
 - [x] Run `npm run ci:required`.
-- [ ] Run `npm run e2e` with Convex port `3210` free.
-- [ ] Complete the manual UI confirmation walkthrough.
+- [x] Record the unexecuted full E2E run as an accepted archival gap.
+- [x] Record manual UI confirmation as an accepted archival gap.
 - [x] Run delegated implementation self-checks for code, coverage, security, and artifacts.
 - [x] Commit verified implementation slices without unrelated path-migration edits.
-- [ ] Rerun `/sdd-review` against an immutable source commit.
+- [x] Preserve the historical review verdict and waive fresh rereview because the repository is retired rather than integration-ready.
 
 ## Existing Implementation Ledger
 
@@ -97,7 +98,8 @@ Preserve the unrelated historical path-migration documentation edits already pre
 
 ## Manual UI Confirmation
 
-- Status: pending user
+- Status: accepted gap
+- Archival decision: the repository was retired before this walkthrough was completed; the steps below remain historical reference, not pending work.
 - Route/setup: `npm run dev:debug`, then open an existing Adventure at `http://localhost:3000/adventures/<adventureId>`.
 - Desktop:
   - Scroll Player, Story, and Room independently.
@@ -117,15 +119,16 @@ Preserve the unrelated historical path-migration documentation edits already pre
 ## Blockers And Open Questions
 
 - No planning blocker remains.
-- The original findings in `review.md` have been remediated or explicitly accepted by the replan; a fresh `/sdd-review` is still required against the completed source commit.
-- Full deterministic E2E requires temporarily freeing local Convex port `3210`; do not stop the always-on server without coordinating that verification step.
+- The original findings in `review.md` were remediated or explicitly accepted by the replan, but no fresh independent review verified the completed source commit. This is an accepted archival gap, not evidence of review readiness.
+- Full deterministic E2E was not rerun because local Convex port `3210` remained occupied. This is an accepted archival gap.
 
 ## Closeout
 
 - Review record: `review.md`; latest verdict `changes-requested` on 2026-07-11.
-- Manual confirmation status: pending user.
+- Closeout reason: repository retired in favor of the official creator-first Lorecraft application.
+- Manual confirmation status: accepted gap.
 - Release communication status: `[Unreleased]` updated with user-facing behavior.
-- PR / merge state: implementation committed at `d93fdbf`; no PR or merge authorized.
+- PR / merge state: implementation committed at `d93fdbf`; no PR or merge performed because the repository was archived.
 - ADR status: not applicable; no durable cross-project architecture decision proposed.
-- Accepted deferred gaps: future public/authenticated NPC-field visibility policy.
-- Folder state: active under `docs/changes/2026-07-11-ui-improvements/`.
+- Accepted deferred gaps: fresh independent review, full deterministic E2E, manual UI confirmation, and future public/authenticated NPC-field visibility policy.
+- Folder state: closed under `docs/changes/closed/2026-07-11-ui-improvements/`.

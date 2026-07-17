@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: LC-002 Multi-World Debug Reset Fixes
 
 ## Resume Here

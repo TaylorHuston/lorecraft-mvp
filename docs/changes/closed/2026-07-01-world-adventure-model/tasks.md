@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: World / Adventure Model
 
 ## Resume Here

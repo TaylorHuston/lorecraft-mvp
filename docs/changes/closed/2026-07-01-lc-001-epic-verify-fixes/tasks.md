@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: LC-001 Epic Verify Fixes
 
 ## Resume Here

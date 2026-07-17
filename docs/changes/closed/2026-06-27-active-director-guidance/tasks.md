@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Active Director Guidance
 
 ## Resume Here

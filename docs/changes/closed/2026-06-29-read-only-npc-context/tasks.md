@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Read-Only NPC Context
 
 ## Resume Here

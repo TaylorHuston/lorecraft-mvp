@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Scoped Turns
 
 ## Resume Here
