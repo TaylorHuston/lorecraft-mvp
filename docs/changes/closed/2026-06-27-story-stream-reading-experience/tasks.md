@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Story Stream Reading Experience
 
 ## Resume Here

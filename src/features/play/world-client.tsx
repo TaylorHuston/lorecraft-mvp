@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +18,7 @@ import {
 } from "./debug-formatters";
 import { AdventureLanding, type AdventureListItem } from "./adventure-landing";
 import { DebugActionButton, DebugPanelShell } from "./debug-panel-shell";
+import { HelpDialog } from "./help-dialog";
 import { PlayerCard } from "./player-card";
 import { RoomInfoCard } from "./room-info-card";
 import { TurnActionPanel } from "./turn-action-panel";
@@ -27,6 +28,7 @@ import {
   type NpcDebugDraft,
   type NpcDebugSavePayload,
   type NpcSaveStatus,
+  type NewNpcDraft,
   useNpcDebugAutosave,
 } from "./use-npc-debug-autosave";
 import {
@@ -46,6 +48,8 @@ type DirectorTurnResponse =
       ok: false;
       error: string;
     };
+
+type MobilePlayPane = "player" | "story" | "room";
 
 type DirectorTurnPayload =
   | { trigger: "act"; input: string }
@@ -95,6 +99,8 @@ const DEFAULT_PROMPT_GUIDANCE: DirectorPromptGuidance = {
     "Keep fleeting gestures and reactions in narration. Only update durable NPC facts when the change should matter after recent context falls away.",
 };
 
+const MOBILE_PLAY_PANES: MobilePlayPane[] = ["player", "story", "room"];
+
 export function WorldClient({
   initialAdventureId = null,
 }: {
@@ -118,7 +124,11 @@ export function WorldClient({
   const [deletingAdventureId, setDeletingAdventureId] = useState<Id<"adventures"> | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [isDebugPanelCollapsed, setIsDebugPanelCollapsed] = useState(true);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isPlayerCardCollapsed, setIsPlayerCardCollapsed] = useState(false);
+  const [isRoomInfoCollapsed, setIsRoomInfoCollapsed] = useState(false);
+  const [mobilePlayPane, setMobilePlayPane] = useState<MobilePlayPane>("story");
+  const [hasNarrowPaneSemantics, setHasNarrowPaneSemantics] = useState(true);
   const [isPlayerCardSavePending, setIsPlayerCardSavePending] = useState(false);
   const [promptGuidance, setPromptGuidance] = useState<DirectorPromptGuidance>(
     DEFAULT_PROMPT_GUIDANCE,
@@ -143,6 +153,7 @@ export function WorldClient({
     : "Adventures";
   const npcDebug = useNpcDebugAutosave({
     adventureId,
+    writesDisabled: isResetting || isSeeding,
     locations: snapshot?.locations,
     onError: setError,
     onNotice: setNotice,
@@ -152,6 +163,14 @@ export function WorldClient({
     onError: setError,
     onNotice: setNotice,
   });
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const updatePaneSemantics = () => setHasNarrowPaneSemantics(!desktopQuery.matches);
+    updatePaneSemantics();
+    desktopQuery.addEventListener("change", updatePaneSemantics);
+    return () => desktopQuery.removeEventListener("change", updatePaneSemantics);
+  }, []);
 
   useEffect(() => {
     const storyScroller = storyScrollerRef.current;
@@ -164,6 +183,9 @@ export function WorldClient({
   }, [feedLength, isSubmitting, error]);
 
   async function handleSeed() {
+    if (npcDebug.isCreatingNpc) {
+      return;
+    }
     setError(null);
     setNotice(null);
     setIsSeeding(true);
@@ -258,7 +280,7 @@ export function WorldClient({
   }
 
   async function handleReset() {
-    if (!adventureId) {
+    if (!adventureId || npcDebug.isCreatingNpc) {
       return;
     }
 
@@ -458,8 +480,19 @@ export function WorldClient({
     }
   }
 
+  const TopBarTitle = adventureId ? "h1" : "div";
+
   return (
     <main id="lorecraft-app" className="min-h-screen bg-[#090908] pt-12 text-zinc-100">
+      {adventureId ? (
+        <a
+          id="skip-to-story-link"
+          href="#story-stream"
+          className="fixed left-3 top-2 z-50 -translate-y-16 rounded-sm border-2 border-amber-300 bg-zinc-950 px-3 py-2 text-sm font-semibold text-amber-200 transition-transform focus:translate-y-0"
+        >
+          Skip to story
+        </a>
+      ) : null}
       <div
         id="app-top-bar"
         className="pointer-events-none fixed inset-x-0 top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
@@ -468,18 +501,18 @@ export function WorldClient({
           id="app-top-bar-inner"
           className="pointer-events-none flex h-12 w-full items-center justify-between px-4 sm:px-6 lg:px-8"
         >
-          <div id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
+          <TopBarTitle id="app-world-title" className="min-w-0 text-sm font-medium text-zinc-200">
             <span className="text-amber-300">Lorecraft</span>
             <span className="px-2 text-zinc-600">-</span>
             <span className="truncate text-zinc-300">{topBarWorldName}</span>
-          </div>
+          </TopBarTitle>
           <div id="top-bar-actions" className="pointer-events-auto flex items-center gap-2">
             {adventureId ? (
               <button
                 id="back-to-adventures-button"
                 type="button"
                 onClick={() => void handleReturnToAdventures()}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                className="min-h-11 rounded-md px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80"
               >
                 Adventures
               </button>
@@ -491,7 +524,7 @@ export function WorldClient({
                 onClick={() => setIsDebugPanelCollapsed((current) => !current)}
                 aria-label={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
                 aria-pressed={!isDebugPanelCollapsed}
-                className={`flex size-8 items-center justify-center rounded border text-zinc-300 hover:bg-zinc-800 ${
+                className={`flex size-11 items-center justify-center rounded-md border text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80 ${
                   isDebugPanelCollapsed
                     ? "border-zinc-700"
                     : "border-amber-300/70 bg-amber-950/20 text-amber-200"
@@ -499,6 +532,19 @@ export function WorldClient({
                 title={isDebugPanelCollapsed ? "Show debug panel" : "Hide debug panel"}
               >
                 <GearIcon />
+              </button>
+            ) : null}
+            {adventureId ? (
+              <button
+                id="help-dialog-toggle"
+                type="button"
+                onClick={() => setIsHelpOpen(true)}
+                aria-label="Show help"
+                aria-haspopup="dialog"
+                className="flex size-11 items-center justify-center rounded-md border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80"
+                title="Help"
+              >
+                <HelpIcon />
               </button>
             ) : null}
           </div>
@@ -546,64 +592,80 @@ export function WorldClient({
             ) : (
               <div
                 id="play-layout"
-                className={`flex min-h-0 flex-1 flex-col lg:grid ${
-                  isPlayerCardCollapsed
-                    ? "lg:grid-cols-[6rem_56fr_23fr]"
-                    : "lg:grid-cols-[23fr_56fr_23fr]"
-                }`}
+                className="flex min-h-0 flex-1 flex-col lg:grid lg:h-full lg:grid-cols-[minmax(14rem,22fr)_minmax(0,56fr)_minmax(14rem,22fr)] lg:gap-3 lg:p-3"
               >
-                <PlayerCard
-                  key={snapshot.player._id}
-                  adventureId={adventureId}
-                  player={snapshot.player}
-                  isCollapsed={isPlayerCardCollapsed}
-                  onError={setError}
-                  onCollapseChange={setIsPlayerCardCollapsed}
-                  onFlushReady={registerPlayerCardFlush}
-                  onSavePendingChange={setIsPlayerCardSavePending}
+                <MobilePlayTabs
+                  value={mobilePlayPane}
+                  onChange={setMobilePlayPane}
+                  hasTabSemantics={hasNarrowPaneSemantics}
                 />
                 <div
-                  id="story-workspace"
-                  className="flex min-h-[calc(100vh-3rem)] min-w-0 flex-col lg:min-h-0"
+                  id="mobile-player-pane"
+                  role={hasNarrowPaneSemantics ? "tabpanel" : undefined}
+                  aria-labelledby={hasNarrowPaneSemantics ? "mobile-player-tab" : undefined}
+                  className={mobilePlayPane === "player" ? "block lg:contents" : "hidden lg:contents"}
                 >
-                  <section
-                    id="story-stream"
-                    ref={storyScrollerRef}
-                    className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-5 lg:px-0"
+                  <PlayerCard
+                    key={snapshot.player._id}
+                    adventureId={adventureId}
+                    player={snapshot.player}
+                    isCollapsed={isPlayerCardCollapsed}
+                    onError={setError}
+                    onCollapseChange={setIsPlayerCardCollapsed}
+                    onFlushReady={registerPlayerCardFlush}
+                    onSavePendingChange={setIsPlayerCardSavePending}
+                  />
+                </div>
+                <div
+                  id="story-workspace"
+                  role={hasNarrowPaneSemantics ? "tabpanel" : undefined}
+                  aria-labelledby={hasNarrowPaneSemantics ? "mobile-story-tab" : undefined}
+                  className={`${mobilePlayPane === "story" ? "flex" : "hidden"} min-h-[calc(100vh-6.5rem)] min-w-0 flex-col gap-3 lg:flex lg:h-full lg:min-h-0 lg:overflow-hidden`}
+                >
+                  <div
+                    id="story-stream-panel"
+                    className="flex min-h-0 flex-1 flex-col overflow-hidden border-2 border-zinc-700"
                   >
-                    <div
-                      id="story-stream-inner"
-                      className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end"
+                    <section
+                      id="story-stream"
+                      ref={storyScrollerRef}
+                      tabIndex={-1}
+                      className="min-h-0 flex-1 overflow-y-auto py-6 pl-0 pr-10 sm:pr-12"
                     >
-                      {snapshot.feed.length > 0 ? (
-                        <div id="story-feed" className="space-y-8">
-                          {snapshot.feed.map((entry) => {
-                            const kind = normalizeFeedKind(entry.kind, entry.source);
-                            const turnId = "turnId" in entry ? entry.turnId : undefined;
-                            return (
-                              <StoryEntry
-                                key={entry.id}
-                                id={entry.id}
-                                kind={kind}
-                                text={entry.text}
-                                turnNumber={
-                                  shouldShowTurnNumber(kind) && turnId
-                                    ? turnSequenceById.get(turnId)
-                                    : undefined
-                                }
-                              />
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
-                          <p className="max-w-md text-base leading-7 text-zinc-400">
-                            The chapel waits in rain and lantern light.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </section>
+                      <div
+                        id="story-stream-inner"
+                        className="mx-auto flex min-h-full max-w-[53rem] flex-col justify-end"
+                      >
+                        {snapshot.feed.length > 0 ? (
+                          <div id="story-feed" className="space-y-8">
+                            {snapshot.feed.map((entry) => {
+                              const kind = normalizeFeedKind(entry.kind, entry.source);
+                              const turnId = "turnId" in entry ? entry.turnId : undefined;
+                              return (
+                                <StoryEntry
+                                  key={entry.id}
+                                  id={entry.id}
+                                  kind={kind}
+                                  text={entry.text}
+                                  turnNumber={
+                                    shouldShowTurnNumber(kind) && turnId
+                                      ? turnSequenceById.get(turnId)
+                                      : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div id="story-empty-state" className="flex flex-1 items-end pb-8 text-zinc-500">
+                            <p className="max-w-md text-base leading-7 text-zinc-400">
+                              The chapel waits in rain and lantern light.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  </div>
 
                   <TurnActionPanel
                     disabled={
@@ -622,29 +684,53 @@ export function WorldClient({
                     onPass={handlePass}
                   />
                 </div>
-                <RoomInfoCard room={snapshot.room} actors={snapshot.actors} />
+                <div
+                  id="mobile-room-pane"
+                  role={hasNarrowPaneSemantics ? "tabpanel" : undefined}
+                  aria-labelledby={hasNarrowPaneSemantics ? "mobile-room-tab" : undefined}
+                  className={mobilePlayPane === "room" ? "block lg:contents" : "hidden lg:contents"}
+                >
+                  <RoomInfoCard
+                    room={snapshot.room}
+                    actors={snapshot.npcProfiles.map((npc) => ({
+                      key: npc.key,
+                      name: npc.name,
+                      description: npc.description,
+                      role: "npc",
+                      locationName: npc.locationName,
+                      facts: NPC_PROFILE_FACT_KEYS.map((key) => ({ key, value: npc[key] })),
+                    }))}
+                    isCollapsed={isRoomInfoCollapsed}
+                    onCollapseChange={setIsRoomInfoCollapsed}
+                  />
+                </div>
               </div>
             )}
           </div>
         </section>
 
         {adventureId ? (
+          <HelpDialog isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+        ) : null}
+
+        {adventureId ? (
           <DebugPanelShell
             isCollapsed={isDebugPanelCollapsed}
+            onClose={() => setIsDebugPanelCollapsed(true)}
             hasSnapshot={Boolean(snapshot)}
             headerActions={
               <>
                 <DebugActionButton
                   id="fresh-seed-button"
                   onClick={handleSeed}
-                  disabled={isSeeding || isResetting}
+                  disabled={isSeeding || isResetting || npcDebug.isCreatingNpc}
                 >
                   {isSeeding ? "Resetting" : "Reset World"}
                 </DebugActionButton>
                 <DebugActionButton
                   id="rough-reset-button"
                   onClick={handleReset}
-                  disabled={!adventureId || isResetting || isSeeding}
+                  disabled={!adventureId || isResetting || isSeeding || npcDebug.isCreatingNpc}
                   tone="danger"
                 >
                   {isResetting ? "Resetting" : "Reset Session"}
@@ -666,12 +752,20 @@ export function WorldClient({
             npcsPanel={snapshot ? (
               <NpcDebugPanel
                 actors={npcDebug.actors}
+                locations={snapshot.locations}
                 facts={snapshot.facts}
                 drafts={npcDebug.drafts}
                 saveStatus={npcDebug.saveStatus}
                 collapsedNpcKeys={npcDebug.collapsedNpcKeys}
                 savingNpcKey={npcDebug.savingNpcKey}
-                onAdd={npcDebug.addNpc}
+                newNpc={npcDebug.newNpc}
+                createError={npcDebug.createError}
+                createValidationError={npcDebug.createValidationError}
+                isCreatingNpc={npcDebug.isCreatingNpc}
+                canCreateNpc={npcDebug.canCreateNpc}
+                writesDisabled={isResetting || isSeeding}
+                onNewNpcChange={npcDebug.setNewNpc}
+                onCreate={npcDebug.createNewNpc}
                 onChange={npcDebug.updateDraft}
                 onToggleCollapsed={npcDebug.toggleCollapsed}
                 onReset={npcDebug.resetActor}
@@ -733,6 +827,84 @@ export function WorldClient({
   );
 }
 
+function MobilePlayTabs({
+  value,
+  onChange,
+  hasTabSemantics,
+}: {
+  value: MobilePlayPane;
+  onChange: (pane: MobilePlayPane) => void;
+  hasTabSemantics: boolean;
+}) {
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, pane: MobilePlayPane) {
+    const currentIndex = MOBILE_PLAY_PANES.indexOf(pane);
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % MOBILE_PLAY_PANES.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + MOBILE_PLAY_PANES.length) % MOBILE_PLAY_PANES.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = MOBILE_PLAY_PANES.length - 1;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextPane = MOBILE_PLAY_PANES[nextIndex];
+    onChange(nextPane);
+    document.getElementById(`mobile-${nextPane}-tab`)?.focus();
+  }
+
+  return (
+    <div
+      id="mobile-play-tabs"
+      role={hasTabSemantics ? "tablist" : undefined}
+      aria-label={hasTabSemantics ? "Adventure views" : undefined}
+      className="grid grid-cols-3 border-b border-zinc-800 bg-zinc-950/80 px-4 lg:hidden"
+    >
+      {MOBILE_PLAY_PANES.map((pane) => {
+        const isSelected = value === pane;
+        const label = pane[0].toUpperCase() + pane.slice(1);
+        return (
+          <button
+            key={pane}
+            id={`mobile-${pane}-tab`}
+            type="button"
+            role={hasTabSemantics ? "tab" : undefined}
+            aria-selected={hasTabSemantics ? isSelected : undefined}
+            aria-controls={
+              hasTabSemantics
+                ? pane === "story"
+                  ? "story-workspace"
+                  : `mobile-${pane}-pane`
+                : undefined
+            }
+            tabIndex={isSelected ? 0 : -1}
+            onClick={() => onChange(pane)}
+            onKeyDown={(event) => handleKeyDown(event, pane)}
+            className={`relative min-h-14 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300/80 ${
+              isSelected ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200"
+            }`}
+          >
+            {label}
+            <span
+              aria-hidden="true"
+              className={`absolute inset-x-3 bottom-0 h-0.5 rounded-full transition-colors ${
+                isSelected ? "bg-amber-300" : "bg-transparent"
+              }`}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function buildSlashCommandTargets(snapshot: SlashCommandSnapshot) {
   const targets: SlashCommandAutocompleteTarget[] = [];
 
@@ -780,6 +952,25 @@ function GearIcon() {
     >
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.7a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.3a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.8 9a2.4 2.4 0 1 1 3.1 2.3c-.6.3-.9.8-.9 1.7" />
+      <path d="M12 17h.01" />
     </svg>
   );
 }
@@ -846,7 +1037,7 @@ function StoryEntry({
       <StoryEntryShell id={entryDomId} kind={kind} turnNumber={undefined}>
         <aside
           id={`${entryDomId}-utility-message`}
-          className="max-w-2xl rounded-xl bg-zinc-800/45 px-4 py-3 text-sm leading-6 text-zinc-300"
+          className="max-w-2xl rounded-sm border-2 border-zinc-700 bg-transparent px-4 py-3 text-sm leading-6 text-zinc-300"
         >
           <p className="mb-2 text-[0.68rem] font-medium uppercase tracking-[0.14em] text-zinc-500">
             Utility
@@ -888,7 +1079,9 @@ function StoryEntryShell({
       <div id={`${id}-turn-number`} className="pt-1 text-right text-xs tabular-nums text-zinc-700">
         {turnNumber ? turnNumber : ""}
       </div>
-      <div id={`${id}-body`} className="min-w-0">{children}</div>
+      <div id={`${id}-body`} className="min-w-0">
+        {children}
+      </div>
     </div>
   );
 }
@@ -963,17 +1156,26 @@ function DebugDisclosureButton({
 
 function NpcDebugPanel({
   actors,
+  locations,
   facts,
   drafts,
   saveStatus,
   collapsedNpcKeys,
   savingNpcKey,
-  onAdd,
+  newNpc,
+  createError,
+  createValidationError,
+  isCreatingNpc,
+  canCreateNpc,
+  writesDisabled,
+  onNewNpcChange,
+  onCreate,
   onChange,
   onToggleCollapsed,
   onReset,
 }: {
   actors: NpcDebugActor[];
+  locations: Array<{ key: string; name: string }>;
   facts: Array<{
     subjectId: string;
     key: string;
@@ -984,7 +1186,14 @@ function NpcDebugPanel({
   saveStatus: Record<string, NpcSaveStatus>;
   collapsedNpcKeys: Record<string, boolean>;
   savingNpcKey: string | null;
-  onAdd: () => void;
+  newNpc: NewNpcDraft;
+  createError: string | null;
+  createValidationError: string | null;
+  isCreatingNpc: boolean;
+  canCreateNpc: boolean;
+  writesDisabled: boolean;
+  onNewNpcChange: (npc: NewNpcDraft) => void;
+  onCreate: () => void;
   onChange: (actor: NpcDebugActor, draft: NpcDebugDraft, payload: NpcDebugSavePayload) => void;
   onToggleCollapsed: (actorKey: string) => void;
   onReset: (actor: NpcDebugActor) => void;
@@ -995,12 +1204,63 @@ function NpcDebugPanel({
         id="npc-debug-panel-header"
         title="NPCs"
         description="Canonical demo-world NPCs. Edits autosave to Convex and can be reset with Reset Session or Reset World."
-        action={
-          <DebugActionButton id="add-debug-npc-button" onClick={onAdd}>
-            Add NPC
-          </DebugActionButton>
-        }
       />
+
+      <fieldset disabled={writesDisabled} className="space-y-4 disabled:opacity-60">
+      <DebugCard id="npc-create-card">
+        <h4 className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
+          Add NPC
+        </h4>
+        <p className="mt-2 text-xs leading-5 text-zinc-500">
+          Choose the Adventure location where this NPC should begin. Profile fields can be edited after creation.
+        </p>
+        <div id="npc-create-fields" className="mt-4 space-y-3">
+          <LocationInput
+            id="new-npc-key"
+            label="Key"
+            value={newNpc.key}
+            onChange={(key) => onNewNpcChange({ ...newNpc, key })}
+          />
+          <LocationInput
+            id="new-npc-name"
+            label="Name"
+            value={newNpc.name}
+            onChange={(name) => onNewNpcChange({ ...newNpc, name })}
+          />
+          <LocationTextarea
+            id="new-npc-description"
+            label="Description"
+            value={newNpc.description}
+            onChange={(description) => onNewNpcChange({ ...newNpc, description })}
+          />
+          <NpcLocationSelect
+            id="new-npc-location"
+            value={newNpc.locationKey}
+            locations={locations}
+            onChange={(locationKey) => onNewNpcChange({ ...newNpc, locationKey })}
+          />
+        </div>
+        {createError || createValidationError ? (
+          <p
+            id="npc-create-error"
+            role={createError ? "alert" : "status"}
+            className={`mt-3 text-xs leading-5 ${
+              createError ? "text-rose-300" : "text-zinc-400"
+            }`}
+          >
+            {createError ?? createValidationError}
+          </p>
+        ) : null}
+        <div className="mt-3" aria-live="polite" aria-busy={isCreatingNpc}>
+          <DebugActionButton
+            id="create-npc-button"
+            onClick={onCreate}
+            disabled={!canCreateNpc || isCreatingNpc}
+          >
+            {isCreatingNpc ? "Adding NPC..." : "Add NPC"}
+          </DebugActionButton>
+        </div>
+      </DebugCard>
       {actors.length > 0 ? (
         actors.map((npc) => {
           const npcDomId = `npc-card-${domId(npc.key)}`;
@@ -1015,11 +1275,13 @@ function NpcDebugPanel({
               source: draftFacts[key] !== undefined ? "draft" : (fact?.source ?? "empty"),
             };
           });
-          const payload: NpcDebugSavePayload = {
+          const payload = {
             name: draft.name ?? npc.name,
             description: draft.description ?? npc.description,
+            locationKey: draft.locationKey ?? npc.locationKey,
             facts: Object.fromEntries(editableFacts.map((fact) => [fact.key, fact.value])),
           };
+          const payloadLocation = locations.find((location) => location.key === payload.locationKey);
           const isSaving = savingNpcKey === npc.key;
           const status = saveStatus[npc.key] ?? "idle";
           const hasDraft = Boolean(drafts[npc.key]);
@@ -1038,7 +1300,7 @@ function NpcDebugPanel({
                     {payload.description || "No description yet."}
                   </p>
                   <p id={`${npcDomId}-location`} className="mt-2 text-xs leading-5 text-zinc-400">
-                    Location: {npc.locationName} ({npc.locationKey})
+                    Location: {payloadLocation?.name ?? npc.locationName} ({payload.locationKey})
                   </p>
                 </div>
                 <div id={`${npcDomId}-actions`} className="flex shrink-0 items-center gap-2">
@@ -1075,7 +1337,7 @@ function NpcDebugPanel({
                     label="Name"
                     meta={draft.name !== undefined ? "draft" : "canonical"}
                     value={payload.name}
-                    onChange={(name) => onChange(npc, { ...draft, name }, { ...payload, name })}
+                    onChange={(name) => onChange(npc, { ...draft, name }, { name })}
                   />
                   <NpcDebugTextarea
                     actorKey={npc.key}
@@ -1083,7 +1345,19 @@ function NpcDebugPanel({
                     meta={draft.description !== undefined ? "draft" : "canonical"}
                     value={payload.description}
                     onChange={(description) =>
-                      onChange(npc, { ...draft, description }, { ...payload, description })
+                      onChange(npc, { ...draft, description }, { description })
+                    }
+                  />
+                  <NpcLocationSelect
+                    id={`npc-debug-${domId(npc.key)}-location`}
+                    value={payload.locationKey}
+                    locations={locations}
+                    onChange={(locationKey) =>
+                      onChange(
+                        npc,
+                        { ...draft, locationKey },
+                        { locationKey },
+                      )
                     }
                   />
                   {editableFacts.map((fact) => (
@@ -1101,11 +1375,7 @@ function NpcDebugPanel({
                             [fact.key]: value,
                           },
                         }, {
-                          ...payload,
-                          facts: {
-                            ...payload.facts,
-                            [fact.key]: value,
-                          },
+                          facts: { [fact.key]: value },
                         })
                       }
                     />
@@ -1118,6 +1388,7 @@ function NpcDebugPanel({
       ) : (
         <p id="npc-debug-panel-empty-state" className="text-sm text-zinc-500">No NPCs exist in this world yet.</p>
       )}
+      </fieldset>
     </section>
   );
 }
@@ -1418,6 +1689,39 @@ function LocationTextarea({
         onBlur={onBlur}
         className="h-20 w-full resize-none overflow-y-auto rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
       />
+    </div>
+  );
+}
+
+function NpcLocationSelect({
+  id,
+  value,
+  locations,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  locations: Array<{ key: string; name: string }>;
+  onChange: (locationKey: string) => void;
+}) {
+  return (
+    <div id={`${id}-field`}>
+      <label htmlFor={id} className="text-xs font-medium text-zinc-400">
+        Location
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-11 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none focus:border-amber-300"
+      >
+        <option value="">Select a location</option>
+        {locations.map((location) => (
+          <option key={location.key} value={location.key}>
+            {location.name} ({location.key})
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

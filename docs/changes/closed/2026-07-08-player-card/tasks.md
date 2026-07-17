@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Player And Room Info Panels
 
 ## Resume Here
@@ -120,7 +123,7 @@ Record meaningful Requirement, Scenario, enabling, or delegated slices as they h
 | 2026-07-08 | Room Info replan | main; `sdd-propose`; shared visual style guide | `proposal.md`, `design.md`, `tasks.md` | Added `LC-001-S16` planning for a right-side Room Info panel derived from current location snapshot state. | `7918983` |
 | 2026-07-08 | `LC-001-S16` Room Info implementation | main; UI/Next/Convex guidance | `src/features/play/room-info-card.tsx`, `src/features/play/world-client.tsx`, E2E spec, LC-001, README, data/persistence/testing docs, CHANGELOG | Implemented read-only Room Info panel from current snapshot state and added unit plus browser coverage. | `7918983` |
 | 2026-07-08 | Apply-side self-check | delegated test engineer; main remediation | `src/features/play/room-info-card.tsx`, LC-001 Epic evidence | Removed debug-like visible room key, reconciled stale Epic verification gap, and reran required CI. | `7918983` |
-| 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, planning/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | `efa9269` |
+| 2026-07-08 | Review remediation | main; delegated artifact/code/UI review | `src/features/play/world-client.tsx`, `src/features/play/player-card.tsx`, `src/lib/world/*`, `convex-snapshot-read-model.test.ts`, ideas/docs/Epics | Reconciled always-editable Player Card field wording, added missing LC-002 blank-field scenario, loaded Player Card facts outside bounded general fact lists, disabled turn controls while Player Card saves are pending, and fixed narrow stacked layout. | `efa9269` |
 | 2026-07-10 | Fresh review remediation | main; delegated artifact/code/security/UI review | Player Card save queue and tests; design, Epic, tasks, and review artifacts | Serialized overlapping Player Card autosaves, added missing LC-001-S15/R1-S3 Epic truth, corrected remaining blank-field wording, and refreshed verification/lifecycle state. | `76db46b` |
 | 2026-07-10 | Final review remediation | main; delegated artifact/security/UI review | Player Card collapse semantics; LC-001-S16 evidence; tasks and review records | Kept the `aria-controls` target mounted while collapsed, reconciled Room Info E2E truth, and recorded immutable review coverage of `76db46b`. | `87eddcb` |
 

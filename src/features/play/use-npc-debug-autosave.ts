@@ -5,19 +5,24 @@ import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { errorMessage } from "./debug-formatters";
+import { NpcSaveQueue, type NpcPatch } from "./npc-save-queue";
 
 export type NpcSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
 
 export type NpcDebugDraft = {
   name?: string;
   description?: string;
+  locationKey?: string;
   facts?: Record<string, string>;
 };
 
-export type NpcDebugSavePayload = {
+export type NpcDebugSavePayload = NpcPatch;
+
+export type NewNpcDraft = {
+  key: string;
   name: string;
   description: string;
-  facts: Record<string, string>;
+  locationKey: string;
 };
 
 export type NpcDebugActor = {
@@ -30,15 +35,9 @@ export type NpcDebugActor = {
   locationName: string;
 };
 
-type NpcPendingSave = {
-  adventureId: Id<"adventures">;
-  actor: NpcDebugActor;
-  payload: NpcDebugSavePayload;
-  saveVersion: number;
-};
-
 type UseNpcDebugAutosaveOptions = {
   adventureId: Id<"adventures"> | null;
+  writesDisabled: boolean;
   locations:
     | Array<{
         key: string;
@@ -64,10 +63,18 @@ export const NPC_PROFILE_FACT_KEYS = [
   "status",
   "memory",
   "knowledge",
-];
+] as const;
+
+const EMPTY_NPC_DRAFT: NewNpcDraft = {
+  key: "",
+  name: "",
+  description: "",
+  locationKey: "",
+};
 
 export function useNpcDebugAutosave({
   adventureId,
+  writesDisabled,
   locations,
   onError,
   onNotice,
@@ -79,11 +86,17 @@ export function useNpcDebugAutosave({
   const [saveStatus, setSaveStatus] = useState<Record<string, NpcSaveStatus>>({});
   const [collapsedNpcKeys, setCollapsedNpcKeys] = useState<Record<string, boolean>>({});
   const [savingNpcKey, setSavingNpcKey] = useState<string | null>(null);
+  const [newNpc, setNewNpcState] = useState<NewNpcDraft>(EMPTY_NPC_DRAFT);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreatingNpc, setIsCreatingNpc] = useState(false);
+  const isCreatingNpcRef = useRef(false);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const saveVersions = useRef<Record<string, number>>({});
-  const pendingSaves = useRef<Record<string, NpcPendingSave>>({});
-  const activeSaves = useRef<Record<string, Promise<boolean>[]>>({});
-  const nextDebugNpcOrdinal = useRef(1);
+  const saveQueues = useRef<Record<string, NpcSaveQueue>>({});
+  const saveQueueOwners = useRef<Record<string, string>>({});
+  const newNpcValidationError = validateNewNpcDraft(newNpc, locations ?? []);
+  const hasNewNpcInput = Boolean(
+    newNpc.key.trim() || newNpc.name.trim() || newNpc.description.trim() || newNpc.locationKey,
+  );
 
   useEffect(() => {
     const timers = saveTimers.current;
@@ -91,50 +104,56 @@ export function useNpcDebugAutosave({
       for (const timer of Object.values(timers)) {
         clearTimeout(timer);
       }
-      pendingSaves.current = {};
     };
   }, []);
 
   function resetLocalState() {
+    for (const timer of Object.values(saveTimers.current)) {
+      clearTimeout(timer);
+    }
+    saveTimers.current = {};
+    saveQueues.current = {};
+    saveQueueOwners.current = {};
     setDrafts({});
     setSaveStatus({});
     setCollapsedNpcKeys({});
+    setNewNpcState(EMPTY_NPC_DRAFT);
+    setCreateError(null);
   }
 
   function updateDraft(
     actor: NpcDebugActor,
     draft: NpcDebugDraft,
-    payload: NpcDebugSavePayload,
+    patch: NpcDebugSavePayload,
   ) {
     setDrafts((current) => ({
       ...current,
       [actor.key]: draft,
     }));
-    scheduleSave(actor, payload);
+    scheduleSave(actor, patch);
   }
 
-  async function addNpc() {
-    if (!adventureId) {
+  async function createNewNpc() {
+    if (!adventureId || writesDisabled || isCreatingNpcRef.current) {
       return;
     }
-
-    const existingActorKeys = new Set(
-      locations?.flatMap((location) => location.actors.map((actor) => actor.key)) ?? [],
-    );
-    let actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
-    while (existingActorKeys.has(actorKey)) {
-      nextDebugNpcOrdinal.current += 1;
-      actorKey = `debug-npc-${nextDebugNpcOrdinal.current}`;
+    const validationError = validateNewNpcDraft(newNpc, locations ?? []);
+    if (validationError) {
+      setCreateError(validationError);
+      return;
     }
-    nextDebugNpcOrdinal.current += 1;
+    const actorKey = newNpc.key.trim().toLowerCase();
     const payload = {
-      name: "New NPC",
-      description: "A temporary NPC for playtesting.",
+      name: newNpc.name.trim(),
+      description: newNpc.description.trim(),
+      locationKey: newNpc.locationKey,
       facts: defaultNpcFacts(),
     };
 
-    onError(null);
+    setCreateError(null);
     onNotice(null);
+    isCreatingNpcRef.current = true;
+    setIsCreatingNpc(true);
     setSavingNpcKey(actorKey);
     setSaveStatus((current) => ({ ...current, [actorKey]: "saving" }));
     setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: false }));
@@ -145,16 +164,19 @@ export function useNpcDebugAutosave({
         ...payload,
       });
       if (!result.ok) {
-        onError(result.error ?? "Failed to create NPC.");
+        setCreateError(result.error ?? "Failed to create NPC.");
         setSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
         return;
       }
+      setNewNpcState(EMPTY_NPC_DRAFT);
       setSaveStatus((current) => ({ ...current, [actorKey]: "saved" }));
       onNotice("NPC created.");
     } catch (createError) {
-      onError(errorMessage(createError));
+      setCreateError(errorMessage(createError));
       setSaveStatus((current) => ({ ...current, [actorKey]: "error" }));
     } finally {
+      isCreatingNpcRef.current = false;
+      setIsCreatingNpc(false);
       setSavingNpcKey(null);
     }
   }
@@ -163,90 +185,69 @@ export function useNpcDebugAutosave({
     setCollapsedNpcKeys((current) => ({ ...current, [actorKey]: !(current[actorKey] ?? true) }));
   }
 
-  function scheduleSave(actor: NpcDebugActor, payload: NpcDebugSavePayload) {
-    if (!adventureId) {
+  function setNewNpc(draft: NewNpcDraft) {
+    setNewNpcState(draft);
+    setCreateError(null);
+  }
+
+  function scheduleSave(actor: NpcDebugActor, patch: NpcDebugSavePayload) {
+    if (!adventureId || writesDisabled) {
       return;
     }
 
-    saveVersions.current[actor.key] = (saveVersions.current[actor.key] ?? 0) + 1;
-    const saveVersion = saveVersions.current[actor.key];
-    const saveAdventureId = adventureId;
-
     setSaveStatus((current) => ({ ...current, [actor.key]: "unsaved" }));
     clearTimeout(saveTimers.current[actor.key]);
-    pendingSaves.current[actor.key] = {
-      adventureId: saveAdventureId,
-      actor,
-      payload,
-      saveVersion,
-    };
+    queueFor(actor, adventureId).stage(patch);
     saveTimers.current[actor.key] = setTimeout(() => {
       delete saveTimers.current[actor.key];
-      delete pendingSaves.current[actor.key];
-      void startPersist({ adventureId: saveAdventureId, actor, payload, saveVersion });
+      void flushNpcQueue(actor.key);
     }, 700);
   }
 
-  function startPersist(pendingSave: NpcPendingSave) {
-    const savePromise = persistNpc(
-      pendingSave.adventureId,
-      pendingSave.actor,
-      pendingSave.payload,
-      pendingSave.saveVersion,
-    );
-    activeSaves.current[pendingSave.actor.key] = [
-      ...(activeSaves.current[pendingSave.actor.key] ?? []),
-      savePromise,
-    ];
-    void savePromise.finally(() => {
-      const remainingSaves = (activeSaves.current[pendingSave.actor.key] ?? []).filter(
-        (activeSave) => activeSave !== savePromise,
+  function queueFor(actor: NpcDebugActor, saveAdventureId: Id<"adventures">) {
+    const owner = `${saveAdventureId}:${actor._id}`;
+    if (!saveQueues.current[actor.key] || saveQueueOwners.current[actor.key] !== owner) {
+      saveQueues.current[actor.key] = new NpcSaveQueue((patch) =>
+        persistNpc(saveAdventureId, actor, patch),
       );
-      if (remainingSaves.length > 0) {
-        activeSaves.current[pendingSave.actor.key] = remainingSaves;
-      } else {
-        delete activeSaves.current[pendingSave.actor.key];
-      }
-    });
-    return savePromise;
+      saveQueueOwners.current[actor.key] = owner;
+    }
+    return saveQueues.current[actor.key];
+  }
+
+  async function flushNpcQueue(actorKey: string) {
+    const queue = saveQueues.current[actorKey];
+    if (!queue) {
+      return true;
+    }
+    const saved = await queue.flush();
+    setSaveStatus((current) => ({ ...current, [actorKey]: saved ? "saved" : "error" }));
+    return saved;
   }
 
   async function flushQueuedSaves() {
-    const queuedSaves = Object.values(pendingSaves.current);
-    const flushedSaves = queuedSaves.map((pendingSave) => {
-      clearTimeout(saveTimers.current[pendingSave.actor.key]);
-      delete saveTimers.current[pendingSave.actor.key];
-      delete pendingSaves.current[pendingSave.actor.key];
-      return startPersist(pendingSave);
-    });
-    const activeSaveList = Object.values(activeSaves.current).flat();
-    const results = await Promise.all([...flushedSaves, ...activeSaveList]);
+    const actorKeys = Object.keys(saveQueues.current);
+    for (const actorKey of actorKeys) {
+      clearTimeout(saveTimers.current[actorKey]);
+      delete saveTimers.current[actorKey];
+    }
+    const results = await Promise.all(actorKeys.map(flushNpcQueue));
     return results.every(Boolean);
   }
 
   async function cancelQueuedSavesAndWaitForActive() {
-    const actorKeys = new Set([
-      ...Object.keys(saveTimers.current),
-      ...Object.keys(pendingSaves.current),
-      ...Object.keys(activeSaves.current),
-      ...Object.keys(saveVersions.current),
-    ]);
-
+    const actorKeys = Object.keys(saveQueues.current);
     for (const actorKey of actorKeys) {
       clearTimeout(saveTimers.current[actorKey]);
       delete saveTimers.current[actorKey];
-      delete pendingSaves.current[actorKey];
-      saveVersions.current[actorKey] = (saveVersions.current[actorKey] ?? 0) + 1;
     }
-
-    await Promise.allSettled(Object.values(activeSaves.current).flat());
+    await Promise.allSettled(actorKeys.map((actorKey) => saveQueues.current[actorKey].cancelAndWait()));
   }
 
   async function persistNpc(
     saveAdventureId: Id<"adventures">,
     actor: NpcDebugActor,
-    payload: NpcDebugSavePayload,
-    saveVersion: number,
+    patch: NpcDebugSavePayload,
   ): Promise<boolean> {
     onError(null);
     setSavingNpcKey(actor.key);
@@ -255,9 +256,7 @@ export function useNpcDebugAutosave({
       const result = await updateNpc({
         adventureId: saveAdventureId,
         actorId: actor._id,
-        name: payload.name,
-        description: payload.description,
-        facts: payload.facts,
+        ...patch,
       });
       if (!result.ok) {
         onError(result.error ?? "Failed to save NPC.");
@@ -265,23 +264,18 @@ export function useNpcDebugAutosave({
         return false;
       }
 
-      if (saveVersions.current[actor.key] === saveVersion) {
-        setSaveStatus((current) => ({ ...current, [actor.key]: "saved" }));
-      }
       return true;
     } catch (saveError) {
       onError(errorMessage(saveError));
       setSaveStatus((current) => ({ ...current, [actor.key]: "error" }));
       return false;
     } finally {
-      if (saveVersions.current[actor.key] === saveVersion) {
-        setSavingNpcKey(null);
-      }
+      setSavingNpcKey(null);
     }
   }
 
   async function resetActor(actor: NpcDebugActor) {
-    if (!adventureId) {
+    if (!adventureId || writesDisabled) {
       return;
     }
 
@@ -290,10 +284,9 @@ export function useNpcDebugAutosave({
     setSavingNpcKey(actor.key);
     clearTimeout(saveTimers.current[actor.key]);
     delete saveTimers.current[actor.key];
-    delete pendingSaves.current[actor.key];
-    saveVersions.current[actor.key] = (saveVersions.current[actor.key] ?? 0) + 1;
     try {
-      const result = await resetNpc({ adventureId, actorId: actor._id });
+      const queue = queueFor(actor, adventureId);
+      const result = await queue.reset(() => resetNpc({ adventureId, actorId: actor._id }));
       if (!result.ok) {
         onError(result.error ?? "Failed to reset NPC.");
         return;
@@ -318,7 +311,13 @@ export function useNpcDebugAutosave({
     saveStatus,
     collapsedNpcKeys,
     savingNpcKey,
-    addNpc,
+    newNpc,
+    createError,
+    createValidationError: hasNewNpcInput ? newNpcValidationError : null,
+    isCreatingNpc,
+    canCreateNpc: !newNpcValidationError && !isCreatingNpc && !writesDisabled,
+    setNewNpc,
+    createNewNpc,
     updateDraft,
     toggleCollapsed,
     resetActor,
@@ -338,6 +337,23 @@ export function defaultNpcFacts() {
     memory: "This NPC has not yet formed meaningful memories of Taylor.",
     knowledge: "This NPC has no private knowledge yet.",
   };
+}
+
+export function validateNewNpcDraft(
+  draft: NewNpcDraft,
+  locations: Array<{ key: string }>,
+) {
+  const key = draft.key.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,48}$/.test(key)) {
+    return "NPC key must use lowercase letters, numbers, and hyphens.";
+  }
+  if (!draft.name.trim() || !draft.description.trim()) {
+    return "NPC name and description are required.";
+  }
+  if (!locations.some((location) => location.key === draft.locationKey)) {
+    return "Select a valid location for this NPC.";
+  }
+  return null;
 }
 
 export function buildNpcDebugActors(

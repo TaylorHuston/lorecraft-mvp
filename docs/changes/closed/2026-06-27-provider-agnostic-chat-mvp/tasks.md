@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Provider-Agnostic Narrative Director MVP
 
 ## Resume Here

@@ -1,6 +1,6 @@
 # Style Guide
 
-Lorecraft's implementation style follows the private visual identity note in `../../../spaces-docs/lorecraft/visual-identity.md` and the shared visual guide in `../../../shared/visual-style-guide.md`.
+Lorecraft's implementation style follows the private visual identity note in `../../../ideas/lorecraft/visual-identity.md` and the shared visual guide in `../../../shared/visual-style-guide.md`.
 
 This file exists as the repo-local pointer for agents working only inside the implementation repo. Keep detailed product taste and private design direction in the private visual identity note unless Taylor explicitly approves moving it here.
 
@@ -29,6 +29,6 @@ This file exists as the repo-local pointer for agents working only inside the im
 
 ## Related References
 
-- `../../../spaces-docs/lorecraft/visual-identity.md`
+- `../../../ideas/lorecraft/visual-identity.md`
 - `../../../shared/visual-style-guide.md`
 - `docs/persistence-system.md`

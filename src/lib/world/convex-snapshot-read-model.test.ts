@@ -8,6 +8,97 @@ import {
 } from "./convex-snapshot-read-model";
 
 describe("Convex snapshot read model", () => {
+  it("returns subject-complete current-scene NPC profiles when debug facts are hidden", async () => {
+    const adventure = row("adventure-1", {
+      name: "Stormbound Chapel",
+      worldId: "world-1",
+      worldVersionId: "world-version-1",
+    });
+    const world = row("world-1", {
+      name: "Stormbound Chapel",
+      description: "A chapel in a storm.",
+    });
+    const worldVersion = row("world-version-1", {
+      versionNumber: 1,
+      name: "Stormbound Chapel",
+    });
+    const room = row("room-1", {
+      key: "chapel",
+      name: "Chapel",
+      description: "Rain taps against warped shutters.",
+    });
+    const player = row("actor-player", {
+      key: "taylor",
+      name: "Taylor",
+      role: "player",
+      roomId: "room-1",
+      description: "A rain-soaked traveler.",
+    });
+    const mira = row("actor-mira", {
+      key: "mira-vale",
+      name: "Mira Vale",
+      role: "npc",
+      roomId: "room-1",
+      description: "A watchful bell-keeper.",
+    });
+    const profileFacts = [
+      ["background", "Mira has kept the chapel bell for ten winters."],
+      ["persona", "Patient, observant, and slow to trust."],
+      ["voice", "Low and deliberate."],
+      ["mood", "Wary"],
+      ["status", "Listening near the altar"],
+      ["memory", "The bell rang before the storm arrived."],
+      ["knowledge", "A hidden stair lies beneath the vestry."],
+    ].map(([key, value]) =>
+      row(`fact-${key}`, {
+        subjectType: "actor",
+        subjectId: "actor:mira-vale",
+        key,
+        value,
+        source: "seed",
+      }),
+    );
+    const ctx = fakeQueryCtx({
+      rooms: [room],
+      actors: [player, mira],
+      worldObjects: [],
+      facts: profileFacts,
+      exits: [],
+      commands: [],
+      narrations: [],
+      events: [],
+      utilityMessages: [],
+      stateDiffs: [],
+      directorCalls: [],
+      turns: [],
+    });
+
+    const snapshot = await loadSnapshotReadModel(ctx, {
+      adventureId: "adventure-1" as never,
+      loaded: { adventure, world, worldVersion, player, room } as never,
+      includeDebugState: false,
+    });
+
+    expect(snapshot.facts).toEqual([]);
+    expect(snapshot.npcProfiles).toEqual([
+      {
+        _id: "actor-mira",
+        key: "mira-vale",
+        name: "Mira Vale",
+        locationKey: "chapel",
+        locationName: "Chapel",
+        description: "A watchful bell-keeper.",
+        background: "Mira has kept the chapel bell for ten winters.",
+        persona: "Patient, observant, and slow to trust.",
+        voice: "Low and deliberate.",
+        mood: "Wary",
+        status: "Listening near the altar",
+        memory: "The bell rang before the storm arrived.",
+        knowledge: "A hidden stair lies beneath the vestry.",
+      },
+    ]);
+  });
+
   it("returns Player Card profile fields even when debug facts are hidden", async () => {
     const adventure = row("adventure-1", {
       name: "Stormbound Chapel",

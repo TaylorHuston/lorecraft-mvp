@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #090908;
+  --foreground: #ededed;
+  --focus-ring: #fcd34d;
 }
 
 @theme inline {
@@ -14,14 +15,8 @@
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
+  min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
   font-family:
@@ -41,45 +36,10 @@ html {
   [role="tab"]:not([aria-disabled="true"])
 ) {
   cursor: pointer;
+  touch-action: manipulation;
 }
 
-.turn-response-area-enter {
-  animation: turn-response-area-enter 180ms ease-out both;
-  transform-origin: top left;
-}
-
-.turn-response-area-exit {
-  animation: turn-response-area-exit 160ms ease-in both;
-  transform-origin: top left;
-}
-
-@keyframes turn-response-area-enter {
-  from {
-    opacity: 0;
-    transform: scaleX(0.18) scaleY(0.75);
-  }
-
-  to {
-    opacity: 1;
-    transform: scaleX(1) scaleY(1);
-  }
-}
-
-@keyframes turn-response-area-exit {
-  from {
-    opacity: 1;
-    transform: scaleX(1) scaleY(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: scaleX(0.18) scaleY(0.75);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .turn-response-area-enter,
-  .turn-response-area-exit {
-    animation: none;
-  }
+:where(a[href], button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Next.js Architecture Refactor
 
 ## Resume Here

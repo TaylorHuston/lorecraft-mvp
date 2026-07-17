@@ -79,8 +79,8 @@ This Epic originally kept the MVP to one editable persistent world. LC-002 now i
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-06
-Last verified: 2026-07-06
+Modified: 2026-07-11
+Last verified: 2026-07-11
 
 As a playtester, I want a simple Act/Pass decision surface and a resumable story feed, so that the MVP feels like interacting with a living scene instead of operating a command parser.
 
@@ -120,6 +120,12 @@ The system SHALL reconstruct the player-facing feed from persisted commands, nar
 - THEN player input, Game Master narration, and world events are lightly distinguished
 - AND all events are shown in the MVP feed until event noise creates a filtering need
 
+###### Scenario R2-S3: Keyboard user skips to the story
+
+- WHEN an Adventure is open and a keyboard user activates the skip link
+- THEN focus moves directly to the story stream
+- AND the fixed top navigation does not obscure the focused story surface
+
 ##### Requirement R3: Pending And Failed Turns
 
 The system SHALL make synchronous Game Master turn progress and failure visible to the playtester.
@@ -140,13 +146,14 @@ The system SHALL make synchronous Game Master turn progress and failure visible 
 
 The system SHALL provide dedicated decision controls at the decision point.
 
-###### Scenario R4-S0: Player opens the action input
+###### Scenario R4-S0: Player uses the persistent command input
 
 - WHEN an Adventure is open
-- THEN the system shows `What do you do?` above the current player decision controls
-- WHEN the player clicks `Act`
-- THEN the system replaces the controls with the narrative input
-- AND the player can submit a normal action
+- THEN a separate bordered command surface shows `What do you do?`, a persistent textarea, and Act, Story, Guide, and Pass controls
+- WHEN the player enters text and clicks `Act` or presses Enter
+- THEN the system submits the text as a normal action
+- AND Story or Guide can submit the same textarea under their distinct semantics
+- AND the textarea grows only to a bounded height, returns to its default height after success, and restores submitted text after failure
 
 ###### Scenario R4-S1: Player passes the turn
 
@@ -162,13 +169,21 @@ The system SHALL provide dedicated decision controls at the decision point.
 - AND it does not show a player-side `Pass` message as story content
 - AND turn/debug metadata still makes the Pass trigger inspectable
 
+###### Scenario R4-S3: Player opens interaction help
+
+- WHEN an Adventure is open and the player activates Help beside Settings
+- THEN an accessible modal explains Act, Story, Guide, and Pass
+- AND it lists `/help` and `/look` with their pre-turn utility behavior
+- AND the player can dismiss it with Close, Escape, or the backdrop and return focus to Help
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/features/play/world-client.tsx` | renders the narrative-only split layout, owns the parent turn submission operation, and shows persisted feed entries. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/turn-action-panel.tsx` | renders the `What do you do?` decision surface, Act/Pass controls, Act-expanded textarea, close animation, pending placeholder, notice/error status, Enter-to-submit behavior, and Pass trigger. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/debug-panel-shell.tsx` | hosts the debug drawer shell and tab selection separately from the player story layout. | Recheck when debug drawer structure changes. |
+| `src/features/play/turn-action-panel.tsx` | renders the separate bordered `What do you do?` command surface, bounded persistent textarea, four action controls, pending state, notice/error status, Enter-to-Act behavior, and slash autocomplete. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/help-dialog.tsx` | explains the four decision actions and supported slash commands in an accessible native modal. | Recheck when action or slash-command semantics change. |
+| `src/features/play/debug-panel-shell.tsx` | hosts the native debug modal and tab selection separately from the player story layout. | Recheck when debug modal structure changes. |
 | `src/app/api/director/turn/route.ts` | receives narrative input or Pass triggers from the client and routes them through the backend Game Master workflow. | Recheck when this Story changes or the listed path changes. |
 | `convex/world.ts`, `src/lib/world/convex-snapshot-read-model.ts`, `src/lib/world/convex-turn-persistence.ts` | record player inputs for action turns, create commandless Pass turns, reconstruct the feed from `commands`, `narrations`, and `events`, and accept actor-location movement only through bounded post-narration extraction validation. | Recheck when this Story changes or the listed paths change. |
 
@@ -179,17 +194,20 @@ The system SHALL provide dedicated decision controls at the decision point.
 | R1-S1 and R1-S2 | `npm run e2e` | proves the browser accepts one narrative input, submits it through the Game Master route, and does not require a separate command/chat mode choice. | Recorded |
 | R2-S1 and R2-S2 | `npm run e2e` | proves persisted player input, Game Master narration, turn evidence, and reset behavior survive reload and remain distinguishable in the story/debug surfaces. | Recorded |
 | R2-S1 and R2-S2 | `CONVEX_AGENT_MODE=anonymous npx convex run world:getSnapshot` showed persisted player input, Game Master narration, and event feed entries ordered from durable rows. | As described in the evidence cell. | Recorded |
+| R2-S3 | Live browser keyboard verification at 1280x720 on 2026-07-11 | proves the skip link becomes visible on focus and activation moves focus directly to `#story-stream`. | Passing |
 | R3-S1 | `npm run e2e` and browser verification | prove pending state disables duplicate submission for the in-flight turn while keeping progress visible. | Recorded |
 | R3-S2 | Seed/no-world browser flow in `npm run e2e` | proves the app exposes a seed action before attempting play when no usable playtest state exists. | Recorded |
 | R4-S0 through R4-S2 | `npm run e2e` and `src/app/api/director/turn/route.test.ts` | prove Act opens the narrative input, Pass starts a turn without typed input, produces Game Master narration, and does not create a player-side Pass story entry. | Recorded |
 | R4-S0 through R4-S2 | `npm run ci:required` and `npm run e2e` on 2026-07-05 after `src/features/play/turn-action-panel.tsx` extraction | prove the extracted turn panel still opens Act input, submits Act with Enter, supports Pass, exposes pending/error state, and preserves the browser playtest path. | Recorded |
 | R4-S0 through R4-S2 | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after client and Convex helper extraction | prove the split play client, debug shell, autosave hooks, snapshot helpers, context helpers, and turn-persistence helpers preserve the deterministic browser playtest path. | Passing |
+| R4-S3 | Deterministic E2E assertion added on 2026-07-11 | covers Help content, Escape dismissal, and focus restoration; full execution remains pending on the fixed-port conflict. | Pending execution |
+| R4-S0 | `src/features/play/turn-action-panel.test.ts` and focused tests on 2026-07-11 | prove textarea growth is capped, its default inline height can be restored, and failed text restoration preserves any newer draft. Successful action wiring and Pass draft retention are asserted in the pending E2E flow. | Passing helper contract |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, runtime HTML smoke, and runtime local-Ollama POST passed for the broader app surface. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
 
 - No unresolved implementation gap for this Story.
-- No unresolved browser automation gap for the current MVP play-feed path.
+- Deterministic R2-S3 E2E assertions are present but have not executed because the always-on debug server occupies the suite's fixed local Convex port `3210`.
 
 
 #### Story Notes
@@ -308,8 +326,8 @@ The system SHALL avoid provider-managed chat sessions while still sending enough
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-11
+Last verified: 2026-07-11
 
 As a playtester, I want an NPC in the scene to remember meaningful interaction state, so that Lorecraft can prove structured persistence without modeling the full world yet.
 
@@ -394,7 +412,7 @@ The system SHALL use NPC facts only for state that should matter after recent tr
 
 ##### Requirement R5: Hidden State, Visible Behavior
 
-The system SHALL use NPC facts as hidden Game Master guidance rather than player-visible metadata.
+The system SHALL use NPC facts as Game Master guidance and avoid mechanically exposing field labels in narration. For the internal MVP only, the Room Info NPC inspector may show the complete canonical profile, including `knowledge`, for playtesting.
 
 ###### Scenario R5-S1: Narration uses mood naturally
 
@@ -415,7 +433,7 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 | `convex/world.ts` | seeds Taylor and Mira with stable actor keys and initializes Mira's `mood`, `status`, and `memory` facts. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/output.ts` | retains structured NPC-update parsing/validation for extractor-style mutation, ignores unknown/offscreen NPC updates, partially accepts valid fields, and caps `memory` at 500 characters. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/prompt.ts` | sends current-scene NPC facts as hidden Game Master guidance. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx` | shows hidden NPC facts only in the debug panel. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx` | keeps raw diagnostic facts in debug while supplying the internal MVP's complete read-only NPC profile to Room Info. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
 
@@ -441,8 +459,8 @@ The system SHALL use NPC facts as hidden Game Master guidance rather than player
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-11
+Last verified: 2026-07-11
 
 As a developer-playtester, I want to inspect Game Master calls and reset the spike world, so that early LLM behavior can be tuned without losing evidence or hand-editing every playtest cleanup.
 
@@ -516,6 +534,24 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 - THEN the design states that future stories/play sessions should be independent instances generated from a world/template
 - AND this change does not add story/play-session schema
 
+##### Requirement R5: Modal Debug Workspace
+
+The system SHALL present debug tooling as a temporary modal workspace over the play surface.
+
+###### Scenario R5-S1: Debug modal opens and closes accessibly
+
+- WHEN a developer-playtester activates the debug control
+- THEN a centered modal opens above a dimmed play surface
+- AND focus moves into the modal
+- AND the modal can be dismissed by its close control, Escape, or the backdrop
+- AND focus returns to the debug control after dismissal
+
+###### Scenario R5-S2: Debug content scrolls independently
+
+- WHEN debug content exceeds the modal viewport
+- THEN the modal content scrolls independently inside its bordered frame
+- AND the underlying Player, Story, and Room panes retain their layout and scroll positions
+
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
@@ -524,7 +560,7 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 | `convex/world.ts` | persists Game Master call audit records, accepted NPC fact diffs, generic world events, and rough reset behavior. | Recheck when this Story changes or the listed path changes. |
 | `src/lib/director/debug-log.ts` | writes opt-in gitignored JSONL debug records for local troubleshooting and gates raw LLM text behind `LORECRAFT_DEBUG_LOG_RAW_LLM` and raw provider request text behind `LORECRAFT_DEBUG_LOG_RAW_REQUEST`. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | records pre-turn rejection logs and one local `director.turn.unit` log entry for each recorded provider-error, invalid-output, or successful Game Master turn when `LORECRAFT_DEBUG_LOG=1` is enabled. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx` | renders hidden facts, events, narrations, state diffs, and Game Master calls in the debug panel and exposes rough reset. | Recheck when this Story changes or the listed path changes. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx` | render hidden facts, events, narrations, state diffs, and Game Master calls in a native modal workspace with reset actions and accessible dismissal. | Recheck when debug workspace structure or controls change. |
 | `.gitignore`, `package.json`, `README.md` | document and support the local-only debug log path. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -535,6 +571,7 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 | R1-S2 | `src/app/api/director/turn/route.test.ts` | proves provider errors and invalid extractor output are recorded as debug-visible extractor failures without faking state; `npm run e2e` proves failed-turn debug evidence remains visible after browser reload. | Recorded |
 | R2-S1 and R2-S2 | Local debug log unit tests | prove JSONL writes are opt-in, raw LLM response text is omitted unless explicitly enabled, and raw request text is gated separately. | Recorded |
 | R4-S1 and R4-S2 | `npm run e2e` exercises Reset Session through the browser and | proves the story surface returns to the empty seeded state while canonical debug state is restored. | Recorded |
+| R5-S1 and R5-S2 | Live browser verification at 1280x720 on 2026-07-11 | proves the centered native modal, dimmed backdrop, initial close-button focus, internal scroll frame, explicit close control, reliable Escape dismissal, and focus restoration to the gear control. | Passing |
 | Supporting gate | `npm run ci:required` passed for lint, unit tests, typecheck, and production build. | As described in the evidence cell. | Passing |
 
 #### Verification Gaps
@@ -550,8 +587,8 @@ The system SHALL provide a rough developer reset for repeated MVP playtesting.
 
 Status: implemented
 Created: 2026-07-01
-Modified: 2026-07-05
-Last verified: 2026-07-05
+Modified: 2026-07-11
+Last verified: 2026-07-11
 
 As a playtester, I want the play surface to read like an unfolding story and stay anchored near the newest turn, so that long sessions feel like interactive fiction instead of a chat log I have to manage.
 
@@ -595,11 +632,11 @@ The system SHALL keep the latest story turn and continuation input easy to reach
 - THEN the story surface opens near the latest story content
 - AND the input remains available for continuing the session
 
-###### Scenario R2-S3: Debug sidebar is taller than the story column
+###### Scenario R2-S3: Debug workspace contains more content than the story viewport
 
-- WHEN the debug sidebar contains more content than the visible story stream
+- WHEN the debug modal contains more content than its visible viewport
 - THEN the story input is not stranded at the viewport bottom away from the feed
-- AND the main story stream remains independently usable from the debug panel
+- AND closing the modal returns to the independently usable story stream
 
 ##### Requirement R3: Empty, Pending, And Error States Fit The Story Surface
 
@@ -637,7 +674,7 @@ The system SHALL keep empty, pending, and error states understandable without re
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R1-S1 through R1-S3 | Browser verification and `npm run e2e` | prove Game Master narration renders as primary prose, player input renders as authored action text, and world/debug events remain visually quieter than story text. | Recorded |
-| R2-S1 through R2-S3 | Browser verification plus `npm run e2e` | prove the story pane uses independent overflow, settles near the newest content, stays usable when the debug drawer is taller, and remains near the bottom after deterministic long-feed interactions. | Recorded |
+| R2-S1 through R2-S3 | Browser verification plus `npm run e2e` | prove the story pane uses independent overflow, settles near the newest content, remains independent from the debug workspace, and stays near the bottom after deterministic long-feed interactions. | Recorded |
 | R3-S1 | `npm run e2e` | proves Reset Session returns the story stream to the empty story state. | Recorded |
 | R3-S2 | Browser verification with a page-local `fetch` stub | proves Enter submits the textarea, the textarea clears while pending, duplicate submission is rejected during the in-flight turn, and pending feedback appears without a submit button. | Recorded |
 | R3-S3 | Browser verification with a page-local error `fetch` stub and `npm run e2e` provider-failure coverage | prove errors appear near the continuation input while the existing story remains readable. | Recorded |
@@ -1453,21 +1490,47 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 - THEN seeded NPC values are restored
 - AND debug-created NPCs are removed from the demo world
 
-###### Scenario R3-S4: Debug create adds a current-location NPC
+###### Scenario R3-S4: Debug create adds an NPC to a chosen location
 
 - WHEN Taylor creates an NPC from the debug `NPCs` tab
-- THEN the system creates a canonical NPC actor in the player's current location with a stable key, name, description, and editable profile facts
+- THEN Taylor chooses an existing Adventure location before creation
+- AND the system creates a canonical NPC actor in that location with a stable key, name, description, and editable profile facts
 - AND that NPC can appear in the next persistent Game Master request when present in the current scene
+
+###### Scenario R3-S5: Debug edit changes an NPC location
+
+- WHEN Taylor changes an existing NPC's Location selector in the debug `NPCs` tab
+- THEN the system validates the chosen location belongs to the Adventure
+- AND autosaves the NPC's canonical room assignment
+- AND current-scene NPC context follows that canonical assignment
+
+###### Scenario R3-S6: Partial NPC edits preserve unrelated fields
+
+- WHEN Taylor edits one actor field or NPC fact
+- THEN omitted actor fields and facts remain unchanged
+- AND explicitly clearing one editable fact removes only that fact
+
+###### Scenario R3-S7: NPC saves and reset are ordered
+
+- WHEN rapid edits overlap or reset begins while a save is active
+- THEN saves for that NPC execute serially
+- AND reset waits for the active save and discards queued stale edits before restoring the baseline
+
+###### Scenario R3-S8: NPC creation validates once inside debug
+
+- WHEN required creation fields or the selected Adventure location are invalid
+- THEN Add NPC remains unavailable and validation feedback stays visible in the debug modal
+- AND an in-flight creation cannot be submitted again
 
 #### Implemented By
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
 | `src/lib/director/npc-profiles.ts` | derives read-only NPC profiles from current-scene actors and actor facts. | Recheck when this Story changes or the listed path changes. |
-| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts` | seed Mira, Brother Alden, Rowan, and Lena with stable visible descriptions plus `background`, `persona`, `voice`, `mood`, `status`, `memory`, and private `knowledge` facts; expose NPC context and debug snapshot data; and keep debug-gated canonical NPC write actions registered through Convex. | Recheck when this Story changes or the listed paths change. |
+| `convex/world.ts`, `src/lib/world/convex-director-context.ts`, `src/lib/world/convex-snapshot-read-model.ts` | seed canonical NPC profiles, expose typed player and Game Master projections, validate patch-only debug writes and locations, and preserve omitted facts. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/prompt.ts` | renders `npcProfiles` into canonical `npcCards`, includes `conversationFocus`, `lastAction`, and `sceneDirective` as persistent-mode prompt components; records `npcProfileKeys` and `npcMutationMode: "bounded_updates"` in request summaries; and keeps read-only NPC cards/profiles higher priority than recent feed prose. | Recheck when this Story changes or the listed path changes. |
 | `src/app/api/director/turn/route.ts` | reads canonical Convex NPC context for persistent Game Master turns and leaves transcript mode unchanged. | Recheck when this Story changes or the listed path changes. |
-| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts` | add a debug `NPCs` tab for inspecting, autosaving, creating, and resetting canonical demo-world NPCs; flush queued NPC autosaves before player turn submission; and cancel queued NPC autosaves before seed/reset. | Recheck when this Story changes or the listed paths change. |
+| `src/features/play/world-client.tsx`, `src/features/play/debug-panel-shell.tsx`, `src/features/play/use-npc-debug-autosave.ts`, `src/features/play/npc-save-queue.ts` | provide modal NPC inspection/creation/editing, local validation and feedback, patch-only autosave, per-NPC ordering, turn-time flush, and reset barriers. | Recheck when this Story changes or the listed paths change. |
 | `src/lib/director/director.test.ts` | covers persistent NPC profile prompt context, prompt priority/scene directive context, direct-NPC question targeting, canonical debug-created NPC context, transcript exclusion, and the bounded mutation boundary. | Recheck when this Story changes or the listed path changes. |
 
 #### Verified By
@@ -1476,7 +1539,11 @@ The system SHALL provide a debug-panel `NPCs` tab for inspecting, editing, creat
 |---|---|---|---|
 | R1-S1 and R1-S2 | Focused director tests | prove current-scene NPC profiles are rendered as NPC Cards, prioritized over recent-feed prose, and kept separate from transcript history. | Recorded |
 | R2-S1 and R2-S2 | Focused director tests | prove story-generation output remains read-only for NPC state while any durable mutation must come from a non-story-generation path. | Recorded |
-| R3-S1 through R3-S4 | `npm run e2e` | proves the debug `NPCs` tab shows seeded NPCs, saves Mira description edits, clears editable knowledge, creates a current-location NPC, and restores/removes debug-created NPC state on Reset Session. | Recorded |
+| R3-S1 through R3-S3 | `npm run e2e` | proves the debug `NPCs` tab shows seeded NPCs, saves Mira description edits, clears editable knowledge, and restores/removes debug-created NPC state on Reset Session. | Recorded |
+| R3-S4 and R3-S5 | Deterministic E2E assertion added on 2026-07-11 | covers creating an NPC in the Vestry, changing its canonical location to the Chapel, and observing saved location state; full execution remains pending on the fixed-port conflict. | Pending execution |
+| R3-S6 | `convex/world.test.ts` and `npm run ci:required` on 2026-07-11 | prove omitted facts survive patches, explicit empty values delete only their named fact, invalid locations do not move actors, and empty patches are rejected. | Passing |
+| R3-S7 | `src/features/play/npc-save-queue.test.ts` and `npm run ci:required` on 2026-07-11 | prove overlapping saves serialize and reset waits while discarding queued stale patches. | Passing |
+| R3-S4 and R3-S8 | `convex/world.test.ts` and `src/features/play/use-npc-debug-autosave.test.ts` on 2026-07-11 | prove valid selected-location creation, unknown-location and duplicate rejection, local key/required/location validation, and complete default profile initialization. Duplicate-click prevention is asserted in the pending E2E path. | Passing deterministic contract |
 | R3-S2 and R3-S4 | Focused director tests | prove canonical debug-created NPC context and direct/recent addressed NPC targeting reach the next persistent Game Master request. | Recorded |
 | Supporting gate | `npm run ci:required`, `npm run typecheck`, `npm run lint`, and `npx convex codegen` passed after NPC profile/debug write remediation. | As described in the evidence cell. | Passing |
 | Supporting gate | `npm run ci:required`, `npm run convex:once`, and `npm run e2e` on 2026-07-05 after Workstream 2 and 4 extraction | prove the extracted NPC autosave hook, debug shell, snapshot read model, director context model, and turn persistence helpers preserve NPC debug editing, reset, turn submission flushing, and deterministic browser flows. | Passing |
@@ -1691,10 +1758,10 @@ The system SHALL provide a Playwright E2E suite that verifies the core seeded-wo
 
 The system SHALL verify the debug/test controls that make local playtesting diagnosable.
 
-###### Scenario R2-S1: Debug drawer toggles without breaking play
+###### Scenario R2-S1: Debug modal toggles without breaking play
 
 - WHEN the E2E suite toggles the top-bar debug gear
-- THEN the debug drawer opens and closes without trapping focus in hidden controls
+- THEN the debug modal opens and closes without trapping focus in hidden controls
 - AND the story stream remains usable for narrative input
 
 ###### Scenario R2-S2: Debug turn evidence is visible
@@ -2081,6 +2148,7 @@ The system SHALL show a persistent player-facing Player Card while an Adventure 
 
 - WHEN the player collapses the Player Card
 - THEN the story stream remains readable
+- AND the Story column retains its width and position
 - AND a clear control remains available to expand the Player Card again
 
 ###### Scenario R1-S3: No debug dependency
@@ -2134,6 +2202,7 @@ The system SHALL include filled Player Card context in Game Master requests whil
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | R1-S1 through R2-S2 | `npm run e2e` on 2026-07-10 | Browser coverage passes for name prompt, cancel, card display without debug dependency, editing, collapse/expand, and reload persistence. | Passing |
+| R1-S2 | Live browser verification at 1280x720 on 2026-07-11 | proves Player contracts to an 80px left rail while Story retains the exact same x position and width. | Passing |
 | R2-S1 and R2-S2 | `src/features/play/player-card-save-queue.test.ts` and immediate-navigation coverage in `npm run e2e` on 2026-07-10 | proves rapid edits serialize to the latest draft, failures remain pending for retry, and returning to Adventures flushes pending Player Card edits. | Passing |
 | R1-S1 through R3-S1 | `src/lib/world/convex-snapshot-read-model.test.ts` | proves snapshot Player Card fields are available even when debug facts are hidden. | Passing |
 | R3-S1 and R3-S2 | `src/lib/director/director.test.ts` | proves Player Card enters prompt context and agency guidance remains present. | Passing |
@@ -2153,8 +2222,8 @@ The system SHALL include filled Player Card context in Game Master requests whil
 
 Status: implemented
 Created: 2026-07-08
-Modified: 2026-07-10
-Last verified: 2026-07-10
+Modified: 2026-07-11
+Last verified: 2026-07-11
 
 As a player, I want the current room's key details visible beside the story, so that I can stay oriented without opening debug or treating the transcript as the only source of scene truth.
 
@@ -2180,8 +2249,26 @@ The system SHALL show a persistent player-facing Room Info panel while an Advent
 ###### Scenario R1-S3: Story remains centered
 
 - WHEN the Player Card and Room Info panel are visible on a wide desktop viewport
-- THEN the story stream remains centered in the main reading column
-- AND the side panels do not create horizontal page scroll
+- THEN Player, Story, and Room appear as three bordered columns with the Story column wider than either context column
+- AND each column can scroll vertically without moving the other columns
+- AND the story stream remains centered in the main reading column
+- AND the columns do not create horizontal page scroll
+
+###### Scenario R1-S4: Narrow viewports use peer play tabs
+
+- WHEN an Adventure is opened on a narrow viewport
+- THEN Player, Story, and Room are available as peer tabs
+- AND Story is selected by default with the story stream and turn controls visible
+- AND Arrow Left, Arrow Right, Home, and End move selection and focus among the tabs
+- AND selecting Player or Room shows that surface without horizontal page scroll
+- AND a wide desktop viewport continues to show all three surfaces together
+
+###### Scenario R1-S5: Room Info collapses without resizing Story
+
+- WHEN the player collapses the Room Info pane on a wide desktop viewport
+- THEN the Room Info content contracts toward the right edge
+- AND a clear control remains available to expand it again
+- AND the Story column retains its width and position
 
 ##### Requirement R2: Present NPC List
 
@@ -2204,6 +2291,14 @@ The system SHALL show NPCs currently present in the player's room/location.
 - THEN the Room Info panel updates from canonical actor location state
 - AND it does not infer NPC presence from stale story text alone
 
+###### Scenario R2-S4: Present NPC opens read-only context
+
+- WHEN the player selects an NPC listed in Room Info
+- THEN the pane replaces the room summary with that NPC's complete canonical profile, including key, location, description, background, persona, voice, mood, status, memory, and knowledge
+- AND a Back control restores the current room summary and NPC list
+- AND the profile remains read-only while editing stays in debug tooling
+- AND the profile remains available when unrestricted debug snapshot data is disabled
+
 ##### Requirement R3: Read-Only Player-Facing Context
 
 The system SHALL keep the Room Info panel as readable scene context rather than debug or editor tooling.
@@ -2224,10 +2319,10 @@ The system SHALL keep the Room Info panel as readable scene context rather than 
 
 | Path | Role | Recheck Trigger |
 |---|---|---|
-| `src/features/play/room-info-card.tsx` | Renders the read-only Room Info panel from current room snapshot data and filters present NPC names from current-room actors. | Recheck when the room panel, current-scene actor display, or side-rail layout changes. |
+| `src/features/play/room-info-card.tsx` | Renders the read-only Room Info panel, present-NPC navigation, and read-only NPC description view from current snapshot data. | Recheck when the room panel, current-scene actor display, NPC visibility, or side-rail layout changes. |
 | `src/features/play/world-client.tsx` | Places Room Info in the right rail of the Adventure play layout beside the centered story stream. | Recheck when the play layout or snapshot consumption changes. |
-| `src/lib/world/convex-snapshot-read-model.ts` | Supplies current room/location data and current-room actors from canonical Adventure state. | Recheck when snapshot room or actor filtering changes. |
-| `tests/e2e/lorecraft-playtest.spec.ts` | Covers Room Info visibility, current room details, NPC exclusion of the player, location update after accepted movement, empty NPC state, and reset back to Chapel. | Recheck when browser user paths change. |
+| `src/lib/world/convex-snapshot-read-model.ts` | Supplies current room/location data plus subject-complete current-scene NPC profiles independently of the bounded debug fact feed. | Recheck when snapshot room, actor filtering, or player NPC-profile visibility changes. |
+| `tests/e2e/lorecraft-playtest.spec.ts` | Covers Room Info visibility, NPC drill-down and Back navigation, current room details, NPC exclusion of the player, location updates, empty NPC state, and reset back to Chapel. | Recheck when browser user paths change. |
 
 #### Verified By
 
@@ -2235,16 +2330,23 @@ The system SHALL keep the Room Info panel as readable scene context rather than 
 |---|---|---|---|
 | R2-S1 and R2-S2 | `src/features/play/room-info-card.test.ts` on 2026-07-08 | proves the Room Info NPC helper lists NPCs and excludes the player, including the no-NPC empty-list case. | Passing |
 | R1-S1 through R3-S2 | `npm run e2e` on 2026-07-10 | proves Room Info display, canonical movement updates, empty NPC state, reset behavior, and Player Card collapse semantics in the complete browser flow. | Passing |
-| Supporting gate | `npm run ci:required` on 2026-07-10 | proves lint, 93 Vitest tests, typecheck, and production build pass with the Room Info component, play layout, browser coverage, and review remediation. | Passing |
+| R1-S3 | Live browser verification at 1280x720 on 2026-07-11 | proves a wider center Story pane, equal-height independently scrolling Player/Story/Room panes, thick bordered transparent surfaces, and no document or horizontal scroll. | Passing |
+| R1-S5 | Live browser verification at 1280x720 on 2026-07-11 | proves Room contracts to an 80px right rail while Story retains the exact same x position and width, with a labeled expand control remaining available. | Passing |
+| R1-S4 | Live browser verification at 375x812 and 1280x720 on 2026-07-11 | proves Story is the default narrow-view tab, Player and Room are independently selectable, Arrow keys and Home/End move selection and keyboard focus, the layout has no horizontal overflow, and desktop still shows all three surfaces together. | Passing |
+| R2-S4 | Deterministic E2E assertion added on 2026-07-11 | covers selecting Mira, viewing her complete canonical profile, and returning to the Chapel summary; full execution remains pending on the fixed-port conflict. | Pending execution |
+| R2-S4 | `src/lib/world/convex-snapshot-read-model.test.ts` and `npm run ci:required` on 2026-07-11 | prove complete current-scene NPC profiles are returned when debug facts are hidden. | Passing |
+| Supporting gate | `npm run ci:required` on 2026-07-11 | proves lint, the current Vitest suite, typecheck, and production build pass with the Room Info projection and remediation. | Passing |
 
 #### Verification Gaps
 
-- Manual visual review is still useful for whether the right rail balances the Player Card and keeps the story stream centered on the user's real viewport.
+- Manual visual confirmation remains pending for the final MUD-style pane proportions, border treatment, and fixed-track collapsed whitespace on the user's preferred full-screen viewport.
+- The deterministic R1-S4 E2E assertions parse successfully, but the suite has not yet executed because the always-on debug server occupies its fixed local Convex port `3210`.
 
 #### Story Notes
 
 - Room Info is a player-facing projection of canonical current-location state, not a new location editor.
 - Room Info deliberately does not expose exits, maps, traversal controls, object actions, raw IDs, or debug reset controls.
+- For the internal MVP, Room Info deliberately exposes every canonical NPC profile field, including `knowledge`; future public/authenticated visibility remains deferred.
 - `LC-001-S12` remains the owner of Location Cards and movement validation; this Story only surfaces the current room to the player.
 
 ## Cross-Story Concerns

@@ -1077,6 +1077,23 @@ export const getSnapshot = query({
         name: v.string(),
         description: v.string(),
       }),
+      npcProfiles: v.array(
+        v.object({
+          _id: v.id("actors"),
+          key: v.string(),
+          name: v.string(),
+          locationKey: v.string(),
+          locationName: v.string(),
+          description: v.string(),
+          background: v.string(),
+          persona: v.string(),
+          voice: v.string(),
+          mood: v.string(),
+          status: v.string(),
+          memory: v.string(),
+          knowledge: v.string(),
+        }),
+      ),
       locations: v.array(
         v.object({
           _id: v.id("rooms"),
@@ -1931,9 +1948,10 @@ export const updateNpc = action({
   args: {
     adventureId: v.id("adventures"),
     actorId: v.id("actors"),
-    name: v.string(),
-    description: v.string(),
-    facts: npcDebugFacts,
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    locationKey: v.optional(v.string()),
+    facts: v.optional(npcDebugFacts),
   },
   returns: debugNpcWriteResult,
   handler: async (ctx, args): Promise<DebugNpcWriteResult> => {
@@ -1952,6 +1970,7 @@ export const createNpc = action({
     key: v.string(),
     name: v.string(),
     description: v.string(),
+    locationKey: v.string(),
     facts: npcDebugFacts,
   },
   returns: debugNpcWriteResult,
@@ -2070,9 +2089,10 @@ export const updateNpcInternal = internalMutation({
   args: {
     adventureId: v.id("adventures"),
     actorId: v.id("actors"),
-    name: v.string(),
-    description: v.string(),
-    facts: npcDebugFacts,
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    locationKey: v.optional(v.string()),
+    facts: v.optional(npcDebugFacts),
   },
   returns: debugNpcWriteResult,
   handler: async (ctx, args) => {
@@ -2081,18 +2101,51 @@ export const updateNpcInternal = internalMutation({
       return { ok: false, error: "NPC could not be found in this Adventure." };
     }
 
-    const actorKey = stableActorKey(actor);
-    const name = args.name.trim();
-    const description = args.description.trim();
-    if (!name || !description) {
-      return { ok: false, error: "NPC name and description are required." };
+    const hasFactPatch = args.facts !== undefined && Object.keys(args.facts).length > 0;
+    if (
+      args.name === undefined &&
+      args.description === undefined &&
+      args.locationKey === undefined &&
+      !hasFactPatch
+    ) {
+      return { ok: false, error: "NPC update must include at least one changed field." };
     }
 
-    await ctx.db.patch(actor._id, {
-      name: name.slice(0, 120),
-      description: description.slice(0, 1200),
-    });
-    await writeNpcFacts(ctx, actor.worldId, args.adventureId, actorKey, args.facts);
+    const actorPatch: Partial<Doc<"actors">> = {};
+    if (args.name !== undefined) {
+      const name = args.name.trim();
+      if (!name) {
+        return { ok: false, error: "NPC name cannot be empty." };
+      }
+      actorPatch.name = name.slice(0, 120);
+    }
+    if (args.description !== undefined) {
+      const description = args.description.trim();
+      if (!description) {
+        return { ok: false, error: "NPC description cannot be empty." };
+      }
+      actorPatch.description = description.slice(0, 1200);
+    }
+    if (args.locationKey !== undefined) {
+      const location = await findRoomByKey(ctx, args.adventureId, args.locationKey);
+      if (!location) {
+        return { ok: false, error: "NPC location could not be found in this Adventure." };
+      }
+      actorPatch.roomId = location._id;
+    }
+
+    if (Object.keys(actorPatch).length > 0) {
+      await ctx.db.patch(actor._id, actorPatch);
+    }
+    if (hasFactPatch) {
+      await patchNpcFacts(
+        ctx,
+        actor.worldId,
+        args.adventureId,
+        stableActorKey(actor),
+        args.facts ?? {},
+      );
+    }
 
     return { ok: true, actorId: actor._id };
   },
@@ -2104,6 +2157,7 @@ export const createNpcInternal = internalMutation({
     key: v.string(),
     name: v.string(),
     description: v.string(),
+    locationKey: v.string(),
     facts: npcDebugFacts,
   },
   returns: debugNpcWriteResult,
@@ -2141,17 +2195,15 @@ export const createNpcInternal = internalMutation({
       };
     }
 
-    const player = adventure.currentPlayerActorId
-      ? await ctx.db.get(adventure.currentPlayerActorId)
-      : null;
-    if (!player) {
-      return { ok: false, error: "Player actor could not be found." };
+    const location = await findRoomByKey(ctx, args.adventureId, args.locationKey);
+    if (!location) {
+      return { ok: false, error: "NPC location could not be found in this Adventure." };
     }
 
     const actorId = await ctx.db.insert("actors", {
       worldId: adventure.worldId,
       adventureId: args.adventureId,
-      roomId: player.roomId,
+      roomId: location._id,
       key,
       name: name.slice(0, 120),
       role: "npc",
@@ -2217,6 +2269,35 @@ async function writeNpcFacts(
   facts: Partial<Record<"background" | "persona" | "voice" | "mood" | "status" | "memory" | "knowledge", string>>,
 ) {
   for (const key of NPC_PROFILE_FACT_KEYS_FOR_WRITE) {
+    const value = facts[key]?.trim();
+    if (!value) {
+      await deleteActorFactByKey(ctx, adventureId, actorKey, key);
+      continue;
+    }
+    await setFact(ctx, {
+      worldId,
+      adventureId,
+      subjectType: "actor",
+      subjectId: actorSubjectId(actorKey),
+      key,
+      value: value.slice(0, 1200),
+      source: "manual",
+      overwrite: true,
+    });
+  }
+}
+
+async function patchNpcFacts(
+  ctx: MutationCtx,
+  worldId: Id<"worlds">,
+  adventureId: Id<"adventures">,
+  actorKey: string,
+  facts: Partial<Record<"background" | "persona" | "voice" | "mood" | "status" | "memory" | "knowledge", string>>,
+) {
+  for (const key of NPC_PROFILE_FACT_KEYS_FOR_WRITE) {
+    if (!Object.prototype.hasOwnProperty.call(facts, key)) {
+      continue;
+    }
     const value = facts[key]?.trim();
     if (!value) {
       await deleteActorFactByKey(ctx, adventureId, actorKey, key);

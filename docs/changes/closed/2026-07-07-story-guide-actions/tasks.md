@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: Story And Guide Actions
 
 ## Resume Here

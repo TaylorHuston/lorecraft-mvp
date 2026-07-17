@@ -1,3 +1,6 @@
+---
+status: ready_to_close
+---
 # Tasks: NPC State Mutation
 
 ## Resume Here

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This repository is the implementation workspace for the Lorecraft MVP prototype: a Next.js + Convex persistent-world memory spike. The current product goal is a local Game Master play loop where seeded Worlds create frozen Adventure copies, Adventures own mutable narrative state, and NPC/Location cards provide structured context for narration and bounded extraction.
+This repository is an archived Lorecraft MVP prototype: a Next.js + Convex persistent-world memory spike retained as implementation and product-history reference for the official Lorecraft application.
 
-Keep the repo disposable until the core loop proves itself. Slash commands currently exist only as pre-turn utility actions such as `/help` and `/look`; do not turn Lorecraft into a broad command parser, MUD, combat simulator, inventory system, quest engine, marketplace, or polished builder UI before playtesting shows a concrete need.
+Do not begin new implementation work here. Use the official Lorecraft repository for active product development. Changes to this repository should be limited to archival integrity, security-sensitive corrections, or explicit reference maintenance authorized by the user.
 
 ## Read First
 
